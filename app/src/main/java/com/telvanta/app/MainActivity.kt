@@ -65,6 +65,18 @@ private fun TelvantaApp(db: LocalDatabase) {
                             modifier = Modifier.padding(horizontal = 10.dp, vertical = 2.dp)
                         )
                     }
+                    HorizontalDivider(color = Color(0xFF234735), modifier = Modifier.padding(vertical = 8.dp))
+                    NavigationDrawerItem(
+                        label = { Text("Sign out", color = Color(0xFFFFB4AB), fontWeight = FontWeight.SemiBold) },
+                        selected = false,
+                        onClick = {
+                            selected = "Settings"
+                            message = "Sign out is not available yet: account login and session management are not implemented in this local-only build."
+                            scope.launch { drawerState.close() }
+                        },
+                        colors = NavigationDrawerItemDefaults.colors(unselectedTextColor = Color(0xFFFFB4AB)),
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 2.dp)
+                    )
                     Spacer(Modifier.height(12.dp))
                     Text("Offline core · local records", color = Muted, style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp))
                 }
@@ -80,7 +92,7 @@ private fun TelvantaApp(db: LocalDatabase) {
                 item {
                     when(selected) {
                         "Dashboard" -> {
-                            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(22.dp)) {
+                            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
                             Surface(color=NavyDeep,shape=MaterialTheme.shapes.extraLarge,modifier=Modifier.fillMaxWidth()) {
                                 Column(Modifier.padding(22.dp),verticalArrangement=Arrangement.spacedBy(13.dp)) {
                                     Row(verticalAlignment=androidx.compose.ui.Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(8.dp)) {
