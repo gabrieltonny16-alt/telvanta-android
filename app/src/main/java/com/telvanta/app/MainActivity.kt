@@ -13,13 +13,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
 private val Navy = Color(0xFF101B35)
+private val NavyDeep = Color(0xFF0A1227)
 private val Teal = Color(0xFF20B995)
 private val Muted = Color(0xFF69758A)
+private val Canvas = Color(0xFFF2F5FA)
 
 class MainActivity : ComponentActivity() {
     private lateinit var localDb: LocalDatabase
@@ -33,24 +36,24 @@ private fun TelvantaApp(db: LocalDatabase) {
     var selected by remember { mutableStateOf("Dashboard") }
     var message by remember { mutableStateOf("") }
     val tabs = listOf("Dashboard", "Offers", "Orders", "Customers", "Transactions", "Settings")
-    MaterialTheme(colorScheme = lightColorScheme(primary=Navy,secondary=Teal,background=Color(0xFFF5F7FB))) {
-        Scaffold(topBar={ TopAppBar(title={Column { Text("Telvanta",fontWeight=FontWeight.Bold); Text("Your Bundles. Your Business. Automated.",style=MaterialTheme.typography.labelSmall,color=Muted) }},colors=TopAppBarDefaults.topAppBarColors(containerColor=Color.White)) }) { padding ->
-            LazyColumn(Modifier.fillMaxSize().padding(padding).padding(horizontal=16.dp),verticalArrangement=Arrangement.spacedBy(12.dp),contentPadding=PaddingValues(vertical=14.dp)) {
-                item { Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(8.dp)) { tabs.forEach { FilterChip(selected==it,onClick={selected=it;message=""},label={Text(it)}) } } }
-                item { Surface(color=Teal.copy(alpha=.12f),shape=MaterialTheme.shapes.medium) { Text("OFFLINE · DEVICE-LOCAL RECORDS",color=Teal,modifier=Modifier.padding(10.dp),style=MaterialTheme.typography.labelMedium,fontWeight=FontWeight.Bold) } }
+    MaterialTheme(colorScheme = lightColorScheme(primary=Navy,secondary=Teal,background=Canvas,surface=Color.White)) {
+        Scaffold(containerColor=Canvas,topBar={ TopAppBar(title={Column(verticalArrangement=Arrangement.spacedBy(2.dp)) { Text("TELVANTA",fontWeight=FontWeight.ExtraBold,color=Color.White,letterSpacing=2.sp); Text("TELECOM BUSINESS CONTROL",style=MaterialTheme.typography.labelSmall,color=Teal,letterSpacing=1.sp) }},colors=TopAppBarDefaults.topAppBarColors(containerColor=NavyDeep)) }) { padding ->
+            LazyColumn(Modifier.fillMaxSize().padding(padding).padding(horizontal=16.dp),verticalArrangement=Arrangement.spacedBy(14.dp),contentPadding=PaddingValues(vertical=16.dp)) {
+                item { Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(8.dp)) { tabs.forEach { tab -> FilterChip(selected==tab,onClick={selected=tab;message=""},label={Text(tab)},colors=FilterChipDefaults.filterChipColors(selectedContainerColor=Navy,selectedLabelColor=Color.White,containerColor=Color.White,labelColor=Navy)) } } }
+                item { Surface(color=Color(0xFFE1F7F1),shape=MaterialTheme.shapes.large) { Row(Modifier.fillMaxWidth().padding(horizontal=13.dp,vertical=11.dp),verticalAlignment=androidx.compose.ui.Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(9.dp)) { Surface(color=Teal,shape=MaterialTheme.shapes.small) { Text("●",color=Color.White,modifier=Modifier.padding(horizontal=7.dp,vertical=4.dp),style=MaterialTheme.typography.labelSmall) }; Column { Text("OFFLINE-READY WORKSPACE",color=Navy,fontWeight=FontWeight.Bold,style=MaterialTheme.typography.labelMedium); Text("Your records stay on this device",color=Muted,style=MaterialTheme.typography.bodySmall) } } } }
                 item {
                     when(selected) {
                         "Dashboard" -> {
-                            Text("Business dashboard",style=MaterialTheme.typography.headlineMedium,fontWeight=FontWeight.Bold)
-                            Text("Records remain on this device. No live payment or bundle action is enabled.",color=Muted)
+                            Surface(color=Navy,shape=MaterialTheme.shapes.extraLarge,modifier=Modifier.fillMaxWidth()) { Column(Modifier.padding(20.dp),verticalArrangement=Arrangement.spacedBy(9.dp)) { Text("YOUR BUSINESS.\nAT A GLANCE.",style=MaterialTheme.typography.headlineMedium,fontWeight=FontWeight.ExtraBold,color=Color.White); Text("Manage offers, customers and orders from one place.",color=Color(0xFFD3DCEC)); Row(horizontalArrangement=Arrangement.spacedBy(8.dp),verticalAlignment=androidx.compose.ui.Alignment.CenterVertically) { Surface(color=Teal,shape=MaterialTheme.shapes.small) { Text("LOCAL MODE",color=NavyDeep,fontWeight=FontWeight.ExtraBold,style=MaterialTheme.typography.labelSmall,modifier=Modifier.padding(horizontal=9.dp,vertical=6.dp)) }; Text("No live payments enabled",color=Color(0xFFB9C6D9),style=MaterialTheme.typography.labelSmall) } } }
+                            Text("Business overview",style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Bold,color=Navy)
                             Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
-                                StatCard("Offers",db.count("offers"),Modifier.weight(1f))
-                                StatCard("Orders",db.count("orders"),Modifier.weight(1f))
-                                StatCard("Customers",db.count("customers"),Modifier.weight(1f))
+                                StatCard("OFFERS",db.count("offers"),Modifier.weight(1f))
+                                StatCard("ORDERS",db.count("orders"),Modifier.weight(1f))
+                                StatCard("CUSTOMERS",db.count("customers"),Modifier.weight(1f))
                             }
-                            StatCard("Transactions",db.count("transactions"),Modifier.fillMaxWidth())
-                            InfoCard("Safe by design","A local order or transaction entry is only a record. It does not prove that M-PESA payment or bundle delivery happened.")
-                            Button(onClick={selected="Orders"},modifier=Modifier.fillMaxWidth()){Text("Open order book")}
+                            StatCard("TRANSACTION ENTRIES",db.count("transactions"),Modifier.fillMaxWidth())
+                            InfoCard("Built for careful operations","A saved order or transaction is a record—not proof of payment or bundle delivery.")
+                            Button(onClick={selected="Orders"},modifier=Modifier.fillMaxWidth(),shape=MaterialTheme.shapes.large,contentPadding=PaddingValues(vertical=15.dp)){Text("OPEN ORDER BOOK  →",fontWeight=FontWeight.Bold)}
                         }
                         "Offers" -> OffersScreen(db){message=it}
                         "Customers" -> CustomersScreen(db){message=it}
@@ -194,9 +197,9 @@ private fun TransactionsScreen(db:LocalDatabase,onMessage:(String)->Unit) {
 
 @Composable
 private fun StatCard(label:String,count:Int,modifier:Modifier=Modifier) {
-    Card(modifier=modifier,colors=CardDefaults.cardColors(containerColor=Color.White)) { Column(Modifier.padding(12.dp),verticalArrangement=Arrangement.spacedBy(4.dp)) { Text(count.toString(),style=MaterialTheme.typography.headlineMedium,fontWeight=FontWeight.Bold,color=Navy);Text(label,color=Muted,style=MaterialTheme.typography.labelMedium) } }
+    Card(modifier=modifier,shape=MaterialTheme.shapes.large,colors=CardDefaults.cardColors(containerColor=Color.White),elevation=CardDefaults.cardElevation(defaultElevation=2.dp)) { Column(Modifier.padding(15.dp),verticalArrangement=Arrangement.spacedBy(7.dp)) { Text(count.toString(),style=MaterialTheme.typography.headlineMedium,fontWeight=FontWeight.ExtraBold,color=Navy);Text(label,color=Muted,style=MaterialTheme.typography.labelSmall,fontWeight=FontWeight.Bold,letterSpacing=.5.sp) } }
 }
 @Composable
-private fun InfoCard(title:String,body:String) { Card(colors=CardDefaults.cardColors(containerColor=Color.White),modifier=Modifier.fillMaxWidth()) { Column(Modifier.padding(15.dp),verticalArrangement=Arrangement.spacedBy(5.dp)){Text(title,fontWeight=FontWeight.Bold);Text(body,color=Muted)} } }
+private fun InfoCard(title:String,body:String) { Card(colors=CardDefaults.cardColors(containerColor=Color.White),shape=MaterialTheme.shapes.large,elevation=CardDefaults.cardElevation(defaultElevation=1.dp),modifier=Modifier.fillMaxWidth()) { Column(Modifier.padding(17.dp),verticalArrangement=Arrangement.spacedBy(7.dp)){Text(title,fontWeight=FontWeight.Bold,color=Navy,style=MaterialTheme.typography.titleMedium);Text(body,color=Muted)} } }
 private fun money(value:Double)=String.format(Locale.US,"%.2f",value)
 private fun dateText(value:Long)=SimpleDateFormat("dd MMM yyyy, HH:mm",Locale.getDefault()).format(Date(value))
