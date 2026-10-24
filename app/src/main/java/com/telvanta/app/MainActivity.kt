@@ -19,11 +19,11 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-private val Navy = Color(0xFF101B35)
-private val NavyDeep = Color(0xFF0A1227)
-private val Teal = Color(0xFF20B995)
-private val Muted = Color(0xFF69758A)
-private val Canvas = Color(0xFFF2F5FA)
+private val Navy = Color(0xFFE7FFF2)
+private val NavyDeep = Color(0xFF03130D)
+private val Teal = Color(0xFF28D879)
+private val Muted = Color(0xFF9CB9AA)
+private val Canvas = Color(0xFF061A12)
 
 class MainActivity : ComponentActivity() {
     private lateinit var localDb: LocalDatabase
@@ -37,11 +37,11 @@ private fun TelvantaApp(db: LocalDatabase) {
     var selected by remember { mutableStateOf("Dashboard") }
     var message by remember { mutableStateOf("") }
     val tabs = listOf("Dashboard", "Offers", "Orders", "Customers", "Transactions", "Settings")
-    MaterialTheme(colorScheme = lightColorScheme(primary=Color(0xFF087F5B),secondary=Color(0xFFB9F227),background=Canvas,surface=Color.White), shapes=Shapes(small=RoundedCornerShape(12.dp),medium=RoundedCornerShape(18.dp),large=RoundedCornerShape(24.dp),extraLarge=RoundedCornerShape(30.dp))) {
+    MaterialTheme(colorScheme = darkColorScheme(primary=Color(0xFF28D879),secondary=Color(0xFFD9FF24),background=Canvas,surface=Color(0xFF102B20)), shapes=Shapes(small=RoundedCornerShape(12.dp),medium=RoundedCornerShape(18.dp),large=RoundedCornerShape(24.dp),extraLarge=RoundedCornerShape(30.dp))) {
         Scaffold(containerColor=Canvas,topBar={ TopAppBar(title={Column(verticalArrangement=Arrangement.spacedBy(2.dp)) { Text("Bingwa Vecta",fontWeight=FontWeight.ExtraBold,color=Color.White,letterSpacing=.5.sp,style=MaterialTheme.typography.titleLarge); Text("TELECOM BUSINESS PLATFORM",style=MaterialTheme.typography.labelSmall,color=Color(0xFFB9F227),letterSpacing=1.2.sp) }},colors=TopAppBarDefaults.topAppBarColors(containerColor=NavyDeep)) }) { padding ->
             LazyColumn(Modifier.fillMaxSize().padding(padding).padding(horizontal=16.dp),verticalArrangement=Arrangement.spacedBy(14.dp),contentPadding=PaddingValues(vertical=16.dp)) {
-                item { Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(8.dp)) { tabs.forEach { tab -> FilterChip(selected==tab,onClick={selected=tab;message=""},label={Text(tab)},colors=FilterChipDefaults.filterChipColors(selectedContainerColor=Navy,selectedLabelColor=Color.White,containerColor=Color.White,labelColor=Navy)) } } }
-                item { Surface(color=Color(0xFFE1F7F1),shape=MaterialTheme.shapes.large) { Row(Modifier.fillMaxWidth().padding(horizontal=13.dp,vertical=11.dp),verticalAlignment=androidx.compose.ui.Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(9.dp)) { Surface(color=Teal,shape=MaterialTheme.shapes.small) { Text("●",color=Color.White,modifier=Modifier.padding(horizontal=7.dp,vertical=4.dp),style=MaterialTheme.typography.labelSmall) }; Column { Text("OFFLINE-READY WORKSPACE",color=Navy,fontWeight=FontWeight.Bold,style=MaterialTheme.typography.labelMedium); Text("Your records stay on this device",color=Muted,style=MaterialTheme.typography.bodySmall) } } } }
+                item { Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(8.dp)) { tabs.forEach { tab -> FilterChip(selected==tab,onClick={selected=tab;message=""},label={Text(tab)},colors=FilterChipDefaults.filterChipColors(selectedContainerColor=Navy,selectedLabelColor=Color.White,containerColor=Color(0xFF102B20),labelColor=Navy)) } } }
+                item { Surface(color=Color(0xFF12382A),shape=MaterialTheme.shapes.large) { Row(Modifier.fillMaxWidth().padding(horizontal=13.dp,vertical=11.dp),verticalAlignment=androidx.compose.ui.Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(9.dp)) { Surface(color=Teal,shape=MaterialTheme.shapes.small) { Text("●",color=Color.White,modifier=Modifier.padding(horizontal=7.dp,vertical=4.dp),style=MaterialTheme.typography.labelSmall) }; Column { Text("OFFLINE-READY WORKSPACE",color=Navy,fontWeight=FontWeight.Bold,style=MaterialTheme.typography.labelMedium); Text("Your records stay on this device",color=Muted,style=MaterialTheme.typography.bodySmall) } } } }
                 item {
                     when(selected) {
                         "Dashboard" -> {
@@ -92,7 +92,7 @@ private fun TelvantaApp(db: LocalDatabase) {
                     }
                 }
                 if(message.isNotBlank()) item { Text(message,color=Teal,fontWeight=FontWeight.SemiBold) }
-                item { Text("Telvanta · offline core development · local-only data",color=Muted,style=MaterialTheme.typography.labelSmall) }
+                item { Text("Bingwa Vecta · offline core · local-only data",color=Muted,style=MaterialTheme.typography.labelSmall) }
             }
         }
     }
@@ -223,7 +223,7 @@ private fun TransactionsScreen(db:LocalDatabase,onMessage:(String)->Unit) {
 private fun QuickAction(symbol:String,label:String,modifier:Modifier=Modifier,onClick:()->Unit) {
     Card(onClick=onClick,modifier=modifier,shape=RoundedCornerShape(18.dp),colors=CardDefaults.cardColors(containerColor=Color.White),elevation=CardDefaults.cardElevation(defaultElevation=2.dp)) {
         Column(Modifier.fillMaxWidth().padding(vertical=16.dp,horizontal=13.dp),verticalArrangement=Arrangement.spacedBy(9.dp)) {
-            Surface(color=Color(0xFFE1F7EC),shape=RoundedCornerShape(12.dp)) { Text(symbol,color=Color(0xFF087F5B),fontWeight=FontWeight.ExtraBold,style=MaterialTheme.typography.titleLarge,modifier=Modifier.padding(horizontal=12.dp,vertical=6.dp)) }
+            Surface(color=Color(0xFF17432F),shape=RoundedCornerShape(12.dp)) { Text(symbol,color=Color(0xFF28D879),fontWeight=FontWeight.ExtraBold,style=MaterialTheme.typography.titleLarge,modifier=Modifier.padding(horizontal=12.dp,vertical=6.dp)) }
             Text(label,color=Navy,fontWeight=FontWeight.Bold,style=MaterialTheme.typography.titleSmall)
         }
     }
