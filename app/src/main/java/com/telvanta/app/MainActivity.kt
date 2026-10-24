@@ -39,10 +39,11 @@ class MainActivity : ComponentActivity() {
 private fun TelvantaApp(db: LocalDatabase) {
     var selected by remember { mutableStateOf("Dashboard") }
     var message by remember { mutableStateOf("") }
+    // Keep management entries near the top so they are visible on small phones.
     val tabs = listOf(
-        "Dashboard", "Wallet", "Offers", "Orders", "Transaction History", "Quick Dial",
-        "Auto Renewals", "Auto-Reply", "Customers", "Signature", "Statistics",
-        "Vecta Connect", "Settings", "Updates"
+        "Dashboard", "Settings", "Updates", "Wallet", "Offers", "Orders",
+        "Transaction History", "Quick Dial", "Auto Renewals", "Auto-Reply",
+        "Customers", "Signature", "Statistics", "Vecta Connect"
     )
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
