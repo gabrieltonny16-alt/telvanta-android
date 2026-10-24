@@ -3,9 +3,7 @@ package com.telvanta.app
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -15,6 +13,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalContext
+import kotlinx.coroutines.launch
 import androidx.compose.foundation.shape.RoundedCornerShape
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -37,11 +36,44 @@ class MainActivity : ComponentActivity() {
 private fun TelvantaApp(db: LocalDatabase) {
     var selected by remember { mutableStateOf("Dashboard") }
     var message by remember { mutableStateOf("") }
-    val tabs = listOf("Dashboard", "Offers", "Orders", "Customers", "Transactions", "Auto-Reply", "Statistics", "Settings")
+    val tabs = listOf(
+        "Dashboard", "Wallet", "Offers", "Transaction History", "Quick Dial",
+        "Auto Renewals", "Auto-Reply", "Customers", "Signature", "Statistics",
+        "Vecta Connect", "Settings", "Updates"
+    )
+    val drawerState = rememberDrawerState(DrawerValue.Closed)
+    val scope = rememberCoroutineScope()
     MaterialTheme(colorScheme = darkColorScheme(primary=Color(0xFF28D879),secondary=Color(0xFFD9FF24),background=Canvas,surface=Color(0xFF102B20)), shapes=Shapes(small=RoundedCornerShape(12.dp),medium=RoundedCornerShape(18.dp),large=RoundedCornerShape(24.dp),extraLarge=RoundedCornerShape(30.dp))) {
-        Scaffold(containerColor=Canvas,topBar={ TopAppBar(title={Column(verticalArrangement=Arrangement.spacedBy(2.dp)) { Text("Bingwa Vecta",fontWeight=FontWeight.ExtraBold,color=Color.White,letterSpacing=.5.sp,style=MaterialTheme.typography.titleLarge); Text("TELECOM BUSINESS PLATFORM",style=MaterialTheme.typography.labelSmall,color=Color(0xFFB9F227),letterSpacing=1.2.sp) }},colors=TopAppBarDefaults.topAppBarColors(containerColor=NavyDeep)) }) { padding ->
+        ModalNavigationDrawer(
+            drawerState = drawerState,
+            drawerContent = {
+                ModalDrawerSheet(drawerContainerColor = Color(0xFF071F15), drawerContentColor = Color.White) {
+                    Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                        Text("BINGWA VECTA", color = Color(0xFFD9FF24), fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.titleLarge)
+                        Text("POWER EVERY CONNECTION", color = Muted, style = MaterialTheme.typography.labelSmall)
+                        Spacer(Modifier.height(12.dp))
+                    }
+                    HorizontalDivider(color = Color(0xFF234735))
+                    tabs.forEach { tab ->
+                        NavigationDrawerItem(
+                            label = { Text(tab, fontWeight = if (selected == tab) FontWeight.Bold else FontWeight.Normal) },
+                            selected = selected == tab,
+                            onClick = { selected = tab; message = ""; scope.launch { drawerState.close() } },
+                            colors = NavigationDrawerItemDefaults.colors(selectedContainerColor = Color(0xFF17432F), selectedTextColor = Color(0xFFD9FF24), unselectedTextColor = Color(0xFFE7FFF2)),
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 2.dp)
+                        )
+                    }
+                    Spacer(Modifier.height(12.dp))
+                    Text("Offline core · local records", color = Muted, style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp))
+                }
+            }
+        ) {
+        Scaffold(containerColor=Canvas,topBar={ TopAppBar(
+            navigationIcon = { IconButton(onClick = { scope.launch { drawerState.open() } }) { Text("≡", color = Color(0xFFD9FF24), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.headlineMedium) } },
+            title={Column(verticalArrangement=Arrangement.spacedBy(2.dp)) { Text("Bingwa Vecta",fontWeight=FontWeight.ExtraBold,color=Color.White,letterSpacing=.5.sp,style=MaterialTheme.typography.titleLarge); Text(selected.uppercase(),style=MaterialTheme.typography.labelSmall,color=Color(0xFFB9F227),letterSpacing=1.2.sp) }},
+            colors=TopAppBarDefaults.topAppBarColors(containerColor=NavyDeep)
+        ) }) { padding ->
             LazyColumn(Modifier.fillMaxSize().padding(padding).padding(horizontal=16.dp),verticalArrangement=Arrangement.spacedBy(14.dp),contentPadding=PaddingValues(vertical=16.dp)) {
-                item { Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(8.dp)) { tabs.forEach { tab -> FilterChip(selected==tab,onClick={selected=tab;message=""},label={Text(tab)},colors=FilterChipDefaults.filterChipColors(selectedContainerColor=Navy,selectedLabelColor=Color.White,containerColor=Color(0xFF102B20),labelColor=Navy)) } } }
                 item { Surface(color=Color(0xFF12382A),shape=MaterialTheme.shapes.large) { Row(Modifier.fillMaxWidth().padding(horizontal=13.dp,vertical=11.dp),verticalAlignment=androidx.compose.ui.Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(9.dp)) { Surface(color=Teal,shape=MaterialTheme.shapes.small) { Text("●",color=Color.White,modifier=Modifier.padding(horizontal=7.dp,vertical=4.dp),style=MaterialTheme.typography.labelSmall) }; Column { Text("OFFLINE-READY WORKSPACE",color=Navy,fontWeight=FontWeight.Bold,style=MaterialTheme.typography.labelMedium); Text("Your records stay on this device",color=Muted,style=MaterialTheme.typography.bodySmall) } } } }
                 item {
                     when(selected) {
@@ -83,12 +115,18 @@ private fun TelvantaApp(db: LocalDatabase) {
                         "Offers" -> OffersScreen(db){message=it}
                         "Customers" -> CustomersScreen(db){message=it}
                         "Orders" -> OrdersScreen(db){message=it}
-                        "Transactions" -> TransactionsScreen(db){message=it}
+                        "Transactions", "Transaction History" -> TransactionsScreen(db){message=it}
                         "Auto-Reply" -> AutoReplyScreen()
                         "Statistics" -> StatisticsScreen(db)
+                        "Wallet" -> PlannedFeatureScreen("Wallet", "Wallet balance and subscription tokens are not connected yet.")
+                        "Quick Dial" -> PlannedFeatureScreen("Quick Dial", "SIM selection and USSD actions are not implemented. No calls or USSD sessions will be started.")
+                        "Auto Renewals" -> PlannedFeatureScreen("Auto Renewals", "Renewal scheduling is not implemented yet.")
+                        "Signature" -> PlannedFeatureScreen("Signature", "Signature import and agent signature management are not implemented yet.")
+                        "Vecta Connect" -> PlannedFeatureScreen("Vecta Connect", "Phone pairing and sync are not implemented yet.")
+                        "Updates" -> PlannedFeatureScreen("Updates", "In-app update checking is not implemented yet.")
                         else -> {
                             Text("Settings",style=MaterialTheme.typography.headlineMedium,fontWeight=FontWeight.Bold)
-                            InfoCard("Workspace","Bingwa Vecta stores records locally on this phone. Multi-agent accounts, encrypted sync and Vecta Connect pairing are not implemented yet.")
+                            InfoCard("Workspace","Bingwa Vecta stores records locally on this phone. Multi-agent accounts and encrypted sync are not implemented yet.")
                             InfoCard("Live integrations","M-PESA collection, SMS, USSD and real bundle fulfilment are disabled. Do not treat manual records as verified payments.")
                             InfoCard("Data safety","Keep this device secure. Local records are not yet synced or backed up to another device.")
                         }
@@ -98,7 +136,15 @@ private fun TelvantaApp(db: LocalDatabase) {
                 item { Text("Bingwa Vecta · offline core · local-only data",color=Muted,style=MaterialTheme.typography.labelSmall) }
             }
         }
+        }
     }
+}
+
+@Composable
+private fun PlannedFeatureScreen(title: String, details: String) {
+    Text(title, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = Navy)
+    InfoCard("Not implemented yet", details)
+    InfoCard("Build status", "This menu item is shown so the workspace is organized, but it is not an active integration. We will implement and test it before calling it ready.")
 }
 
 @Composable
