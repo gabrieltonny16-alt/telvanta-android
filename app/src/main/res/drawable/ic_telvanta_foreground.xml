@@ -4,14 +4,12 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <path android:fillColor="#FF04130D" android:pathData="M0,0 L108,0 L108,108 L0,108 Z" />
-    <!-- Bold geometric V mark -->
-    <path android:fillColor="#FFFFFFFF" android:pathData="M17,25 L34,25 L53,70 L73,25 L91,25 L64,84 L48,84 Z" />
-    <!-- Green inner edge and energy accent -->
-    <path android:fillColor="#FF00D66B" android:pathData="M17,25 L28,25 L49,74 L43,74 Z" />
-    <path android:fillColor="#FFB9F227" android:pathData="M68,25 L79,25 L58,74 L52,74 Z" />
-    <!-- Orbit swoosh -->
-    <path android:fillColor="#00000000" android:strokeColor="#FF00E676" android:strokeWidth="5.5" android:strokeLineCap="round" android:strokeLineJoin="round" android:pathData="M16,72 C29,59 49,54 80,49 C73,59 53,72 31,77" />
-    <path android:fillColor="#00000000" android:strokeColor="#FFB9F227" android:strokeWidth="3.5" android:strokeLineCap="round" android:pathData="M75,17 C84,19 90,25 93,34" />
-    <path android:fillColor="#00000000" android:strokeColor="#FFB9F227" android:strokeWidth="3.5" android:strokeLineCap="round" android:pathData="M82,10 C94,13 100,22 103,34" />
+    <!-- Vecta's clean V mark stays inside Android's adaptive-icon safe zone. -->
+    <path android:fillColor="#FFFFFFFF" android:pathData="M20,27 L35,27 L53,66 L73,27 L88,27 L62,81 L47,81 Z" />
+    <path android:fillColor="#FF00D66B" android:pathData="M20,27 L29,27 L49,69 L43,69 Z" />
+    <path android:fillColor="#FFB9F227" android:pathData="M68,27 L78,27 L58,69 L52,69 Z" />
+    <!-- Orbit sweep -->
+    <path android:fillColor="#00000000" android:strokeColor="#FF00E676" android:strokeWidth="6" android:strokeLineCap="round" android:strokeLineJoin="round" android:pathData="M17,70 C32,58 55,52 83,49 C73,62 52,73 29,77" />
+    <path android:fillColor="#00000000" android:strokeColor="#FFB9F227" android:strokeWidth="3.5" android:strokeLineCap="round" android:pathData="M76,17 C84,19 90,25 93,34" />
+    <path android:fillColor="#FFB9F227" android:pathData="M82,9 C94,12 101,22 104,34 L99,35 C96,25 90,17 81,14 Z" />
 </vector>
