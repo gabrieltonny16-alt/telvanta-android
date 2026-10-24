@@ -100,14 +100,14 @@ private fun TelvantaApp(db: LocalDatabase) {
                             Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
                             Surface(color=NavyDeep,shape=MaterialTheme.shapes.extraLarge,modifier=Modifier.fillMaxWidth()) {
                                 Column(Modifier.padding(22.dp),verticalArrangement=Arrangement.spacedBy(13.dp)) {
-                                    Row(verticalAlignment=androidx.compose.ui.Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+                                    Row(Modifier.fillMaxWidth(),verticalAlignment=androidx.compose.ui.Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(8.dp)) {
                                         Surface(color=Color(0xFF0D6B4B),shape=RoundedCornerShape(50)) { Text("●  READY OFFLINE",color=Color(0xFFB9F227),fontWeight=FontWeight.Bold,style=MaterialTheme.typography.labelSmall,modifier=Modifier.padding(horizontal=11.dp,vertical=7.dp)) }
                                         Spacer(Modifier.weight(1f))
                                         Text("v1 · LOCAL",color=Color(0xFFB7C8C1),style=MaterialTheme.typography.labelSmall)
                                     }
                                     Text("Your telecom business,\nunder control.",style=MaterialTheme.typography.headlineMedium,fontWeight=FontWeight.ExtraBold,color=Color.White,lineHeight=34.sp)
                                     Text("Offers, customers, orders and records — organised in one workspace.",color=Color(0xFFD2E2DB),style=MaterialTheme.typography.bodyMedium)
-                                    Row(horizontalArrangement=Arrangement.spacedBy(8.dp),verticalAlignment=androidx.compose.ui.Alignment.CenterVertically) {
+                                    Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp),verticalAlignment=androidx.compose.ui.Alignment.CenterVertically) {
                                         Surface(color=Color(0xFFB9F227),shape=RoundedCornerShape(50)) { Text("LOCAL DATA",color=NavyDeep,fontWeight=FontWeight.ExtraBold,style=MaterialTheme.typography.labelSmall,modifier=Modifier.padding(horizontal=10.dp,vertical=7.dp)) }
                                         Text("No live payments or fulfilment",color=Color(0xFFB7C8C1),style=MaterialTheme.typography.labelSmall)
                                     }
@@ -181,7 +181,7 @@ private fun OffersScreen(db: LocalDatabase,onMessage:(String)->Unit) {
     OutlinedTextField(price,{price=it},label={Text("Selling price (KES)")},modifier=Modifier.fillMaxWidth(),singleLine=true)
     OutlinedTextField(originalPrice,{originalPrice=it},label={Text("Original/source price (optional, KES)")},modifier=Modifier.fillMaxWidth(),singleLine=true)
     OutlinedTextField(source,{source=it},label={Text("Offer source (e.g. Manual, Signature)")},modifier=Modifier.fillMaxWidth(),singleLine=true)
-    Row(verticalAlignment=androidx.compose.ui.Alignment.CenterVertically) { Checkbox(checked=verified,onCheckedChange={verified=it}); Text("Marked verified by operator") }
+    Row(Modifier.fillMaxWidth(),verticalAlignment=androidx.compose.ui.Alignment.CenterVertically) { Checkbox(checked=verified,onCheckedChange={verified=it}); Text("Marked verified by operator") }
     Text("Bulk import offers",fontWeight=FontWeight.Bold)
     Text("One offer per line: name | category | original price or blank | selling price | source. Imported offers remain unverified.",color=Muted,style=MaterialTheme.typography.bodySmall)
     OutlinedTextField(importText,{importText=it},label={Text("Paste offer rows")},modifier=Modifier.fillMaxWidth(),minLines=3)
@@ -198,7 +198,7 @@ private fun OffersScreen(db: LocalDatabase,onMessage:(String)->Unit) {
         else try { val count=db.importOffers(parsed.filterNotNull());importText="";reload++;onMessage("Imported $count offers locally. All are marked unverified.") }
         catch(_:Exception) { onMessage("Import failed; no partial import was saved.") }
     },modifier=Modifier.fillMaxWidth()){Text("Import offers")}
-    Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+    Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp)) {
         Button(onClick={val amount=price.toDoubleOrNull(); val original=if(originalPrice.isBlank()) null else originalPrice.toDoubleOrNull()
             if(name.isBlank()||category.isBlank()||amount==null||amount<0||source.isBlank()||(!originalPrice.isBlank()&&(original==null||original<0))) onMessage("Enter valid offer details and prices.")
             else try {db.saveOffer(editId,name,category,amount,original,source,verified);name="";category="Data";price="";originalPrice="";source="Manual";verified=false;editId=null;reload++;onMessage("Offer saved locally; verification is an operator-recorded flag.")}
@@ -213,7 +213,7 @@ private fun OffersScreen(db: LocalDatabase,onMessage:(String)->Unit) {
             Text(o.name,fontWeight=FontWeight.Bold);Text("${o.category} · Selling KES ${money(o.price)}",color=Muted)
             Text("Source: ${o.source} · ${if(o.verified) "Marked verified by operator" else "Unverified"}",color=Muted,style=MaterialTheme.typography.bodySmall)
             Text("Original price: ${o.originalPrice?.let { "KES ${money(it)}" } ?: "Not recorded"}",color=Muted,style=MaterialTheme.typography.bodySmall)
-            Row { TextButton(onClick={editId=o.id;name=o.name;category=o.category;price=o.price.toString();originalPrice=o.originalPrice?.toString() ?: "";source=o.source;verified=o.verified}){Text("Edit")};TextButton(onClick={db.deleteOffer(o.id);reload++;onMessage("Offer deleted.")}){Text("Delete")} }
+            Row(Modifier.fillMaxWidth()) { TextButton(onClick={editId=o.id;name=o.name;category=o.category;price=o.price.toString();originalPrice=o.originalPrice?.toString() ?: "";source=o.source;verified=o.verified}){Text("Edit")};TextButton(onClick={db.deleteOffer(o.id);reload++;onMessage("Offer deleted.")}){Text("Delete")} }
         }
     } }
 }
@@ -225,7 +225,7 @@ private fun CustomersScreen(db:LocalDatabase,onMessage:(String)->Unit) {
     OutlinedTextField(name,{name=it},label={Text("Customer name")},modifier=Modifier.fillMaxWidth(),singleLine=true)
     OutlinedTextField(phone,{phone=it},label={Text("Phone number")},modifier=Modifier.fillMaxWidth(),singleLine=true)
     OutlinedTextField(notes,{notes=it},label={Text("Notes (optional)")},modifier=Modifier.fillMaxWidth())
-    Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+    Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp)) {
         Button(onClick={if(name.isBlank()||phone.isBlank()) onMessage("Enter customer name and phone number.")
             else try{db.saveCustomer(editId,name,phone,notes);name="";phone="";notes="";editId=null;reload++;onMessage("Customer saved locally.")}
             catch(_:Exception){onMessage("Could not save: phone number may already be used.")}
@@ -238,7 +238,7 @@ private fun CustomersScreen(db:LocalDatabase,onMessage:(String)->Unit) {
     customers.forEach { c -> Card(colors=CardDefaults.cardColors(containerColor=Color(0xFF12382A)),modifier=Modifier.fillMaxWidth()) {
         Column(Modifier.padding(12.dp),verticalArrangement=Arrangement.spacedBy(4.dp)) {
             Text(c.name,fontWeight=FontWeight.Bold);Text(c.phone,color=Muted);if(c.notes.isNotBlank())Text(c.notes)
-            Row { TextButton(onClick={editId=c.id;name=c.name;phone=c.phone;notes=c.notes}){Text("Edit")};TextButton(onClick={db.deleteCustomer(c.id);reload++;onMessage("Customer deleted.")}){Text("Delete")} }
+            Row(Modifier.fillMaxWidth()) { TextButton(onClick={editId=c.id;name=c.name;phone=c.phone;notes=c.notes}){Text("Edit")};TextButton(onClick={db.deleteCustomer(c.id);reload++;onMessage("Customer deleted.")}){Text("Delete")} }
         }
     } }
 }
@@ -313,7 +313,7 @@ private fun AutoReplyScreen() {
         Card(colors=CardDefaults.cardColors(containerColor=Color(0xFF102B20)),modifier=Modifier.fillMaxWidth()) {
             Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(9.dp)) {
                 Text(item.first,fontWeight=FontWeight.Bold,color=Navy,style=MaterialTheme.typography.titleMedium)
-                Row(verticalAlignment=androidx.compose.ui.Alignment.CenterVertically) {
+                Row(Modifier.fillMaxWidth(),verticalAlignment=androidx.compose.ui.Alignment.CenterVertically) {
                     Text("Draft enabled",color=Muted,modifier=Modifier.weight(1f))
                     Switch(checked=enabled,onCheckedChange={enabled=it;prefs.edit().putBoolean("enabled_$index",it).apply()})
                 }
@@ -336,11 +336,11 @@ private fun StatisticsScreen(db:LocalDatabase) {
     val unverified = transactions.count { it.status == "UNVERIFIED" }
     Text("Business statistics",style=MaterialTheme.typography.headlineMedium,fontWeight=FontWeight.Bold,color=Navy)
     InfoCard("Local records only","Figures are calculated from records on this phone. They are not live provider data, verified revenue, or proof of bundle delivery.")
-    Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+    Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp)) {
         StatCard("ALL ORDERS",orders.size,Modifier.weight(1f))
         StatCard("PENDING",pending,Modifier.weight(1f))
     }
-    Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+    Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp)) {
         StatCard("FAILED",failed,Modifier.weight(1f))
         StatCard("CANCELLED",cancelled,Modifier.weight(1f))
     }
