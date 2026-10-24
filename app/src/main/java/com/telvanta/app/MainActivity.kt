@@ -14,6 +14,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.foundation.shape.RoundedCornerShape
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -36,7 +37,7 @@ class MainActivity : ComponentActivity() {
 private fun TelvantaApp(db: LocalDatabase) {
     var selected by remember { mutableStateOf("Dashboard") }
     var message by remember { mutableStateOf("") }
-    val tabs = listOf("Dashboard", "Offers", "Orders", "Customers", "Transactions", "Settings")
+    val tabs = listOf("Dashboard", "Offers", "Orders", "Customers", "Transactions", "Auto-Reply", "Statistics", "Settings")
     MaterialTheme(colorScheme = darkColorScheme(primary=Color(0xFF28D879),secondary=Color(0xFFD9FF24),background=Canvas,surface=Color(0xFF102B20)), shapes=Shapes(small=RoundedCornerShape(12.dp),medium=RoundedCornerShape(18.dp),large=RoundedCornerShape(24.dp),extraLarge=RoundedCornerShape(30.dp))) {
         Scaffold(containerColor=Canvas,topBar={ TopAppBar(title={Column(verticalArrangement=Arrangement.spacedBy(2.dp)) { Text("Bingwa Vecta",fontWeight=FontWeight.ExtraBold,color=Color.White,letterSpacing=.5.sp,style=MaterialTheme.typography.titleLarge); Text("TELECOM BUSINESS PLATFORM",style=MaterialTheme.typography.labelSmall,color=Color(0xFFB9F227),letterSpacing=1.2.sp) }},colors=TopAppBarDefaults.topAppBarColors(containerColor=NavyDeep)) }) { padding ->
             LazyColumn(Modifier.fillMaxSize().padding(padding).padding(horizontal=16.dp),verticalArrangement=Arrangement.spacedBy(14.dp),contentPadding=PaddingValues(vertical=16.dp)) {
@@ -83,9 +84,11 @@ private fun TelvantaApp(db: LocalDatabase) {
                         "Customers" -> CustomersScreen(db){message=it}
                         "Orders" -> OrdersScreen(db){message=it}
                         "Transactions" -> TransactionsScreen(db){message=it}
+                        "Auto-Reply" -> AutoReplyScreen()
+                        "Statistics" -> StatisticsScreen(db)
                         else -> {
                             Text("Settings",style=MaterialTheme.typography.headlineMedium,fontWeight=FontWeight.Bold)
-                            InfoCard("Workspace","Telvanta currently stores records locally on this phone. Multi-agent accounts, encrypted sync and Telvanta Connect pairing are not implemented yet.")
+                            InfoCard("Workspace","Bingwa Vecta stores records locally on this phone. Multi-agent accounts, encrypted sync and Vecta Connect pairing are not implemented yet.")
                             InfoCard("Live integrations","M-PESA collection, SMS, USSD and real bundle fulfilment are disabled. Do not treat manual records as verified payments.")
                             InfoCard("Data safety","Keep this device secure. Local records are not yet synced or backed up to another device.")
                         }
@@ -217,6 +220,62 @@ private fun TransactionsScreen(db:LocalDatabase,onMessage:(String)->Unit) {
             Text("Entry #${t.id} · Order #${t.orderId}",fontWeight=FontWeight.Bold);Text("KES ${money(t.amount)} · ${t.status}",color=Muted);if(t.reference.isNotBlank())Text(t.reference);Text(dateText(t.createdAt),color=Muted,style=MaterialTheme.typography.labelSmall)
         }
     } }
+}
+
+@Composable
+private fun AutoReplyScreen() {
+    val context = LocalContext.current
+    val prefs = remember { context.getSharedPreferences("vecta_auto_reply_drafts", android.content.Context.MODE_PRIVATE) }
+    val types = listOf(
+        "Successful response" to "Hi <firstName>, thank you for purchasing from Bingwa Vecta.",
+        "Failed request" to "Hello <firstName>, your request could not be completed. Please contact support.",
+        "Unavailable offer" to "Hi <firstName>, we could not find an offer matching your payment. Please contact support.",
+        "Offer already recommended" to "Hello <firstName>, this offer has already been recommended today.",
+        "App paused" to "Hi <firstName>, processing is temporarily paused. We will update you when service resumes.",
+        "Customer blacklisted" to "Hi <firstName>, please contact support about your account."
+    )
+    var refresh by remember { mutableIntStateOf(0) }
+    Text("Auto-Reply Messages",style=MaterialTheme.typography.headlineMedium,fontWeight=FontWeight.Bold,color=Navy)
+    InfoCard("Template workspace only","Edit and save message drafts on this phone. SMS sending and automatic replies are NOT connected or enabled in this build.")
+    types.forEachIndexed { index, item ->
+        var body by remember(refresh) { mutableStateOf(prefs.getString("body_$index", item.second) ?: item.second) }
+        var enabled by remember(refresh) { mutableStateOf(prefs.getBoolean("enabled_$index", false)) }
+        Card(colors=CardDefaults.cardColors(containerColor=Color(0xFF102B20)),modifier=Modifier.fillMaxWidth()) {
+            Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(9.dp)) {
+                Text(item.first,fontWeight=FontWeight.Bold,color=Navy,style=MaterialTheme.typography.titleMedium)
+                Row(verticalAlignment=androidx.compose.ui.Alignment.CenterVertically) {
+                    Text("Draft enabled",color=Muted,modifier=Modifier.weight(1f))
+                    Switch(checked=enabled,onCheckedChange={enabled=it;prefs.edit().putBoolean("enabled_$index",it).apply()})
+                }
+                OutlinedTextField(value=body,onValueChange={body=it},label={Text("Message template")},modifier=Modifier.fillMaxWidth(),minLines=2)
+                Button(onClick={prefs.edit().putString("body_$index",body.trim()).putBoolean("enabled_$index",enabled).apply();refresh++},modifier=Modifier.fillMaxWidth()) { Text("Save template") }
+            }
+        }
+    }
+    Text("Placeholder available in drafts: <firstName>. Templates are stored locally; the app does not send them.",color=Muted,style=MaterialTheme.typography.bodySmall)
+}
+
+@Composable
+private fun StatisticsScreen(db:LocalDatabase) {
+    val orders = remember { db.orders() }
+    val transactions = remember { db.transactions() }
+    val totalSales = orders.filter { it.status == "DELIVERED_MANUALLY_RECORDED" }.sumOf { it.price }
+    val pending = orders.count { it.status == "PENDING" }
+    val failed = orders.count { it.status == "FAILED" }
+    val cancelled = orders.count { it.status == "CANCELLED" }
+    val unverified = transactions.count { it.status == "UNVERIFIED" }
+    Text("Business statistics",style=MaterialTheme.typography.headlineMedium,fontWeight=FontWeight.Bold,color=Navy)
+    InfoCard("Local records only","Figures are calculated from records on this phone. They are not live provider data, verified revenue, or proof of bundle delivery.")
+    Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+        StatCard("ALL ORDERS",orders.size,Modifier.weight(1f))
+        StatCard("PENDING",pending,Modifier.weight(1f))
+    }
+    Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+        StatCard("FAILED",failed,Modifier.weight(1f))
+        StatCard("CANCELLED",cancelled,Modifier.weight(1f))
+    }
+    InfoCard("Manually recorded delivery value","KES \${money(totalSales)}")
+    InfoCard("Unverified transaction notes","\$unverified entries — not counted as confirmed payments.")
 }
 
 @Composable
