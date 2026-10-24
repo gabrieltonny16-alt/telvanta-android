@@ -12,15 +12,18 @@ data class OrderRow(val id: Long, val customer: String, val offer: String, val p
 data class TransactionRow(val id: Long, val orderId: Long, val amount: Double, val status: String, val reference: String, val createdAt: Long)
 
 /** Device-local business records only. This class does not initiate payments or fulfil bundles. */
-class LocalDatabase(context: Context) : SQLiteOpenHelper(context, "telvanta.db", null, 2) {
+class LocalDatabase(context: Context) : SQLiteOpenHelper(context, "telvanta.db", null, 3) {
+    override fun onConfigure(db: SQLiteDatabase) { db.setForeignKeyConstraintsEnabled(true) }
     override fun onCreate(db: SQLiteDatabase) {
         db.execSQL("CREATE TABLE offers (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, category TEXT NOT NULL, original_price REAL, selling_price REAL NOT NULL, source TEXT NOT NULL DEFAULT 'Manual', verified INTEGER NOT NULL DEFAULT 0)")
         db.execSQL("CREATE TABLE customers (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, phone TEXT NOT NULL UNIQUE, notes TEXT NOT NULL DEFAULT '')")
         db.execSQL("CREATE TABLE orders (id INTEGER PRIMARY KEY AUTOINCREMENT, customer_phone TEXT NOT NULL, offer_name TEXT NOT NULL, selling_price REAL NOT NULL, status TEXT NOT NULL DEFAULT 'PENDING', created_at INTEGER NOT NULL)")
         db.execSQL("CREATE TABLE transactions (id INTEGER PRIMARY KEY AUTOINCREMENT, order_id INTEGER NOT NULL, amount REAL NOT NULL, status TEXT NOT NULL DEFAULT 'UNVERIFIED', reference TEXT NOT NULL DEFAULT '', created_at INTEGER NOT NULL, FOREIGN KEY(order_id) REFERENCES orders(id))")
+        db.execSQL("CREATE UNIQUE INDEX idx_transactions_reference_unique ON transactions(reference) WHERE reference <> ''")
     }
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
         if (oldVersion < 2) db.execSQL("CREATE TABLE IF NOT EXISTS transactions (id INTEGER PRIMARY KEY AUTOINCREMENT, order_id INTEGER NOT NULL, amount REAL NOT NULL, status TEXT NOT NULL DEFAULT 'UNVERIFIED', reference TEXT NOT NULL DEFAULT '', created_at INTEGER NOT NULL, FOREIGN KEY(order_id) REFERENCES orders(id))")
+        if (oldVersion < 3) db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS idx_transactions_reference_unique ON transactions(reference) WHERE reference <> ''")
     }
     fun count(table: String): Int {
         require(table in setOf("offers", "customers", "orders", "transactions"))
@@ -87,8 +90,18 @@ class LocalDatabase(context: Context) : SQLiteOpenHelper(context, "telvanta.db",
         buildList { while(c.moveToNext()) add(TransactionRow(c.getLong(0),c.getLong(1),c.getDouble(2),c.getString(3),c.getString(4),c.getLong(5))) }
     }
     fun recordTransaction(orderId: Long, amount: Double, reference: String) {
-        require(amount >= 0)
-        val v=ContentValues().apply { put("order_id",orderId); put("amount",amount); put("status","UNVERIFIED"); put("reference",reference.trim()); put("created_at",System.currentTimeMillis()) }
-        writableDatabase.insertOrThrow("transactions",null,v)
+        require(amount >= 0 && orderId > 0)
+        val normalizedReference = reference.trim()
+        val db = writableDatabase
+        db.rawQuery("SELECT id FROM orders WHERE id=?", arrayOf(orderId.toString())).use { c ->
+            require(c.moveToFirst()) { "Order does not exist." }
+        }
+        if (normalizedReference.isNotEmpty()) {
+            db.rawQuery("SELECT id FROM transactions WHERE reference=?", arrayOf(normalizedReference)).use { c ->
+                require(!c.moveToFirst()) { "This transaction reference is already recorded." }
+            }
+        }
+        val v=ContentValues().apply { put("order_id",orderId); put("amount",amount); put("status","UNVERIFIED"); put("reference",normalizedReference); put("created_at",System.currentTimeMillis()) }
+        db.insertOrThrow("transactions",null,v)
     }
 }
