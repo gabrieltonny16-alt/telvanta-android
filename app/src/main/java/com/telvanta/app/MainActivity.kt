@@ -94,12 +94,14 @@ private fun TelvantaApp(db: LocalDatabase) {
                                 }
                             }
                             Text("Workspace overview",style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Bold,color=Navy)
-                            Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+                            Row(horizontalArrangement=Arrangement.spacedBy(9.dp)) {
                                 StatCard("OFFERS",db.count("offers"),Modifier.weight(1f))
                                 StatCard("ORDERS",db.count("orders"),Modifier.weight(1f))
-                                StatCard("CUSTOMERS",db.count("customers"),Modifier.weight(1f))
                             }
-                            StatCard("TRANSACTION ENTRIES",db.count("transactions"),Modifier.fillMaxWidth())
+                            Row(horizontalArrangement=Arrangement.spacedBy(9.dp)) {
+                                StatCard("CUSTOMERS",db.count("customers"),Modifier.weight(1f))
+                                StatCard("TRANSACTIONS",db.count("transactions"),Modifier.weight(1f))
+                            }
                             Text("Quick actions",style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Bold,color=Navy)
                             Row(horizontalArrangement=Arrangement.spacedBy(9.dp)) {
                                 QuickAction("＋","Add offer",Modifier.weight(1f)){selected="Offers"}
@@ -110,7 +112,7 @@ private fun TelvantaApp(db: LocalDatabase) {
                                 QuickAction("≡","Ledger",Modifier.weight(1f)){selected="Transactions"}
                             }
                             InfoCard("Clear and safe by design","Saved records are not proof of payment or bundle delivery.")
-                            Button(onClick={selected="Orders"},modifier=Modifier.fillMaxWidth(),shape=RoundedCornerShape(16.dp),contentPadding=PaddingValues(vertical=16.dp),colors=ButtonDefaults.buttonColors(containerColor=Color(0xFF087F5B))){Text("OPEN ORDER BOOK  →",fontWeight=FontWeight.Bold)}
+                            Button(onClick={selected="Orders"},modifier=Modifier.fillMaxWidth(),shape=RoundedCornerShape(16.dp),contentPadding=PaddingValues(vertical=16.dp),colors=ButtonDefaults.buttonColors(containerColor=Color(0xFF087F5B),contentColor=Color.White)){Text("OPEN ORDER BOOK  →",fontWeight=FontWeight.Bold)}
                         }
                         "Offers" -> OffersScreen(db){message=it}
                         "Customers" -> CustomersScreen(db){message=it}
