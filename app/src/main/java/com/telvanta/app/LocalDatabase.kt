@@ -5,7 +5,7 @@ import android.content.Context
 import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
 
-data class OfferRow(val id: Long, val name: String, val category: String, val price: Double)
+data class OfferRow(val id: Long, val name: String, val category: String, val price: Double, val originalPrice: Double?, val source: String, val verified: Boolean)
 data class CustomerRow(val id: Long, val name: String, val phone: String, val notes: String)
 data class OrderRow(val id: Long, val customer: String, val offer: String, val price: Double, val status: String, val createdAt: Long)
 data class TransactionRow(val id: Long, val orderId: Long, val amount: Double, val status: String, val reference: String, val createdAt: Long)
@@ -25,13 +25,17 @@ class LocalDatabase(context: Context) : SQLiteOpenHelper(context, "telvanta.db",
         require(table in setOf("offers", "customers", "orders", "transactions"))
         readableDatabase.rawQuery("SELECT COUNT(*) FROM $table", null).use { c -> return if (c.moveToFirst()) c.getInt(0) else 0 }
     }
-    fun offers(): List<OfferRow> = readableDatabase.rawQuery("SELECT id,name,category,selling_price FROM offers ORDER BY name", null).use { c ->
-        buildList { while (c.moveToNext()) add(OfferRow(c.getLong(0), c.getString(1), c.getString(2), c.getDouble(3))) }
+    fun offers(): List<OfferRow> = readableDatabase.rawQuery("SELECT id,name,category,selling_price,original_price,source,verified FROM offers ORDER BY name", null).use { c ->
+        buildList { while (c.moveToNext()) add(OfferRow(c.getLong(0), c.getString(1), c.getString(2), c.getDouble(3), if (c.isNull(4)) null else c.getDouble(4), c.getString(5), c.getInt(6) == 1)) }
     }
-    fun saveOffer(id: Long?, name: String, category: String, price: Double) {
-        require(name.isNotBlank() && category.isNotBlank() && price >= 0)
-        val v = ContentValues().apply { put("name", name.trim()); put("category", category.trim()); put("selling_price", price) }
-        if (id == null) { v.put("source", "Manual"); v.put("verified", 0); writableDatabase.insertOrThrow("offers", null, v) }
+    fun saveOffer(id: Long?, name: String, category: String, price: Double, originalPrice: Double? = null, source: String = "Manual", verified: Boolean = false) {
+        require(name.isNotBlank() && category.isNotBlank() && price >= 0 && (originalPrice == null || originalPrice >= 0) && source.isNotBlank())
+        val v = ContentValues().apply {
+            put("name", name.trim()); put("category", category.trim()); put("selling_price", price)
+            if (originalPrice == null) putNull("original_price") else put("original_price", originalPrice)
+            put("source", source.trim()); put("verified", if (verified) 1 else 0)
+        }
+        if (id == null) writableDatabase.insertOrThrow("offers", null, v)
         else writableDatabase.update("offers", v, "id=?", arrayOf(id.toString()))
     }
     fun deleteOffer(id: Long) { writableDatabase.delete("offers", "id=?", arrayOf(id.toString())) }
