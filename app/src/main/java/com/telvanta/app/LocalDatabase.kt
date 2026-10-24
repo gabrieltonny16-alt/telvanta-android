@@ -5,6 +5,7 @@ import android.content.Context
 import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
 
+data class ImportedOffer(val name: String, val category: String, val originalPrice: Double?, val sellingPrice: Double, val source: String = "Signature import")
 data class OfferRow(val id: Long, val name: String, val category: String, val price: Double, val originalPrice: Double?, val source: String, val verified: Boolean)
 data class CustomerRow(val id: Long, val name: String, val phone: String, val notes: String)
 data class OrderRow(val id: Long, val customer: String, val offer: String, val price: Double, val status: String, val createdAt: Long)
@@ -39,6 +40,25 @@ class LocalDatabase(context: Context) : SQLiteOpenHelper(context, "telvanta.db",
         else writableDatabase.update("offers", v, "id=?", arrayOf(id.toString()))
     }
     fun deleteOffer(id: Long) { writableDatabase.delete("offers", "id=?", arrayOf(id.toString())) }
+    fun importOffers(rows: List<ImportedOffer>): Int {
+        require(rows.isNotEmpty())
+        rows.forEach { require(it.name.isNotBlank() && it.category.isNotBlank() && it.sellingPrice >= 0 && (it.originalPrice == null || it.originalPrice >= 0) && it.source.isNotBlank()) }
+        val db = writableDatabase
+        db.beginTransaction()
+        try {
+            rows.forEach { row ->
+                val values = ContentValues().apply {
+                    put("name", row.name.trim()); put("category", row.category.trim())
+                    if (row.originalPrice == null) putNull("original_price") else put("original_price", row.originalPrice)
+                    put("selling_price", row.sellingPrice); put("source", row.source.trim()); put("verified", 0)
+                }
+                db.insertOrThrow("offers", null, values)
+            }
+            db.setTransactionSuccessful()
+        } finally { db.endTransaction() }
+        return rows.size
+    }
+
     fun customers(search: String = ""): List<CustomerRow> = readableDatabase.rawQuery(
         "SELECT id,name,phone,notes FROM customers WHERE name LIKE ? OR phone LIKE ? ORDER BY name",
         arrayOf("%$search%", "%$search%")
