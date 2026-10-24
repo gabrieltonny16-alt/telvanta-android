@@ -40,7 +40,7 @@ private fun TelvantaApp(db: LocalDatabase) {
     var selected by remember { mutableStateOf("Dashboard") }
     var message by remember { mutableStateOf("") }
     val tabs = listOf(
-        "Dashboard", "Wallet", "Offers", "Transaction History", "Quick Dial",
+        "Dashboard", "Wallet", "Offers", "Orders", "Transaction History", "Quick Dial",
         "Auto Renewals", "Auto-Reply", "Customers", "Signature", "Statistics",
         "Vecta Connect", "Settings", "Updates"
     )
@@ -93,6 +93,7 @@ private fun TelvantaApp(db: LocalDatabase) {
             LazyColumn(Modifier.fillMaxSize().padding(padding).padding(horizontal=16.dp),verticalArrangement=Arrangement.spacedBy(14.dp),contentPadding=PaddingValues(vertical=16.dp)) {
                 item { Surface(color=Color(0xFF12382A),shape=MaterialTheme.shapes.large) { Row(Modifier.fillMaxWidth().padding(horizontal=13.dp,vertical=11.dp),verticalAlignment=androidx.compose.ui.Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(9.dp)) { Surface(color=Teal,shape=MaterialTheme.shapes.small) { Text("●",color=Color.White,modifier=Modifier.padding(horizontal=7.dp,vertical=4.dp),style=MaterialTheme.typography.labelSmall) }; Column { Text("OFFLINE-READY WORKSPACE",color=Navy,fontWeight=FontWeight.Bold,style=MaterialTheme.typography.labelMedium); Text("Your records stay on this device",color=Muted,style=MaterialTheme.typography.bodySmall) } } } }
                 item {
+                    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                     when(selected) {
                         "Dashboard" -> {
                             Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -151,6 +152,7 @@ private fun TelvantaApp(db: LocalDatabase) {
                             InfoCard("Live integrations","M-PESA collection, SMS, USSD and real bundle fulfilment are disabled. Do not treat manual records as verified payments.")
                             InfoCard("Data safety","Keep this device secure. Local records are not yet synced or backed up to another device.")
                         }
+                    }
                     }
                 }
                 if(message.isNotBlank()) item { Text(message,color=Teal,fontWeight=FontWeight.SemiBold) }
