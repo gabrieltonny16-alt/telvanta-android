@@ -80,6 +80,7 @@ private fun TelvantaApp(db: LocalDatabase) {
                 item {
                     when(selected) {
                         "Dashboard" -> {
+                            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
                             Surface(color=NavyDeep,shape=MaterialTheme.shapes.extraLarge,modifier=Modifier.fillMaxWidth()) {
                                 Column(Modifier.padding(22.dp),verticalArrangement=Arrangement.spacedBy(13.dp)) {
                                     Row(verticalAlignment=androidx.compose.ui.Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(8.dp)) {
@@ -116,6 +117,7 @@ private fun TelvantaApp(db: LocalDatabase) {
                             InfoCard("Clear and safe by design","Saved records are not proof of payment or bundle delivery.")
                             Button(onClick={selected="Orders"},modifier=Modifier.fillMaxWidth(),shape=RoundedCornerShape(16.dp),contentPadding=PaddingValues(vertical=16.dp),colors=ButtonDefaults.buttonColors(containerColor=Color(0xFF087F5B),contentColor=Color.White)){Text("OPEN ORDER BOOK  →",fontWeight=FontWeight.Bold)}
                         }
+                            }
                         "Offers" -> OffersScreen(db){message=it}
                         "Customers" -> CustomersScreen(db){message=it}
                         "Orders" -> OrdersScreen(db){message=it}
