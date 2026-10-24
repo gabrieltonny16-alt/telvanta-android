@@ -73,26 +73,31 @@ private fun TelvantaApp(db: LocalDatabase) {
 
 @Composable
 private fun OffersScreen(db: LocalDatabase,onMessage:(String)->Unit) {
-    var editId by remember { mutableStateOf<Long?>(null) }; var name by remember { mutableStateOf("") }; var category by remember { mutableStateOf("Data") }; var price by remember { mutableStateOf("") }; var reload by remember { mutableIntStateOf(0) }
+    var editId by remember { mutableStateOf<Long?>(null) }; var name by remember { mutableStateOf("") }; var category by remember { mutableStateOf("Data") }; var price by remember { mutableStateOf("") }; var originalPrice by remember { mutableStateOf("") }; var source by remember { mutableStateOf("Manual") }; var verified by remember { mutableStateOf(false) }; var reload by remember { mutableIntStateOf(0) }
     Text("Offer catalogue",style=MaterialTheme.typography.headlineMedium,fontWeight=FontWeight.Bold)
     Text("Create offers or tap Edit to change a saved offer.",color=Muted)
     OutlinedTextField(name,{name=it},label={Text("Offer name")},modifier=Modifier.fillMaxWidth(),singleLine=true)
     OutlinedTextField(category,{category=it},label={Text("Category: Data, Minutes, SMS, Combo")},modifier=Modifier.fillMaxWidth(),singleLine=true)
     OutlinedTextField(price,{price=it},label={Text("Selling price (KES)")},modifier=Modifier.fillMaxWidth(),singleLine=true)
+    OutlinedTextField(originalPrice,{originalPrice=it},label={Text("Original/source price (optional, KES)")},modifier=Modifier.fillMaxWidth(),singleLine=true)
+    OutlinedTextField(source,{source=it},label={Text("Offer source (e.g. Manual, Signature)")},modifier=Modifier.fillMaxWidth(),singleLine=true)
+    Row(verticalAlignment=androidx.compose.ui.Alignment.CenterVertically) { Checkbox(checked=verified,onCheckedChange={verified=it}); Text("Marked verified by operator") }
     Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
-        Button(onClick={val amount=price.toDoubleOrNull()
-            if(name.isBlank()||category.isBlank()||amount==null||amount<0) onMessage("Enter offer name, category and valid price.")
-            else try {db.saveOffer(editId,name,category,amount);name="";category="Data";price="";editId=null;reload++;onMessage("Offer saved on this device.")}
+        Button(onClick={val amount=price.toDoubleOrNull(); val original=if(originalPrice.isBlank()) null else originalPrice.toDoubleOrNull()
+            if(name.isBlank()||category.isBlank()||amount==null||amount<0||source.isBlank()||(!originalPrice.isBlank()&&(original==null||original<0))) onMessage("Enter valid offer details and prices.")
+            else try {db.saveOffer(editId,name,category,amount,original,source,verified);name="";category="Data";price="";originalPrice="";source="Manual";verified=false;editId=null;reload++;onMessage("Offer saved locally; verification is an operator-recorded flag.")}
             catch(_:Exception){onMessage("Could not save offer. Check details.")}
         },modifier=Modifier.weight(1f)){Text(if(editId==null)"Save offer" else "Update offer")}
-        OutlinedButton(onClick={editId=null;name="";category="Data";price=""}){Text("Clear")}
+        OutlinedButton(onClick={editId=null;name="";category="Data";price="";originalPrice="";source="Manual";verified=false}){Text("Clear")}
     }
     val offers=remember(reload){db.offers()}
     Text("Saved offers (${offers.size})",fontWeight=FontWeight.Bold)
     offers.forEach { o -> Card(colors=CardDefaults.cardColors(containerColor=Color.White),modifier=Modifier.fillMaxWidth()) {
         Column(Modifier.padding(12.dp),verticalArrangement=Arrangement.spacedBy(5.dp)) {
-            Text(o.name,fontWeight=FontWeight.Bold);Text("${o.category} · KES ${money(o.price)}",color=Muted)
-            Row { TextButton(onClick={editId=o.id;name=o.name;category=o.category;price=o.price.toString()}){Text("Edit")};TextButton(onClick={db.deleteOffer(o.id);reload++;onMessage("Offer deleted.")}){Text("Delete")} }
+            Text(o.name,fontWeight=FontWeight.Bold);Text("${o.category} · Selling KES ${money(o.price)}",color=Muted)
+            Text("Source: ${o.source} · ${if(o.verified) "Marked verified by operator" else "Unverified"}",color=Muted,style=MaterialTheme.typography.bodySmall)
+            Text("Original price: ${o.originalPrice?.let { "KES ${money(it)}" } ?: "Not recorded"}",color=Muted,style=MaterialTheme.typography.bodySmall)
+            Row { TextButton(onClick={editId=o.id;name=o.name;category=o.category;price=o.price.toString();originalPrice=o.originalPrice?.toString() ?: "";source=o.source;verified=o.verified}){Text("Edit")};TextButton(onClick={db.deleteOffer(o.id);reload++;onMessage("Offer deleted.")}){Text("Delete")} }
         }
     } }
 }
