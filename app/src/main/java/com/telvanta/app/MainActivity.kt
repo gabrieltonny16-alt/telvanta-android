@@ -80,7 +80,7 @@ private fun TelvantaApp(db: LocalDatabase) {
                 item {
                     when(selected) {
                         "Dashboard" -> {
-                            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(22.dp)) {
                             Surface(color=NavyDeep,shape=MaterialTheme.shapes.extraLarge,modifier=Modifier.fillMaxWidth()) {
                                 Column(Modifier.padding(22.dp),verticalArrangement=Arrangement.spacedBy(13.dp)) {
                                     Row(verticalAlignment=androidx.compose.ui.Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(8.dp)) {
@@ -97,20 +97,20 @@ private fun TelvantaApp(db: LocalDatabase) {
                                 }
                             }
                             Text("Workspace overview",style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Bold,color=Navy)
-                            Row(horizontalArrangement=Arrangement.spacedBy(9.dp)) {
+                            Row(Modifier.padding(bottom=8.dp), horizontalArrangement=Arrangement.spacedBy(12.dp)) {
                                 StatCard("OFFERS",db.count("offers"),Modifier.weight(1f))
                                 StatCard("ORDERS",db.count("orders"),Modifier.weight(1f))
                             }
-                            Row(horizontalArrangement=Arrangement.spacedBy(9.dp)) {
+                            Row(Modifier.padding(bottom=8.dp), horizontalArrangement=Arrangement.spacedBy(12.dp)) {
                                 StatCard("CUSTOMERS",db.count("customers"),Modifier.weight(1f))
                                 StatCard("TRANSACTIONS",db.count("transactions"),Modifier.weight(1f))
                             }
                             Text("Quick actions",style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Bold,color=Navy)
-                            Row(horizontalArrangement=Arrangement.spacedBy(9.dp)) {
+                            Row(Modifier.padding(bottom=8.dp), horizontalArrangement=Arrangement.spacedBy(12.dp)) {
                                 QuickAction("＋","Add offer",Modifier.weight(1f)){selected="Offers"}
                                 QuickAction("＋","Customer",Modifier.weight(1f)){selected="Customers"}
                             }
-                            Row(horizontalArrangement=Arrangement.spacedBy(9.dp)) {
+                            Row(Modifier.padding(bottom=8.dp), horizontalArrangement=Arrangement.spacedBy(12.dp)) {
                                 QuickAction("↗","New order",Modifier.weight(1f)){selected="Orders"}
                                 QuickAction("≡","Ledger",Modifier.weight(1f)){selected="Transactions"}
                             }
