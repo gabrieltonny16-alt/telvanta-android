@@ -43,7 +43,7 @@ private fun TelvantaApp(db: LocalDatabase) {
     val tabs = listOf(
         "Dashboard", "Settings", "Updates", "Wallet", "Offers", "Orders",
         "Transaction History", "Quick Dial", "Auto Renewals", "Auto-Reply",
-        "Customers", "Signature", "Statistics", "Vecta Connect"
+        "Customers", "Signature Offers", "SiteLink", "Signature", "Statistics", "Vecta Connect"
     )
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
@@ -140,6 +140,8 @@ private fun TelvantaApp(db: LocalDatabase) {
                         "Orders" -> OrdersScreen(db){message=it}
                         "Transactions", "Transaction History" -> TransactionsScreen(db){message=it}
                         "Auto-Reply" -> AutoReplyScreen()
+                        "SiteLink" -> SiteLinkScreen { message = it }
+                        "Signature Offers" -> SignatureOffersScreen(db) { message = it }
                         "Statistics" -> StatisticsScreen(db)
                         "Wallet" -> PlannedFeatureScreen("Wallet", "Wallet balance and subscription tokens are not connected yet.")
                         "Quick Dial" -> PlannedFeatureScreen("Quick Dial", "SIM selection and USSD actions are not implemented. No calls or USSD sessions will be started.")
@@ -164,6 +166,39 @@ private fun TelvantaApp(db: LocalDatabase) {
     }
 }
 
+@Composable
+private fun SiteLinkScreen(onMessage: (String) -> Unit) {
+    var rawMessage by remember { mutableStateOf("") }
+    var sender by remember { mutableStateOf("") }
+    var status by remember { mutableStateOf("Not processed") }
+    var extracted by remember { mutableStateOf("") }
+    Text("SiteLink message desk", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = Navy)
+    InfoCard("Local processing only", "Paste a SiteLink-related message to review its contents. This does not send SMS, trigger USSD, verify payment, or deliver a bundle.")
+    OutlinedTextField(sender, { sender = it }, label = { Text("Sender / customer phone (optional)") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+    OutlinedTextField(rawMessage, { rawMessage = it; status = "Not processed"; extracted = "" }, label = { Text("Paste SiteLink message") }, modifier = Modifier.fillMaxWidth(), minLines = 4)
+    Button(onClick = {
+        if (rawMessage.isBlank()) onMessage("Paste a message before processing.")
+        else { val lines = rawMessage.lines().map { it.trim() }.filter { it.isNotBlank() }; extracted = lines.take(8).joinToString(" | "); status = "Reviewed locally · " + lines.size + " non-empty line(s)"; onMessage("Message reviewed on this device only. No order or payment was created.") }
+    }, modifier = Modifier.fillMaxWidth()) { Text("Review message") }
+    InfoCard("Review status", status)
+    if (extracted.isNotBlank()) { Text("Message preview", fontWeight = FontWeight.Bold, color = Navy); Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF12382A)), modifier = Modifier.fillMaxWidth()) { Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) { Text(if (sender.isBlank()) "Sender not supplied" else "Sender: " + sender, color = Muted); Text(extracted, color = Navy) } } }
+}
+
+@Composable
+private fun SignatureOffersScreen(db: LocalDatabase, onMessage: (String) -> Unit) {
+    var offerName by remember { mutableStateOf("") }
+    var price by remember { mutableStateOf("") }
+    var reload by remember { mutableIntStateOf(0) }
+    val saved = remember(reload) { db.offers().filter { it.source.contains("signature", ignoreCase = true) } }
+    Text("Signature Offers", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = Navy)
+    InfoCard("Manage signature offers", "Create a locally saved offer marked with source Signature, or review existing offers. Provider integrations remain disabled.")
+    OutlinedTextField(offerName, { offerName = it }, label = { Text("Offer name / bundle") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+    OutlinedTextField(price, { price = it }, label = { Text("Selling price (KES)") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+    Button(onClick = { val amount = price.toDoubleOrNull(); if (offerName.isBlank() || amount == null || amount < 0) onMessage("Enter an offer name and a valid non-negative price.") else try { db.saveOffer(null, offerName, "Signature", amount, null, "Signature", false); offerName = ""; price = ""; reload++; onMessage("Signature offer saved locally and marked unverified.") } catch (_: Exception) { onMessage("Could not save signature offer. Check the details.") } }, modifier = Modifier.fillMaxWidth()) { Text("Save signature offer") }
+    Text("Saved signature offers (" + saved.size + ")", fontWeight = FontWeight.Bold, color = Navy)
+    if (saved.isEmpty()) InfoCard("No signature offers yet", "Add your first offer above. Saved entries remain local and unverified.")
+    saved.forEach { offer -> Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF12382A)), modifier = Modifier.fillMaxWidth()) { Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) { Text(offer.name, fontWeight = FontWeight.Bold, color = Navy); Text("KES " + money(offer.price) + " · " + offer.category, color = Muted); Text("Source: " + offer.source + " · " + if (offer.verified) "Operator marked verified" else "Unverified", color = Muted, style = MaterialTheme.typography.bodySmall) } } }
+}
 @Composable
 private fun PlannedFeatureScreen(title: String, details: String) {
     Text(title, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = Navy)
