@@ -6,16 +6,16 @@ import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
 
 data class ImportedOffer(val name: String, val category: String, val originalPrice: Double?, val sellingPrice: Double, val source: String = "Signature import")
-data class OfferRow(val id: Long, val name: String, val category: String, val price: Double, val originalPrice: Double?, val source: String, val verified: Boolean)
+data class OfferRow(val id: Long, val name: String, val category: String, val price: Double, val originalPrice: Double?, val source: String, val verified: Boolean, val active: Boolean)
 data class CustomerRow(val id: Long, val name: String, val phone: String, val notes: String)
 data class OrderRow(val id: Long, val customer: String, val offer: String, val price: Double, val status: String, val createdAt: Long)
 data class TransactionRow(val id: Long, val orderId: Long, val amount: Double, val status: String, val reference: String, val createdAt: Long)
 
 /** Device-local business records only. This class does not initiate payments or fulfil bundles. */
-class LocalDatabase(context: Context) : SQLiteOpenHelper(context, "telvanta.db", null, 3) {
+class LocalDatabase(context: Context) : SQLiteOpenHelper(context, "telvanta.db", null, 4) {
     override fun onConfigure(db: SQLiteDatabase) { db.setForeignKeyConstraintsEnabled(true) }
     override fun onCreate(db: SQLiteDatabase) {
-        db.execSQL("CREATE TABLE offers (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, category TEXT NOT NULL, original_price REAL, selling_price REAL NOT NULL, source TEXT NOT NULL DEFAULT 'Manual', verified INTEGER NOT NULL DEFAULT 0)")
+        db.execSQL("CREATE TABLE offers (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, category TEXT NOT NULL, original_price REAL, selling_price REAL NOT NULL, source TEXT NOT NULL DEFAULT 'Manual', verified INTEGER NOT NULL DEFAULT 0, is_active INTEGER NOT NULL DEFAULT 0)")
         db.execSQL("CREATE TABLE customers (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, phone TEXT NOT NULL UNIQUE, notes TEXT NOT NULL DEFAULT '')")
         db.execSQL("CREATE TABLE orders (id INTEGER PRIMARY KEY AUTOINCREMENT, customer_phone TEXT NOT NULL, offer_name TEXT NOT NULL, selling_price REAL NOT NULL, status TEXT NOT NULL DEFAULT 'PENDING', created_at INTEGER NOT NULL)")
         db.execSQL("CREATE TABLE transactions (id INTEGER PRIMARY KEY AUTOINCREMENT, order_id INTEGER NOT NULL, amount REAL NOT NULL, status TEXT NOT NULL DEFAULT 'UNVERIFIED', reference TEXT NOT NULL DEFAULT '', created_at INTEGER NOT NULL, FOREIGN KEY(order_id) REFERENCES orders(id))")
@@ -24,28 +24,33 @@ class LocalDatabase(context: Context) : SQLiteOpenHelper(context, "telvanta.db",
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
         if (oldVersion < 2) db.execSQL("CREATE TABLE IF NOT EXISTS transactions (id INTEGER PRIMARY KEY AUTOINCREMENT, order_id INTEGER NOT NULL, amount REAL NOT NULL, status TEXT NOT NULL DEFAULT 'UNVERIFIED', reference TEXT NOT NULL DEFAULT '', created_at INTEGER NOT NULL, FOREIGN KEY(order_id) REFERENCES orders(id))")
         if (oldVersion < 3) db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS idx_transactions_reference_unique ON transactions(reference) WHERE reference <> ''")
+        if (oldVersion < 4) db.execSQL("ALTER TABLE offers ADD COLUMN is_active INTEGER NOT NULL DEFAULT 0")
     }
     fun count(table: String): Int {
         require(table in setOf("offers", "customers", "orders", "transactions"))
         readableDatabase.rawQuery("SELECT COUNT(*) FROM $table", null).use { c -> return if (c.moveToFirst()) c.getInt(0) else 0 }
     }
-    fun offers(): List<OfferRow> = readableDatabase.rawQuery("SELECT id,name,category,selling_price,original_price,source,verified FROM offers ORDER BY name", null).use { c ->
+    fun offers(): List<OfferRow> = readableDatabase.rawQuery("SELECT id,name,category,selling_price,original_price,source,verified,is_active FROM offers ORDER BY name", null).use { c ->
         buildList { while (c.moveToNext()) add(OfferRow(c.getLong(0), c.getString(1), c.getString(2), c.getDouble(3), if (c.isNull(4)) null else c.getDouble(4), c.getString(5), c.getInt(6) == 1)) }
     }
-    fun saveOffer(id: Long?, name: String, category: String, price: Double, originalPrice: Double? = null, source: String = "Manual", verified: Boolean = false) {
+    fun saveOffer(id: Long?, name: String, category: String, price: Double, originalPrice: Double? = null, source: String = "Manual", verified: Boolean = false, active: Boolean = false) {
         require(name.isNotBlank() && category.isNotBlank() && price >= 0 && (originalPrice == null || originalPrice >= 0) && source.isNotBlank())
+        if (readableDatabase.rawQuery("SELECT id FROM offers WHERE selling_price=? AND id<>?", arrayOf(price.toString(), (id ?: -1L).toString())).use { it.moveToFirst() }) throw IllegalArgumentException("That selling price is already assigned to another offer.")
         val v = ContentValues().apply {
             put("name", name.trim()); put("category", category.trim()); put("selling_price", price)
             if (originalPrice == null) putNull("original_price") else put("original_price", originalPrice)
-            put("source", source.trim()); put("verified", if (verified) 1 else 0)
+            put("source", source.trim()); put("verified", if (verified) 1 else 0); put("is_active", if (active) 1 else 0)
         }
         if (id == null) writableDatabase.insertOrThrow("offers", null, v)
         else writableDatabase.update("offers", v, "id=?", arrayOf(id.toString()))
     }
+    fun setOfferActive(id: Long, active: Boolean) { val v = ContentValues().apply { put("is_active", if (active) 1 else 0) }; writableDatabase.update("offers", v, "id=?", arrayOf(id.toString())) }
     fun deleteOffer(id: Long) { writableDatabase.delete("offers", "id=?", arrayOf(id.toString())) }
     fun importOffers(rows: List<ImportedOffer>): Int {
         require(rows.isNotEmpty())
         rows.forEach { require(it.name.isNotBlank() && it.category.isNotBlank() && it.sellingPrice >= 0 && (it.originalPrice == null || it.originalPrice >= 0) && it.source.isNotBlank()) }
+        require(rows.map { it.sellingPrice }.distinct().size == rows.size) { "Imported offers must have unique selling prices." }
+        rows.forEach { row -> require(readableDatabase.rawQuery("SELECT id FROM offers WHERE selling_price=?", arrayOf(row.sellingPrice.toString())).use { !it.moveToFirst() }) { "Selling price KES ${row.sellingPrice} is already assigned to an offer." } }
         val db = writableDatabase
         db.beginTransaction()
         try {
