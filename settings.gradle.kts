@@ -6,4 +6,4 @@ dependencyResolutionManagement {
     repositories { google(); mavenCentral() }
 }
 rootProject.name = "BingwaPulse"
-include(":app")
+include(":app", ":connectpulse")
