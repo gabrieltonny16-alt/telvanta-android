@@ -226,7 +226,7 @@ private fun TelvantaApp(db: LocalDatabase) {
                         "Signature" -> FeatureWorkspaceScreen("Signature")
                         "Connect Pulse" -> ConnectPulseScreen()
                         "Updates" -> UpdatesScreen()
-                        "Settings" -> FeatureWorkspaceScreen("Settings")
+                        "Settings" -> UssdAutomationSettingsScreen()
                         else -> FeatureWorkspaceScreen(selected)
                     }
                     }
@@ -772,3 +772,45 @@ private fun StatCard(label:String,count:Int,modifier:Modifier=Modifier) {
 private fun InfoCard(title:String,body:String) { Card(colors=CardDefaults.cardColors(containerColor=Color(0xFF12382A)),shape=MaterialTheme.shapes.large,elevation=CardDefaults.cardElevation(defaultElevation=1.dp),modifier=Modifier.fillMaxWidth()) { Column(Modifier.padding(17.dp),verticalArrangement=Arrangement.spacedBy(7.dp)){Text(title,fontWeight=FontWeight.Bold,color=Navy,style=MaterialTheme.typography.titleMedium);Text(body,color=Muted)} } }
 private fun money(value:Double)=String.format(Locale.US,"%.2f",value)
 private fun dateText(value:Long)=SimpleDateFormat("dd MMM yyyy, HH:mm",Locale.getDefault()).format(Date(value))
+
+
+@Composable
+private fun UssdAutomationSettingsScreen() {
+    val context = LocalContext.current
+    var refresh by remember { mutableIntStateOf(0) }
+    val prefs = remember(refresh) {
+        context.getSharedPreferences(UssdAccessibilityService.PREFS, android.content.Context.MODE_PRIVATE)
+    }
+    val enabled = remember(refresh) {
+        val enabledServices = android.provider.Settings.Secure.getString(
+            context.contentResolver,
+            android.provider.Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
+        ).orEmpty()
+        val serviceName = context.packageName + "/" + UssdAccessibilityService::class.java.name
+        enabledServices.split(':').any { it.equals(serviceName, ignoreCase = true) }
+    }
+    val lastState = prefs.getString(UssdAccessibilityService.KEY_STATE, "NOT_STARTED") ?: "NOT_STARTED"
+    val lastDetail = prefs.getString(UssdAccessibilityService.KEY_DETAIL, "No USSD screen has been observed yet.") ?: ""
+    val updatedAt = prefs.getLong(UssdAccessibilityService.KEY_UPDATED_AT, 0L)
+
+    Text("USSD automation", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.ExtraBold, color = Navy)
+    InfoCard(
+        "Accessibility service",
+        if (enabled) "ENABLED on this phone. The observer can inspect supported visible USSD screens."
+        else "NOT ENABLED. Turn it on in Android Accessibility settings to allow USSD screen observation."
+    )
+    Button(
+        onClick = {
+            context.startActivity(Intent(android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS))
+        },
+        modifier = Modifier.fillMaxWidth()
+    ) { Text(if (enabled) "Open Accessibility settings" else "Enable Accessibility Service") }
+    OutlinedButton(onClick = { refresh++ }, modifier = Modifier.fillMaxWidth()) { Text("Refresh status") }
+    InfoCard("Last observed state", lastState)
+    InfoCard("Last screen details", if (lastDetail.isBlank()) "No screen details recorded." else lastDetail)
+    if (updatedAt > 0L) InfoCard("Last update", dateText(updatedAt))
+    InfoCard(
+        "Safety status",
+        "This first version observes and records visible USSD screens only. It does not submit menu choices, confirm purchases, read M-PESA SMS, or deliver bundles automatically. Automatic selection stays disabled until the exact provider menu flow is verified."
+    )
+}
