@@ -218,6 +218,7 @@ private fun SignatureOffersScreen(db: LocalDatabase, onMessage: (String) -> Unit
 private fun UpdatesScreen() {
     val context = LocalContext.current
     var checking by remember { mutableStateOf(false) }
+    var checkAttempt by remember { mutableIntStateOf(0) }
     var status by remember { mutableStateOf("Checking for the latest published release…") }
     var latestVersion by remember { mutableStateOf("") }
     var releaseNotes by remember { mutableStateOf("") }
@@ -246,7 +247,7 @@ private fun UpdatesScreen() {
         }
     }
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(checkAttempt) {
         currentVersion = try { context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "unknown" } catch (_: Exception) { "unknown" }
         checking = true
         val result = withContext(Dispatchers.IO) {
@@ -321,7 +322,7 @@ private fun UpdatesScreen() {
             status = "Downloading version $latestVersion. Android will notify you when it is ready."
         } catch (_: Exception) { status = "Could not start the update download. Try again." }
     }, enabled = apkUrl.isNotBlank() && !checking, modifier = Modifier.fillMaxWidth()) { Text("Update now") }
-    OutlinedButton(onClick = { scope.launch { checking = true; status = "To check again, reopen the Updates screen or restart the app."; checking = false } }, modifier = Modifier.fillMaxWidth()) { Text("Check again") }
+    OutlinedButton(onClick = { checkAttempt++ }, enabled = !checking, modifier = Modifier.fillMaxWidth()) { Text(if (checking) "Checking…" else "Check again") }
     InfoCard("Android security", "Android requires your approval to install an APK update. Updates must be signed with the same certificate as the installed app.")
 }
 
