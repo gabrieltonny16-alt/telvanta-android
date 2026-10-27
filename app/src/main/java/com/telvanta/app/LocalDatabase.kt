@@ -31,7 +31,7 @@ class LocalDatabase(context: Context) : SQLiteOpenHelper(context, "telvanta.db",
         readableDatabase.rawQuery("SELECT COUNT(*) FROM $table", null).use { c -> return if (c.moveToFirst()) c.getInt(0) else 0 }
     }
     fun offers(): List<OfferRow> = readableDatabase.rawQuery("SELECT id,name,category,selling_price,original_price,source,verified,is_active FROM offers ORDER BY name", null).use { c ->
-        buildList { while (c.moveToNext()) add(OfferRow(c.getLong(0), c.getString(1), c.getString(2), c.getDouble(3), if (c.isNull(4)) null else c.getDouble(4), c.getString(5), c.getInt(6) == 1)) }
+        buildList { while (c.moveToNext()) add(OfferRow(c.getLong(0), c.getString(1), c.getString(2), c.getDouble(3), if (c.isNull(4)) null else c.getDouble(4), c.getString(5), c.getInt(6) == 1, c.getInt(7) == 1)) }
     }
     fun saveOffer(id: Long?, name: String, category: String, price: Double, originalPrice: Double? = null, source: String = "Manual", verified: Boolean = false, active: Boolean = false) {
         require(name.isNotBlank() && category.isNotBlank() && price >= 0 && (originalPrice == null || originalPrice >= 0) && source.isNotBlank())
