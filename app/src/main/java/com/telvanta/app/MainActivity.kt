@@ -217,7 +217,7 @@ private fun TelvantaApp(db: LocalDatabase) {
                         "EngageBot" -> EngageBotScreen()
                         "Message Processing" -> FeatureWorkspaceScreen("Message Processing")
                         "Account & Session" -> AccountSessionScreen { message = it }
-                        "SiteLink" -> SiteLinkScreen { message = it }
+                        "SiteLink" -> SiteLinkScreen(db) { message = it }
                         "Signature Offers" -> SignatureOffersScreen(db) { message = it }
                         "Statistics" -> StatisticsScreen(db)
                         "Wallet" -> FeatureWorkspaceScreen("Wallet")
