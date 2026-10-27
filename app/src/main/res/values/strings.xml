@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">BingwaPulse</string>
+    <string name="ussd_accessibility_description">Observe supported USSD screens for BingwaPulse order processing. Screen content is used to identify session states. Automatic selections remain disabled until a verified menu flow is configured.</string>
+</resources>
