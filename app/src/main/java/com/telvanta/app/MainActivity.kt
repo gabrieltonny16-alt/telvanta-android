@@ -56,8 +56,8 @@ private fun TelvantaApp(db: LocalDatabase) {
     // Keep management entries near the top so they are visible on small phones.
     val tabs = listOf(
         "Dashboard", "Settings", "Updates", "Wallet", "Offers", "Orders",
-        "Transaction History", "Quick Dial", "Auto Renewals", "Auto-Reply",
-        "Customers", "Signature Offers", "SiteLink", "Signature", "Statistics", "Vecta Connect"
+        "Transaction History", "Quick Dial", "Auto Renewals", "Auto-Reply", "EngageBot",
+        "Customers", "Signature Offers", "SiteLink", "Signature", "Statistics", "Vecta Connect", "Account & Session"
     )
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
@@ -154,6 +154,8 @@ private fun TelvantaApp(db: LocalDatabase) {
                         "Orders" -> OrdersScreen(db){message=it}
                         "Transactions", "Transaction History" -> TransactionsScreen(db){message=it}
                         "Auto-Reply" -> AutoReplyScreen()
+                        "EngageBot" -> EngageBotScreen()
+                        "Account & Session" -> AccountSessionScreen { message = it }
                         "SiteLink" -> SiteLinkScreen { message = it }
                         "Signature Offers" -> SignatureOffersScreen(db) { message = it }
                         "Statistics" -> StatisticsScreen(db)
@@ -177,6 +179,27 @@ private fun TelvantaApp(db: LocalDatabase) {
             }
         }
         }
+    }
+}
+
+@Composable
+private fun EngageBotScreen() {
+    Text("EngageBot", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = Navy)
+    InfoCard("Automation control centre", "EngageBot is reserved for the message-automation workflow. The controls below are planning/status indicators only; no incoming messages are monitored and no replies are sent.")
+    InfoCard("Message sources", "Planned: M-PESA, Till, Paybill and SiteLink messages, with sender authorization checks before processing.")
+    InfoCard("Decision workflow", "Planned: identify the message type, match it to a customer/order, apply blacklist and duplicate checks, then prepare the appropriate response.")
+    InfoCard("Safety controls", "Live messaging is disabled. Automation must remain paused until sender permissions, message parsing, audit records and explicit activation controls are implemented and tested.")
+    InfoCard("Current status", "Feature entry added. Message monitoring, parsing, automated customer saving and live response delivery are not implemented in this screen yet.")
+}
+
+@Composable
+private fun AccountSessionScreen(onMessage: (String) -> Unit) {
+    Text("Account & Session", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = Navy)
+    InfoCard("Local-only account", "Authentication, multi-agent accounts and encrypted production synchronization are not implemented. This screen does not claim that a signed-in identity has been verified.")
+    InfoCard("Security requirements", "Planned: authenticated profile, session expiry, secure sign-out, account access controls and clear device/session status.")
+    InfoCard("Local data", "Business records currently remain on this device. Protect the phone and do not treat local records as synchronized backups.")
+    Button(onClick = { onMessage("Sign out is not available yet because login and session management are not implemented. No session was ended.") }, modifier = Modifier.fillMaxWidth()) {
+        Text("Sign out (not available yet)")
     }
 }
 
