@@ -54,12 +54,10 @@ private fun TelvantaApp(db: LocalDatabase) {
     var selected by remember { mutableStateOf("Dashboard") }
     var message by remember { mutableStateOf("") }
     val navGroups = listOf(
-        "HOME" to listOf("Dashboard"),
-        "SALES & CATALOG" to listOf("Offers", "Signature Offers", "Orders", "Transaction History", "Wallet"),
-        "AUTOMATION" to listOf("Message Processing", "Auto-Reply", "EngageBot", "Auto Renewals", "Quick Dial", "SiteLink"),
-        "CUSTOMERS & BRAND" to listOf("Customers", "Signature"),
-        "PERFORMANCE & DEVICES" to listOf("Statistics", "Connect Pulse"),
-        "SYSTEM" to listOf("Settings", "Updates", "Account & Session")
+        "MAIN" to listOf("Dashboard", "Wallet", "Offers", "Transaction History"),
+        "TOOLS" to listOf("Bulk Messenger", "Quick Dial", "Auto Renewals", "SiteLink", "Auto-Reply"),
+        "MANAGEMENT" to listOf("Customers", "Signature", "Statistics", "Connect Pulse"),
+        "SUPPORT" to listOf("Settings", "Updates", "Help & Support", "About BingwaPulse")
     )
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
@@ -212,7 +210,10 @@ private fun TelvantaApp(db: LocalDatabase) {
                         "Customers" -> CustomersScreen(db){message=it}
                         "Orders" -> OrdersScreen(db){message=it}
                         "Transactions", "Transaction History" -> TransactionsScreen(db){message=it}
+                        "Bulk Messenger" -> BulkMessengerScreen(db)
                         "Auto-Reply" -> AutoReplyScreen()
+                        "Help & Support" -> FeatureWorkspaceScreen("Help & Support")
+                        "About BingwaPulse" -> FeatureWorkspaceScreen("About BingwaPulse")
                         "EngageBot" -> EngageBotScreen()
                         "Message Processing" -> FeatureWorkspaceScreen("Message Processing")
                         "Account & Session" -> AccountSessionScreen { message = it }
@@ -638,6 +639,43 @@ private fun TransactionsScreen(db:LocalDatabase,onMessage:(String)->Unit) {
             Text("Entry #${t.id} · Order #${t.orderId}",fontWeight=FontWeight.Bold);Text("KES ${money(t.amount)} · ${t.status}",color=Muted);if(t.reference.isNotBlank())Text(t.reference);Text(dateText(t.createdAt),color=Muted,style=MaterialTheme.typography.labelSmall)
         }
     } }
+}
+
+@Composable
+private fun BulkMessengerScreen(db: LocalDatabase) {
+    val context = LocalContext.current
+    val prefs = remember { context.getSharedPreferences("bingwapulse_bulk_messenger", Context.MODE_PRIVATE) }
+    var audience by remember { mutableStateOf(prefs.getString("audience", "Selected customers") ?: "Selected customers") }
+    var message by remember { mutableStateOf(prefs.getString("message", "Hello <firstName>, ") ?: "Hello <firstName>, ") }
+    var campaignName by remember { mutableStateOf(prefs.getString("campaign", "") ?: "") }
+    var notice by remember { mutableStateOf("") }
+    val customerCount = remember { db.customers("").size }
+    Text("Bulk Messenger", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.ExtraBold, color = Navy)
+    InfoCard("Campaign workspace", "Create and save message drafts, choose an audience, and preview personalization. Live SMS, WhatsApp and Telegram sending are not connected or enabled.")
+    OutlinedTextField(value = campaignName, onValueChange = { campaignName = it }, label = { Text("Campaign name") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+    Text("Audience", fontWeight = FontWeight.Bold, color = Navy)
+    listOf("Selected customers", "All customers", "Saved customer group").forEach { option ->
+        Row(Modifier.fillMaxWidth(), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+            RadioButton(selected = audience == option, onClick = { audience = option })
+            Column {
+                Text(option, color = Navy)
+                if (option == "All customers") Text("$customerCount customer records currently stored on this phone", color = Muted, style = MaterialTheme.typography.bodySmall)
+            }
+        }
+    }
+    OutlinedTextField(value = message, onValueChange = { message = it }, label = { Text("Message draft") }, modifier = Modifier.fillMaxWidth(), minLines = 4)
+    Text("Personalization placeholder: <firstName>", color = Muted, style = MaterialTheme.typography.bodySmall)
+    InfoCard("Preview", message.replace("<firstName>", "Customer").ifBlank { "(empty message)" })
+    Button(onClick = {
+        if (campaignName.isBlank() || message.isBlank()) notice = "Add a campaign name and message before saving."
+        else {
+            prefs.edit().putString("campaign", campaignName.trim()).putString("audience", audience).putString("message", message).apply()
+            notice = "Campaign draft saved on this device. No messages were sent."
+        }
+    }, modifier = Modifier.fillMaxWidth()) { Text("Save campaign draft") }
+    OutlinedButton(onClick = { campaignName = ""; message = ""; notice = "Draft fields cleared. Previously saved draft remains until overwritten." }, modifier = Modifier.fillMaxWidth()) { Text("Clear fields") }
+    if (notice.isNotBlank()) Text(notice, color = Teal, fontWeight = FontWeight.SemiBold)
+    InfoCard("Sending safety", "Before live sending is enabled, the app needs verified channel setup, consent-aware recipients, duplicate prevention, rate limits, delivery/error reporting, and a stop control. This screen currently sends nothing.")
 }
 
 @Composable
