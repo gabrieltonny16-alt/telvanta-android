@@ -368,67 +368,32 @@ private fun AccountSessionScreen(onMessage: (String) -> Unit) {
 }
 
 @Composable
-private fun SiteLinkScreen(onMessage: (String) -> Unit) {
-    val context = LocalContext.current
-    val prefs = remember { context.getSharedPreferences("bingwapulse_sitelink", Context.MODE_PRIVATE) }
-    var title by remember { mutableStateOf("") }
-    var url by remember { mutableStateOf("") }
-    var description by remember { mutableStateOf("") }
-    var refresh by remember { mutableIntStateOf(0) }
-    val links = remember(refresh) {
-        val array = try { org.json.JSONArray(prefs.getString("links", "[]") ?: "[]") } catch (_: Exception) { org.json.JSONArray() }
-        (0 until array.length()).mapNotNull { index ->
-            try { array.getJSONObject(index).let { Triple(it.getString("title"), it.getString("url"), it.optString("description")) } } catch (_: Exception) { null }
-        }
+private fun SiteLinkScreen(db: LocalDatabase, onMessage: (String) -> Unit) {
+    var reload by remember { mutableIntStateOf(0) }
+    val offers = remember(reload) { db.offers().filter { it.active } }
+    Text("SiteLink storefront", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.ExtraBold, color = Navy)
+    InfoCard("Your shop uses My Offers", "SiteLink reads active offers directly from My Offers. Prices are shared automatically; there is no separate SiteLink price list. Deactivate an offer in My Offers to hide it here.")
+    Row(Modifier.fillMaxWidth(), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+        Text("Active offers (${offers.size})", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = Navy, modifier = Modifier.weight(1f))
+        OutlinedButton(onClick = { reload++ }) { Text("Refresh") }
     }
-    Text("SiteLink workspace", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.ExtraBold, color = Navy)
-    InfoCard("Business links manager", "Create and manage shareable links for your storefront, products, offers, payment instructions or social pages. Links are saved on this phone; this workspace does not host websites or track clicks.")
-    Text("Create a link", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = Navy)
-    OutlinedTextField(title, { title = it }, label = { Text("Link name (e.g. Buy bundles)") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
-    OutlinedTextField(url, { url = it }, label = { Text("Website URL") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
-    OutlinedTextField(description, { description = it }, label = { Text("Short note (optional)") }, modifier = Modifier.fillMaxWidth(), minLines = 2)
-    Button(onClick = {
-        val normalized = url.trim().let { if (it.startsWith("https://", true) || it.startsWith("http://", true)) it else "https://$it" }
-        val valid = try { val parsed = Uri.parse(normalized); (parsed.scheme == "https" || parsed.scheme == "http") && !parsed.host.isNullOrBlank() } catch (_: Exception) { false }
-        if (title.isBlank() || !valid) onMessage("Enter a link name and a valid website address.")
-        else try {
-            val array = org.json.JSONArray(prefs.getString("links", "[]") ?: "[]")
-            array.put(JSONObject().put("title", title.trim()).put("url", normalized).put("description", description.trim()))
-            prefs.edit().putString("links", array.toString()).apply()
-            title = ""; url = ""; description = ""; refresh++
-            onMessage("Link saved on this device.")
-        } catch (_: Exception) { onMessage("Could not save this link. Please try again.") }
-    }, modifier = Modifier.fillMaxWidth()) { Text("Save link") }
-    HorizontalDivider(color = Color(0xFF234735))
-    Text("Saved links (${links.size})", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = Navy)
-    if (links.isEmpty()) InfoCard("No links saved yet", "Add your first business link above. You can copy or share it after saving.")
-    links.forEachIndexed { index, link ->
-        Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF102B20)), modifier = Modifier.fillMaxWidth()) {
-            Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(link.first, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Navy)
-                Text(link.second, color = Teal)
-                if (link.third.isNotBlank()) Text(link.third, color = Muted, style = MaterialTheme.typography.bodySmall)
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton(onClick = {
-                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
-                        clipboard.setPrimaryClip(android.content.ClipData.newPlainText(link.first, link.second))
-                        onMessage("Link copied to clipboard.")
-                    }, modifier = Modifier.weight(1f)) { Text("Copy") }
-                    Button(onClick = {
-                        val intent = Intent(Intent.ACTION_SEND).apply { type = "text/plain"; putExtra(Intent.EXTRA_TEXT, "${link.first}\n${link.second}") }
-                        context.startActivity(Intent.createChooser(intent, "Share link"))
-                    }, modifier = Modifier.weight(1f)) { Text("Share") }
-                    TextButton(onClick = {
-                        val array = org.json.JSONArray()
-                        links.filterIndexed { itemIndex, _ -> itemIndex != index }.forEach { item -> array.put(JSONObject().put("title", item.first).put("url", item.second).put("description", item.third)) }
-                        prefs.edit().putString("links", array.toString()).apply(); refresh++
-                        onMessage("Link removed from this device.")
-                    }) { Text("Delete", color = Color(0xFFFFB4AB)) }
+    if (offers.isEmpty()) {
+        InfoCard("Your storefront is empty", "Open My Offers and activate the offers you want customers to see. They will appear here at the exact same selling prices.")
+    } else {
+        offers.forEach { offer ->
+            Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF102B20)), modifier = Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                    Text(offer.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Navy)
+                    Text(offer.category, color = Muted)
+                    Text("KES ${money(offer.price)}", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.ExtraBold, color = Teal)
+                    if (!offer.verified) Text("Offer details not independently verified", color = Muted, style = MaterialTheme.typography.bodySmall)
                 }
             }
         }
     }
-    InfoCard("Current limits", "Links are stored locally and are not synced or shortened. Click analytics, custom landing pages and public link hosting require a separate backend and are not active.")
+    HorizontalDivider(color = Color(0xFF234735))
+    Text("Customer checkout", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = Navy)
+    InfoCard("Not connected yet", "This screen is an in-app storefront preview. A public customer URL, secure M-PESA payment verification and automatic bundle delivery require a hosted backend and provider integration. Checkout is not live and no payment will be taken here.")
 }
 
 @Composable
@@ -568,7 +533,7 @@ private fun PlannedFeatureScreen(title: String, details: String) {
 
 @Composable
 private fun OffersScreen(db: LocalDatabase,onMessage:(String)->Unit) {
-    var editId by remember { mutableStateOf<Long?>(null) }; var name by remember { mutableStateOf("") }; var category by remember { mutableStateOf("Data") }; var price by remember { mutableStateOf("") }; var originalPrice by remember { mutableStateOf("") }; var source by remember { mutableStateOf("Manual") }; var verified by remember { mutableStateOf(false) }; var importText by remember { mutableStateOf("") }; var reload by remember { mutableIntStateOf(0) }
+    var editId by remember { mutableStateOf<Long?>(null) }; var name by remember { mutableStateOf("") }; var category by remember { mutableStateOf("Data") }; var price by remember { mutableStateOf("") }; var originalPrice by remember { mutableStateOf("") }; var source by remember { mutableStateOf("Manual") }; var verified by remember { mutableStateOf(false) }; var active by remember { mutableStateOf(false) }; var importText by remember { mutableStateOf("") }; var reload by remember { mutableIntStateOf(0) }
     Text("Offer catalogue",style=MaterialTheme.typography.headlineMedium,fontWeight=FontWeight.Bold)
     Text("Create offers or tap Edit to change a saved offer.",color=Muted)
     OutlinedTextField(name,{name=it},label={Text("Offer name")},modifier=Modifier.fillMaxWidth(),singleLine=true)
@@ -596,10 +561,10 @@ private fun OffersScreen(db: LocalDatabase,onMessage:(String)->Unit) {
     Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp)) {
         Button(onClick={val amount=price.toDoubleOrNull(); val original=if(originalPrice.isBlank()) null else originalPrice.toDoubleOrNull()
             if(name.isBlank()||category.isBlank()||amount==null||amount<0||source.isBlank()||(!originalPrice.isBlank()&&(original==null||original<0))) onMessage("Enter valid offer details and prices.")
-            else try {db.saveOffer(editId,name,category,amount,original,source,verified);name="";category="Data";price="";originalPrice="";source="Manual";verified=false;editId=null;reload++;onMessage("Offer saved locally; verification is an operator-recorded flag.")}
-            catch(_:Exception){onMessage("Could not save offer. Check details.")}
+            else try {db.saveOffer(editId,name,category,amount,original,source,verified,active);name="";category="Data";price="";originalPrice="";source="Manual";verified=false;active=false;editId=null;reload++;onMessage("Offer saved. Selling prices must be unique.")}
+            catch(e:Exception){onMessage(e.message ?: "Could not save offer. Check details.")}
         },modifier=Modifier.weight(1f)){Text(if(editId==null)"Save offer" else "Update offer")}
-        OutlinedButton(onClick={editId=null;name="";category="Data";price="";originalPrice="";source="Manual";verified=false}){Text("Clear")}
+        OutlinedButton(onClick={editId=null;name="";category="Data";price="";originalPrice="";source="Manual";verified=false;active=false}){Text("Clear")}
     }
     val offers=remember(reload){db.offers()}
     Text("Saved offers (${offers.size})",fontWeight=FontWeight.Bold)
@@ -607,8 +572,9 @@ private fun OffersScreen(db: LocalDatabase,onMessage:(String)->Unit) {
         Column(Modifier.padding(12.dp),verticalArrangement=Arrangement.spacedBy(5.dp)) {
             Text(o.name,fontWeight=FontWeight.Bold);Text("${o.category} · Selling KES ${money(o.price)}",color=Muted)
             Text("Source: ${o.source} · ${if(o.verified) "Marked verified by operator" else "Unverified"}",color=Muted,style=MaterialTheme.typography.bodySmall)
+            Row(Modifier.fillMaxWidth(), verticalAlignment=androidx.compose.ui.Alignment.CenterVertically) { Checkbox(checked=o.active,onCheckedChange={enabled -> try { db.setOfferActive(o.id,enabled); reload++; onMessage(if(enabled) "Offer activated for SiteLink." else "Offer hidden from SiteLink.") } catch(e:Exception) { onMessage(e.message ?: "Could not update offer status.") } }); Text(if(o.active) "Active on SiteLink" else "Not listed on SiteLink") }
             Text("Original price: ${o.originalPrice?.let { "KES ${money(it)}" } ?: "Not recorded"}",color=Muted,style=MaterialTheme.typography.bodySmall)
-            Row(Modifier.fillMaxWidth()) { TextButton(onClick={editId=o.id;name=o.name;category=o.category;price=o.price.toString();originalPrice=o.originalPrice?.toString() ?: "";source=o.source;verified=o.verified}){Text("Edit")};TextButton(onClick={db.deleteOffer(o.id);reload++;onMessage("Offer deleted.")}){Text("Delete")} }
+            Row(Modifier.fillMaxWidth()) { TextButton(onClick={editId=o.id;name=o.name;category=o.category;price=o.price.toString();originalPrice=o.originalPrice?.toString() ?: "";source=o.source;verified=o.verified;active=o.active}){Text("Edit")};TextButton(onClick={db.deleteOffer(o.id);reload++;onMessage("Offer deleted.")}){Text("Delete")} }
         }
     } }
 }
