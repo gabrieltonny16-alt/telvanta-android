@@ -111,44 +111,66 @@ private fun TelvantaApp(db: LocalDatabase) {
                     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                     when(selected) {
                         "Dashboard" -> {
+                            var dashboardView by remember { mutableStateOf("Overview") }
+                            val orderCount = db.count("orders")
+                            val customerCount = db.count("customers")
+                            val offerCount = db.count("offers")
+                            val transactionCount = db.count("transactions")
+                            val hour = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
+                            val greeting = if (hour < 12) "Good Morning" else if (hour < 17) "Good Afternoon" else "Good Evening"
                             Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                            Surface(color=NavyDeep,shape=MaterialTheme.shapes.extraLarge,modifier=Modifier.fillMaxWidth()) {
-                                Column(Modifier.padding(22.dp),verticalArrangement=Arrangement.spacedBy(13.dp)) {
-                                    Row(Modifier.fillMaxWidth(),verticalAlignment=androidx.compose.ui.Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(8.dp)) {
-                                        Surface(color=Color(0xFF0D6B4B),shape=RoundedCornerShape(50)) { Text("●  READY OFFLINE",color=Color(0xFFB9F227),fontWeight=FontWeight.Bold,style=MaterialTheme.typography.labelSmall,modifier=Modifier.padding(horizontal=11.dp,vertical=7.dp)) }
-                                        Spacer(Modifier.weight(1f))
-                                        Text("v1 · LOCAL",color=Color(0xFFB7C8C1),style=MaterialTheme.typography.labelSmall)
+                                Surface(color = Color(0xFF101F17), shape = MaterialTheme.shapes.extraLarge, modifier = Modifier.fillMaxWidth()) {
+                                    Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                                        Text(greeting + ", Gabriel", color = Navy, fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.headlineSmall)
+                                        Text(SimpleDateFormat("EEEE, MMMM d", Locale.getDefault()).format(Date()), color = Muted)
+                                        HorizontalDivider(color = Color(0xFF234735))
+                                        Text("Workspace status", color = Muted)
+                                        Text("Local records only", color = Teal, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleLarge)
+                                        Text("Wallet, airtime balance and live provider status are not connected.", color = Muted, style = MaterialTheme.typography.bodySmall)
+                                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                            DashboardMetric("Orders", orderCount, Color(0xFF28D879), Modifier.weight(1f))
+                                            DashboardMetric("Customers", customerCount, Color(0xFF38BDF8), Modifier.weight(1f))
+                                            DashboardMetric("Offers", offerCount, Color(0xFFFFB020), Modifier.weight(1f))
+                                        }
+                                        Text("Transactions recorded locally: " + transactionCount, color = Muted, style = MaterialTheme.typography.bodySmall)
                                     }
-                                    Text("Your telecom business,\nunder control.",style=MaterialTheme.typography.headlineMedium,fontWeight=FontWeight.ExtraBold,color=Color.White,lineHeight=34.sp)
-                                    Text("Offers, customers, orders and records — organised in one workspace.",color=Color(0xFFD2E2DB),style=MaterialTheme.typography.bodyMedium)
-                                    Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp),verticalAlignment=androidx.compose.ui.Alignment.CenterVertically) {
-                                        Surface(color=Color(0xFFB9F227),shape=RoundedCornerShape(50)) { Text("LOCAL DATA",color=NavyDeep,fontWeight=FontWeight.ExtraBold,style=MaterialTheme.typography.labelSmall,modifier=Modifier.padding(horizontal=10.dp,vertical=7.dp)) }
-                                        Text("No live payments or fulfilment",color=Color(0xFFB7C8C1),style=MaterialTheme.typography.labelSmall)
+                                }
+                                Surface(color = Color(0xFF101F17), shape = RoundedCornerShape(18.dp), modifier = Modifier.fillMaxWidth()) {
+                                    Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        Text("Airtime balance", color = Muted)
+                                        Text("Not connected", color = Navy, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleLarge)
+                                        Text("Airtime usage will appear here when a verified device/provider connection is implemented.", color = Muted, style = MaterialTheme.typography.bodySmall)
+                                    }
+                                }
+                                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    listOf("Overview", "Transactions", "Analytics").forEach { view ->
+                                        val active = dashboardView == view
+                                        TextButton(onClick = { dashboardView = view }, modifier = Modifier.weight(1f)) {
+                                            Column(horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally) {
+                                                Text(view, color = if (active) Teal else Muted, fontWeight = if (active) FontWeight.Bold else FontWeight.Normal, maxLines = 1, style = MaterialTheme.typography.labelLarge)
+                                                if (active) HorizontalDivider(color = Teal, thickness = 2.dp)
+                                            }
+                                        }
+                                    }
+                                }
+                                when (dashboardView) {
+                                    "Transactions" -> TransactionsScreen(db) { message = it }
+                                    "Analytics" -> StatisticsScreen(db)
+                                    else -> {
+                                        Text("Quick actions", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = Navy)
+                                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                            QuickAction("＋", "Add offer", Modifier.weight(1f)) { selected = "Offers" }
+                                            QuickAction("＋", "Add customer", Modifier.weight(1f)) { selected = "Customers" }
+                                        }
+                                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                            QuickAction("↗", "New order", Modifier.weight(1f)) { selected = "Orders" }
+                                            QuickAction("≡", "Message review", Modifier.weight(1f)) { selected = "Message Processing" }
+                                        }
+                                        InfoCard("Payment and delivery safety", "Only locally recorded information is shown here. No payment is considered verified and no bundle is marked delivered by this dashboard.")
                                     }
                                 }
                             }
-                            Text("Workspace overview",style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Bold,color=Navy)
-                            Row(Modifier.padding(bottom=8.dp), horizontalArrangement=Arrangement.spacedBy(12.dp)) {
-                                StatCard("OFFERS",db.count("offers"),Modifier.weight(1f))
-                                StatCard("ORDERS",db.count("orders"),Modifier.weight(1f))
-                            }
-                            Row(Modifier.padding(bottom=8.dp), horizontalArrangement=Arrangement.spacedBy(12.dp)) {
-                                StatCard("CUSTOMERS",db.count("customers"),Modifier.weight(1f))
-                                StatCard("TRANSACTIONS",db.count("transactions"),Modifier.weight(1f))
-                            }
-                            Text("Quick actions",style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Bold,color=Navy)
-                            Row(Modifier.padding(bottom=8.dp), horizontalArrangement=Arrangement.spacedBy(12.dp)) {
-                                QuickAction("＋","Add offer",Modifier.weight(1f)){selected="Offers"}
-                                QuickAction("＋","Customer",Modifier.weight(1f)){selected="Customers"}
-                            }
-                            Row(Modifier.padding(bottom=8.dp), horizontalArrangement=Arrangement.spacedBy(12.dp)) {
-                                QuickAction("↗","New order",Modifier.weight(1f)){selected="Orders"}
-                                QuickAction("≡","Ledger",Modifier.weight(1f)){selected="Transactions"}
-                            }
-                            InfoCard("Clear and safe by design","Saved records are not proof of payment or bundle delivery.")
-                            Button(onClick={selected="Orders"},modifier=Modifier.fillMaxWidth(),shape=RoundedCornerShape(16.dp),contentPadding=PaddingValues(vertical=16.dp),colors=ButtonDefaults.buttonColors(containerColor=Color(0xFF087F5B),contentColor=Color.White)){Text("OPEN ORDER BOOK  →",fontWeight=FontWeight.Bold)}
                         }
-                            }
                         "Offers" -> OffersScreen(db){message=it}
                         "Customers" -> CustomersScreen(db){message=it}
                         "Orders" -> OrdersScreen(db){message=it}
@@ -611,6 +633,15 @@ private fun StatisticsScreen(db:LocalDatabase) {
     InfoCard("Unverified transaction notes","\$unverified entries — not counted as confirmed payments.")
 }
 
+@Composable
+private fun DashboardMetric(label: String, count: Int, accent: Color, modifier: Modifier = Modifier) {
+    Card(modifier = modifier, shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = Color(0xFF17291F))) {
+        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+            Text(count.toString(), color = accent, fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.headlineSmall)
+            Text(label, color = Muted, style = MaterialTheme.typography.labelSmall)
+        }
+    }
+}
 @Composable
 private fun QuickAction(symbol:String,label:String,modifier:Modifier=Modifier,onClick:()->Unit) {
     Card(onClick=onClick,modifier=modifier,shape=RoundedCornerShape(18.dp),colors=CardDefaults.cardColors(containerColor=Color(0xFF12382A)),elevation=CardDefaults.cardElevation(defaultElevation=2.dp)) {
