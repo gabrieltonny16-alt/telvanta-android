@@ -17,6 +17,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
@@ -779,7 +781,7 @@ private fun UssdAutomationSettingsScreen() {
     val context = LocalContext.current
     var refresh by remember { mutableIntStateOf(0) }
     val prefs = remember(refresh) {
-        context.getSharedPreferences(UssdAccessibilityService.PREFS, android.content.Context.MODE_PRIVATE)
+        context.getSharedPreferences(UssdAccessibilityService.PREFS, Context.MODE_PRIVATE)
     }
     val enabled = remember(refresh) {
         val enabledServices = android.provider.Settings.Secure.getString(
@@ -789,28 +791,70 @@ private fun UssdAutomationSettingsScreen() {
         val serviceName = context.packageName + "/" + UssdAccessibilityService::class.java.name
         enabledServices.split(':').any { it.equals(serviceName, ignoreCase = true) }
     }
+    val notificationPermissionGranted = Build.VERSION.SDK_INT < 33 ||
+        androidx.core.content.ContextCompat.checkSelfPermission(
+            context, android.Manifest.permission.POST_NOTIFICATIONS
+        ) == PackageManager.PERMISSION_GRANTED
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        refresh++
+    }
+    val listenerAccessEnabled = remember(refresh) {
+        val enabledListeners = android.provider.Settings.Secure.getString(
+            context.contentResolver,
+            "enabled_notification_listeners"
+        ).orEmpty()
+        enabledListeners.split(':').any { it.startsWith(context.packageName + "/") }
+    }
     val lastState = prefs.getString(UssdAccessibilityService.KEY_STATE, "NOT_STARTED") ?: "NOT_STARTED"
     val lastDetail = prefs.getString(UssdAccessibilityService.KEY_DETAIL, "No USSD screen has been observed yet.") ?: ""
     val updatedAt = prefs.getLong(UssdAccessibilityService.KEY_UPDATED_AT, 0L)
 
-    Text("USSD automation", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.ExtraBold, color = Navy)
+    Text("Permissions & automation", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.ExtraBold, color = Navy)
     InfoCard(
-        "Accessibility service",
-        if (enabled) "ENABLED on this phone. The observer can inspect supported visible USSD screens."
-        else "NOT ENABLED. Turn it on in Android Accessibility settings to allow USSD screen observation."
+        "App notifications",
+        if (notificationPermissionGranted) "ALLOWED. Android permits BingwaPulse to show its own notifications."
+        else "BLOCKED. On Android 13 and newer, BingwaPulse must request permission before it can show notifications."
     )
     Button(
         onClick = {
-            context.startActivity(Intent(android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS))
+            if (Build.VERSION.SDK_INT >= 33 && !notificationPermissionGranted) {
+                notificationPermissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+            } else {
+                context.startActivity(Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, context.packageName))
+            }
         },
         modifier = Modifier.fillMaxWidth()
+    ) { Text(if (notificationPermissionGranted) "Open app notification settings" else "Allow app notifications") }
+
+    HorizontalDivider(color = Color(0xFF234735))
+    InfoCard(
+        "Notification access (different permission)",
+        if (listenerAccessEnabled) "Notification access is enabled for this app. The M-PESA notification reader is not implemented yet."
+        else "Not enabled. This special Android setting is separate from app notification permission. It allows a future opt-in reader to receive posted notifications; it is not enabled automatically."
+    )
+    OutlinedButton(
+        onClick = { context.startActivity(Intent("android.settings.ACTION_NOTIFICATION_LISTENER_SETTINGS")) },
+        modifier = Modifier.fillMaxWidth()
+    ) { Text("Open Notification Access settings") }
+
+    HorizontalDivider(color = Color(0xFF234735))
+    InfoCard(
+        "USSD accessibility service",
+        if (enabled) "ENABLED. The current service observes supported visible USSD screens only."
+        else "NOT ENABLED. Android requires you to turn it on manually in Accessibility settings."
+    )
+    Button(
+        onClick = { context.startActivity(Intent(android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS)) },
+        modifier = Modifier.fillMaxWidth()
     ) { Text(if (enabled) "Open Accessibility settings" else "Enable Accessibility Service") }
-    OutlinedButton(onClick = { refresh++ }, modifier = Modifier.fillMaxWidth()) { Text("Refresh status") }
-    InfoCard("Last observed state", lastState)
+    OutlinedButton(onClick = { refresh++ }, modifier = Modifier.fillMaxWidth()) { Text("Refresh all permission statuses") }
+    InfoCard("Last observed USSD state", lastState)
     InfoCard("Last screen details", if (lastDetail.isBlank()) "No screen details recorded." else lastDetail)
     if (updatedAt > 0L) InfoCard("Last update", dateText(updatedAt))
     InfoCard(
-        "Safety status",
-        "This first version observes and records visible USSD screens only. It does not submit menu choices, confirm purchases, read M-PESA SMS, or deliver bundles automatically. Automatic selection stays disabled until the exact provider menu flow is verified."
+        "What is not live yet",
+        "This build does not yet read M-PESA notifications or SMS, verify payments, submit USSD menu choices, or deliver bundles. Granting Android permissions alone does not activate those features. No payment or bundle action will be triggered by these settings."
     )
 }
