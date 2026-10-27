@@ -400,7 +400,7 @@ private fun SiteLinkScreen(onMessage: (String) -> Unit) {
         } catch (_: Exception) { onMessage("Could not save this link. Please try again.") }
     }, modifier = Modifier.fillMaxWidth()) { Text("Save link") }
     HorizontalDivider(color = Color(0xFF234735))
-    Text("Saved links (\${links.size})", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = Navy)
+    Text("Saved links (${links.size})", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = Navy)
     if (links.isEmpty()) InfoCard("No links saved yet", "Add your first business link above. You can copy or share it after saving.")
     links.forEachIndexed { index, link ->
         Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF102B20)), modifier = Modifier.fillMaxWidth()) {
@@ -415,7 +415,7 @@ private fun SiteLinkScreen(onMessage: (String) -> Unit) {
                         onMessage("Link copied to clipboard.")
                     }, modifier = Modifier.weight(1f)) { Text("Copy") }
                     Button(onClick = {
-                        val intent = Intent(Intent.ACTION_SEND).apply { type = "text/plain"; putExtra(Intent.EXTRA_TEXT, "\${link.first}\n\${link.second}") }
+                        val intent = Intent(Intent.ACTION_SEND).apply { type = "text/plain"; putExtra(Intent.EXTRA_TEXT, "${link.first}\n${link.second}") }
                         context.startActivity(Intent.createChooser(intent, "Share link"))
                     }, modifier = Modifier.weight(1f)) { Text("Share") }
                     TextButton(onClick = {
@@ -776,7 +776,7 @@ private fun StatisticsScreen(db:LocalDatabase) {
         StatCard("FAILED",failed,Modifier.weight(1f))
         StatCard("CANCELLED",cancelled,Modifier.weight(1f))
     }
-    InfoCard("Manually recorded delivery value","KES \${money(totalSales)}")
+    InfoCard("Manually recorded delivery value","KES ${money(totalSales)}")
     InfoCard("Unverified transaction notes","\$unverified entries — not counted as confirmed payments.")
 }
 
