@@ -223,7 +223,7 @@ private fun TelvantaApp(db: LocalDatabase) {
                         "Quick Dial" -> FeatureWorkspaceScreen("Quick Dial")
                         "Auto Renewals" -> FeatureWorkspaceScreen("Auto Renewals")
                         "Signature" -> FeatureWorkspaceScreen("Signature")
-                        "Connect Pulse" -> FeatureWorkspaceScreen("Connect Pulse")
+                        "Connect Pulse" -> ConnectPulseScreen()
                         "Updates" -> UpdatesScreen()
                         "Settings" -> FeatureWorkspaceScreen("Settings")
                         else -> FeatureWorkspaceScreen(selected)
@@ -238,6 +238,30 @@ private fun TelvantaApp(db: LocalDatabase) {
     }
 }
 
+
+
+@Composable
+private fun ConnectPulseScreen() {
+    var pairingCode by remember { mutableStateOf("") }
+    var deviceLabel by remember { mutableStateOf("") }
+    var notice by remember { mutableStateOf("") }
+    Text("Connect Pulse", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.ExtraBold, color = Navy)
+    InfoCard("BingwaPulse companion connection", "Use Connect Pulse to pair an authorized phone with BingwaPulse. This screen is ready for the connection workflow; secure pairing and live sync are not yet connected.")
+    Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF102B20)), modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(17.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
+            Text("Connection status", color = Muted)
+            Text("NOT CONNECTED", color = Color(0xFFFFC857), fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.titleLarge)
+            Text("No device is paired. This status is not inferred from a demo connection.", color = Muted, style = MaterialTheme.typography.bodySmall)
+        }
+    }
+    Text("Pair a device", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = Navy)
+    OutlinedTextField(value = deviceLabel, onValueChange = { deviceLabel = it }, label = { Text("Device name (e.g. Shop phone)") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+    OutlinedTextField(value = pairingCode, onValueChange = { pairingCode = it.filter { ch -> ch.isLetterOrDigit() }.take(8) }, label = { Text("Pairing code") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+    Button(onClick = { notice = if (deviceLabel.isBlank() || pairingCode.length < 6) "Enter a device name and a pairing code of at least 6 characters." else "Pairing is not active yet. No device was connected and no data was synced." }, modifier = Modifier.fillMaxWidth()) { Text("Verify and pair device") }
+    InfoCard("Planned connection controls", "Paired devices · last sync time · sync status · revoke device access · reconnect. These controls will become active after secure pairing and the companion service are implemented.")
+    InfoCard("Security", "No payment, SMS, USSD, customer data transfer, or background sync is triggered from this screen.")
+    if (notice.isNotBlank()) Text(notice, color = Teal, fontWeight = FontWeight.SemiBold)
+}
 
 @Composable
 private fun FeatureWorkspaceScreen(title: String) {
