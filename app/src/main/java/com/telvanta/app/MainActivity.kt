@@ -155,23 +155,19 @@ private fun TelvantaApp(db: LocalDatabase) {
                         "Transactions", "Transaction History" -> TransactionsScreen(db){message=it}
                         "Auto-Reply" -> AutoReplyScreen()
                         "EngageBot" -> EngageBotScreen()
-                        "Message Processing" -> PlannedFeatureScreen("Message Processing", "M-PESA, Till, Paybill and SiteLink message parsing, authorized-sender checks, duplicate detection and customer/order linking. Live message access remains disabled.")
+                        "Message Processing" -> FeatureWorkspaceScreen("Message Processing")
                         "Account & Session" -> AccountSessionScreen { message = it }
                         "SiteLink" -> SiteLinkScreen { message = it }
                         "Signature Offers" -> SignatureOffersScreen(db) { message = it }
                         "Statistics" -> StatisticsScreen(db)
-                        "Wallet" -> PlannedFeatureScreen("Wallet", "Wallet balance and subscription tokens are not connected yet.")
-                        "Quick Dial" -> PlannedFeatureScreen("Quick Dial", "SIM selection and USSD actions are not implemented. No calls or USSD sessions will be started.")
-                        "Auto Renewals" -> PlannedFeatureScreen("Auto Renewals", "Renewal scheduling is not implemented yet.")
-                        "Signature" -> PlannedFeatureScreen("Signature", "Signature import and agent signature management are not implemented yet.")
-                        "Vecta Connect" -> PlannedFeatureScreen("Vecta Connect", "Phone pairing and sync are not implemented yet.")
+                        "Wallet" -> FeatureWorkspaceScreen("Wallet")
+                        "Quick Dial" -> FeatureWorkspaceScreen("Quick Dial")
+                        "Auto Renewals" -> FeatureWorkspaceScreen("Auto Renewals")
+                        "Signature" -> FeatureWorkspaceScreen("Signature")
+                        "Vecta Connect" -> FeatureWorkspaceScreen("Vecta Connect")
                         "Updates" -> UpdatesScreen()
-                        else -> {
-                            Text("Settings",style=MaterialTheme.typography.headlineMedium,fontWeight=FontWeight.Bold)
-                            InfoCard("Workspace","Bingwa Vecta stores records locally on this phone. Multi-agent accounts and encrypted sync are not implemented yet.")
-                            InfoCard("Live integrations","M-PESA collection, SMS, USSD and real bundle fulfilment are disabled. Do not treat manual records as verified payments.")
-                            InfoCard("Data safety","Keep this device secure. Local records are not yet synced or backed up to another device.")
-                        }
+                        "Settings" -> FeatureWorkspaceScreen("Settings")
+                        else -> FeatureWorkspaceScreen(selected)
                     }
                     }
                 }
@@ -181,6 +177,87 @@ private fun TelvantaApp(db: LocalDatabase) {
         }
         }
     }
+}
+
+
+@Composable
+private fun FeatureWorkspaceScreen(title: String) {
+    var fieldOne by remember(title) { mutableStateOf("") }
+    var fieldTwo by remember(title) { mutableStateOf("") }
+    var fieldThree by remember(title) { mutableStateOf("") }
+    var option by remember(title) { mutableStateOf("Not configured") }
+    var notice by remember(title) { mutableStateOf("") }
+    Text(title, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.ExtraBold, color = Navy)
+    InfoCard(title + " workspace", "Dedicated screen layout. This stage adds the interface only; data persistence and integrations are still pending. Live payments, SMS, USSD and remote sync remain disabled.")
+    when (title) {
+        "Wallet" -> {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                StatCard("AVAILABLE TOKENS", 0, Modifier.weight(1f))
+                StatCard("RECENT ACTIVITY", 0, Modifier.weight(1f))
+            }
+            InfoCard("Balance status", "Not connected. No wallet balance is being reported.")
+            OutlinedTextField(fieldOne, { fieldOne = it }, label = { Text("Reference / transaction note") }, modifier = Modifier.fillMaxWidth())
+            OutlinedTextField(fieldTwo, { fieldTwo = it }, label = { Text("Amount (KES) — note only") }, modifier = Modifier.fillMaxWidth())
+            Button(onClick = { notice = "Preview only. No funds or tokens were moved." }, modifier = Modifier.fillMaxWidth()) { Text("Preview wallet entry") }
+        }
+        "Quick Dial" -> {
+            OutlinedTextField(fieldOne, { fieldOne = it }, label = { Text("USSD code (e.g. *123#)") }, modifier = Modifier.fillMaxWidth())
+            OutlinedTextField(fieldTwo, { fieldTwo = it }, label = { Text("Action / offer label") }, modifier = Modifier.fillMaxWidth())
+            Text("SIM preference", fontWeight = FontWeight.Bold)
+            listOf("Not configured", "SIM 1", "SIM 2", "Ask each time").forEach { item ->
+                Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                    RadioButton(selected = option == item, onClick = { option = item })
+                    Text(item, color = Navy)
+                }
+            }
+            Button(onClick = { notice = "Draft only. No dialler or USSD session was launched." }, modifier = Modifier.fillMaxWidth()) { Text("Preview dial action") }
+        }
+        "Auto Renewals" -> {
+            OutlinedTextField(fieldOne, { fieldOne = it }, label = { Text("Customer phone") }, modifier = Modifier.fillMaxWidth())
+            OutlinedTextField(fieldTwo, { fieldTwo = it }, label = { Text("Offer to renew") }, modifier = Modifier.fillMaxWidth())
+            OutlinedTextField(fieldThree, { fieldThree = it }, label = { Text("Renewal interval / schedule") }, modifier = Modifier.fillMaxWidth())
+            listOf("Paused", "Draft", "Ready for testing").forEach { item ->
+                Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                    RadioButton(selected = option == item, onClick = { option = item })
+                    Text(item, color = Navy)
+                }
+            }
+            Button(onClick = { notice = "Renewal rule preview only. Automatic purchases remain disabled." }, modifier = Modifier.fillMaxWidth()) { Text("Preview renewal rule") }
+        }
+        "Signature" -> {
+            OutlinedTextField(fieldOne, { fieldOne = it }, label = { Text("Agent / business display name") }, modifier = Modifier.fillMaxWidth())
+            OutlinedTextField(fieldTwo, { fieldTwo = it }, label = { Text("Signature text") }, modifier = Modifier.fillMaxWidth(), minLines = 2)
+            OutlinedTextField(fieldThree, { fieldThree = it }, label = { Text("Contact / support line") }, modifier = Modifier.fillMaxWidth())
+            Button(onClick = { notice = "Preview only. Signature has not been saved." }, modifier = Modifier.fillMaxWidth()) { Text("Preview signature") }
+        }
+        "Vecta Connect" -> {
+            InfoCard("Connection status", "Not paired")
+            InfoCard("Last sync", "No sync recorded")
+            OutlinedTextField(fieldOne, { fieldOne = it }, label = { Text("Pairing code (when available)") }, modifier = Modifier.fillMaxWidth())
+            Button(onClick = { notice = "Pairing is not implemented yet. No device was connected." }, modifier = Modifier.fillMaxWidth()) { Text("Check pairing") }
+            Button(onClick = { notice = "Sync is unavailable until secure device pairing is implemented." }, modifier = Modifier.fillMaxWidth()) { Text("Check connection / sync") }
+        }
+        "Message Processing" -> {
+            OutlinedTextField(fieldOne, { fieldOne = it }, label = { Text("Message source (M-PESA / Till / Paybill / SiteLink)") }, modifier = Modifier.fillMaxWidth())
+            OutlinedTextField(fieldTwo, { fieldTwo = it }, label = { Text("Sender phone / sender ID") }, modifier = Modifier.fillMaxWidth())
+            OutlinedTextField(fieldThree, { fieldThree = it }, label = { Text("Paste message for review") }, modifier = Modifier.fillMaxWidth(), minLines = 4)
+            InfoCard("Processing checks", "Authorized sender · duplicate detection · customer matching · order matching · classification")
+            Button(onClick = { notice = if (fieldThree.isBlank()) "Paste a message before reviewing." else "Local preview only. No message was intercepted, no order was created and no reply was sent." }, modifier = Modifier.fillMaxWidth()) { Text("Review message draft") }
+        }
+        else -> {
+            InfoCard("Account and security", "Authentication and server-side sessions are not connected in this local build.")
+            listOf("Secure sign-in", "Session timeout", "Biometric lock", "Offline data protection", "Integration permissions", "Notifications").forEach { item ->
+                Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                    Checkbox(checked = false, onCheckedChange = { notice = item + " is interface-only and is not enforced yet." })
+                    Text(item, color = Navy)
+                }
+            }
+            OutlinedTextField(fieldOne, { fieldOne = it }, label = { Text("Support contact / configuration note") }, modifier = Modifier.fillMaxWidth())
+            Button(onClick = { notice = "Settings preview only. Preferences are not persisted yet." }, modifier = Modifier.fillMaxWidth()) { Text("Preview settings") }
+        }
+    }
+    if (notice.isNotBlank()) InfoCard("Preview result", notice)
+    InfoCard("Status", "Screen layout added. Local persistence, device integration and end-to-end behaviour remain pending.")
 }
 
 @Composable
