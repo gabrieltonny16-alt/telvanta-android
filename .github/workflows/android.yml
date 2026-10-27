@@ -1,7 +1,7 @@
 name: BingwaPulse Android build
 on:
   push:
-    branches: [ "main", "feature/offer-catalogue-pricing" ]
+    branches: [ "main", "feature/vecta-branding" ]
   pull_request:
     branches: [ "main" ]
   workflow_dispatch:
