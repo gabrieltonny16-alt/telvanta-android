@@ -70,7 +70,7 @@ private fun TelvantaApp(db: LocalDatabase) {
                 ModalDrawerSheet(drawerContainerColor = Color(0xFF071F15), drawerContentColor = Color.White) {
                     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(vertical = 12.dp)) {
                     Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                        Text("BINGWA VECTA", color = Color(0xFFD9FF24), fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.titleLarge)
+                        Text("BINGWAPULSE", color = Color(0xFFD9FF24), fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.titleLarge)
                         Text("POWER EVERY CONNECTION", color = Muted, style = MaterialTheme.typography.labelSmall)
                         Spacer(Modifier.height(12.dp))
                     }
@@ -139,7 +139,7 @@ private fun TelvantaApp(db: LocalDatabase) {
             }
         },topBar={ TopAppBar(
             navigationIcon = { IconButton(onClick = { scope.launch { drawerState.open() } }) { Text("≡", color = Color(0xFFD9FF24), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.headlineMedium) } },
-            title={Column(verticalArrangement=Arrangement.spacedBy(2.dp)) { Text("Bingwa Vecta",fontWeight=FontWeight.ExtraBold,color=Color.White,letterSpacing=.5.sp,style=MaterialTheme.typography.titleLarge); Text(selected.uppercase(),style=MaterialTheme.typography.labelSmall,color=Color(0xFFB9F227),letterSpacing=1.2.sp) }},
+            title={Column(verticalArrangement=Arrangement.spacedBy(2.dp)) { Text("BingwaPulse",fontWeight=FontWeight.ExtraBold,color=Color.White,letterSpacing=.5.sp,style=MaterialTheme.typography.titleLarge); Text(selected.uppercase(),style=MaterialTheme.typography.labelSmall,color=Color(0xFFB9F227),letterSpacing=1.2.sp) }},
             colors=TopAppBarDefaults.topAppBarColors(containerColor=NavyDeep)
         ) }) { padding ->
             LazyColumn(Modifier.fillMaxSize().padding(padding).padding(horizontal=16.dp),verticalArrangement=Arrangement.spacedBy(14.dp),contentPadding=PaddingValues(vertical=16.dp)) {
@@ -231,7 +231,7 @@ private fun TelvantaApp(db: LocalDatabase) {
                     }
                 }
                 if(message.isNotBlank()) item { Text(message,color=Teal,fontWeight=FontWeight.SemiBold) }
-                item { Text("Bingwa Vecta · offline core · local-only data",color=Muted,style=MaterialTheme.typography.labelSmall) }
+                item { Text("BingwaPulse · offline core · local-only data",color=Muted,style=MaterialTheme.typography.labelSmall) }
             }
         }
         }
@@ -393,7 +393,7 @@ private fun UpdatesScreen() {
             val uri = manager.getUriForDownloadedFile(id)
             if (uri == null) { status = "Download did not finish. Try again."; return }
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !context.packageManager.canRequestPackageInstalls()) {
-                status = "Download complete. Allow Bingwa Vecta to install unknown apps in Android Settings, then tap Install downloaded update."
+                status = "Download complete. Allow BingwaPulse to install unknown apps in Android Settings, then tap Install downloaded update."
                 return
             }
             val intent = Intent(Intent.ACTION_VIEW).apply {
@@ -415,7 +415,7 @@ private fun UpdatesScreen() {
                 val conn = (URL("https://api.github.com/repos/gabrieltonny16-alt/telvanta-android/releases/latest").openConnection() as HttpURLConnection).apply {
                     connectTimeout = 10000; readTimeout = 10000
                     setRequestProperty("Accept", "application/vnd.github+json")
-                    setRequestProperty("User-Agent", "Bingwa-Vecta-Android")
+                    setRequestProperty("User-Agent", "BingwaPulse-Android")
                 }
                 try {
                     if (conn.responseCode == 404) "NO_RELEASE" to ""
@@ -463,7 +463,7 @@ private fun UpdatesScreen() {
     }
 
     Text("App updates", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = Navy)
-    InfoCard("Current version", "Bingwa Vecta $currentVersion")
+    InfoCard("Current version", "BingwaPulse $currentVersion")
     InfoCard("Update status", status)
     if (latestVersion.isNotBlank()) {
         InfoCard("Latest release", latestVersion)
@@ -473,7 +473,7 @@ private fun UpdatesScreen() {
         if (apkUrl.isBlank()) status = "No downloadable APK is available. Publish a signed release with an APK asset first."
         else try {
             val request = DownloadManager.Request(Uri.parse(apkUrl))
-                .setTitle("Bingwa Vecta update $latestVersion")
+                .setTitle("BingwaPulse update $latestVersion")
                 .setDescription("Downloading app update")
                 .setMimeType("application/vnd.android.package-archive")
                 .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
@@ -619,7 +619,7 @@ private fun AutoReplyScreen() {
     val context = LocalContext.current
     val prefs = remember { context.getSharedPreferences("vecta_auto_reply_drafts", android.content.Context.MODE_PRIVATE) }
     val types = listOf(
-        "Successful response" to "Hi <firstName>, thank you for purchasing from Bingwa Vecta.",
+        "Successful response" to "Hi <firstName>, thank you for purchasing from BingwaPulse.",
         "Failed request" to "Hello <firstName>, your request could not be completed. Please contact support.",
         "Unavailable offer" to "Hi <firstName>, we could not find an offer matching your payment. Please contact support.",
         "Offer already recommended" to "Hello <firstName>, this offer has already been recommended today.",
