@@ -290,11 +290,13 @@ private fun FeatureWorkspaceScreen(title: String) {
             Button(onClick = { notice = "Preview only. Signature has not been saved." }, modifier = Modifier.fillMaxWidth()) { Text("Preview signature") }
         }
         "Connect Pulse" -> {
+            InfoCard("BingwaPulse companion", "Connect Pulse is the companion connection app for BingwaPulse. It is intended to securely pair an authorized phone/device with the main BingwaPulse app.")
             InfoCard("Connection status", "Not paired")
             InfoCard("Last sync", "No sync recorded")
-            OutlinedTextField(fieldOne, { fieldOne = it }, label = { Text("Pairing code (when available)") }, modifier = Modifier.fillMaxWidth())
-            Button(onClick = { notice = "Pairing is not implemented yet. No device was connected." }, modifier = Modifier.fillMaxWidth()) { Text("Check pairing") }
-            Button(onClick = { notice = "Sync is unavailable until secure device pairing is implemented." }, modifier = Modifier.fillMaxWidth()) { Text("Check connection / sync") }
+            OutlinedTextField(fieldOne, { fieldOne = it }, label = { Text("Pairing code (when pairing is available)") }, modifier = Modifier.fillMaxWidth())
+            Button(onClick = { notice = "Secure pairing is not implemented yet. No device was connected." }, modifier = Modifier.fillMaxWidth()) { Text("Check pairing") }
+            Button(onClick = { notice = "Connection and sync are not implemented yet. No data was transferred." }, modifier = Modifier.fillMaxWidth()) { Text("Check connection / sync") }
+            InfoCard("Safety", "This screen is a UI placeholder for now. It does not pair devices, authenticate a session, or sync data with BingwaPulse yet.")
         }
         "Message Processing" -> {
             OutlinedTextField(fieldOne, { fieldOne = it }, label = { Text("Message source (M-PESA / Till / Paybill / SiteLink)") }, modifier = Modifier.fillMaxWidth())
