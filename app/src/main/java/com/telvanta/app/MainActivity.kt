@@ -53,11 +53,13 @@ class MainActivity : ComponentActivity() {
 private fun TelvantaApp(db: LocalDatabase) {
     var selected by remember { mutableStateOf("Dashboard") }
     var message by remember { mutableStateOf("") }
-    // Keep management entries near the top so they are visible on small phones.
-    val tabs = listOf(
-        "Dashboard", "Settings", "Updates", "Wallet", "Offers", "Orders",
-        "Transaction History", "Quick Dial", "Auto Renewals", "Auto-Reply", "EngageBot", "Message Processing",
-        "Customers", "Signature Offers", "SiteLink", "Signature", "Statistics", "Vecta Connect", "Account & Session"
+    val navGroups = listOf(
+        "HOME" to listOf("Dashboard"),
+        "SALES & CATALOG" to listOf("Offers", "Signature Offers", "Orders", "Transaction History", "Wallet"),
+        "AUTOMATION" to listOf("Message Processing", "Auto-Reply", "EngageBot", "Auto Renewals", "Quick Dial", "SiteLink"),
+        "CUSTOMERS & BRAND" to listOf("Customers", "Signature"),
+        "PERFORMANCE & DEVICES" to listOf("Statistics", "Vecta Connect"),
+        "SYSTEM" to listOf("Settings", "Updates", "Account & Session")
     )
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
@@ -73,14 +75,28 @@ private fun TelvantaApp(db: LocalDatabase) {
                         Spacer(Modifier.height(12.dp))
                     }
                     HorizontalDivider(color = Color(0xFF234735))
-                    tabs.forEach { tab ->
-                        NavigationDrawerItem(
-                            label = { Text(tab, fontWeight = if (selected == tab) FontWeight.Bold else FontWeight.Normal) },
-                            selected = selected == tab,
-                            onClick = { selected = tab; message = ""; scope.launch { drawerState.close() } },
-                            colors = NavigationDrawerItemDefaults.colors(selectedContainerColor = Color(0xFF17432F), selectedTextColor = Color(0xFFD9FF24), unselectedTextColor = Color(0xFFE7FFF2)),
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 2.dp)
+                    navGroups.forEach { group ->
+                        Text(
+                            group.first,
+                            color = Color(0xFF7FAE96),
+                            fontWeight = FontWeight.Bold,
+                            style = MaterialTheme.typography.labelSmall,
+                            letterSpacing = 1.1.sp,
+                            modifier = Modifier.padding(start = 22.dp, top = 15.dp, bottom = 5.dp)
                         )
+                        group.second.forEach { tab ->
+                            NavigationDrawerItem(
+                                label = { Text(tab, fontWeight = if (selected == tab) FontWeight.Bold else FontWeight.Normal) },
+                                selected = selected == tab,
+                                onClick = { selected = tab; message = ""; scope.launch { drawerState.close() } },
+                                colors = NavigationDrawerItemDefaults.colors(
+                                    selectedContainerColor = Color(0xFF17432F),
+                                    selectedTextColor = Color(0xFFD9FF24),
+                                    unselectedTextColor = Color(0xFFE7FFF2)
+                                ),
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 2.dp)
+                            )
+                        }
                     }
                     HorizontalDivider(color = Color(0xFF234735), modifier = Modifier.padding(vertical = 8.dp))
                     NavigationDrawerItem(
@@ -100,7 +116,28 @@ private fun TelvantaApp(db: LocalDatabase) {
                 }
             }
         ) {
-        Scaffold(containerColor=Canvas,topBar={ TopAppBar(
+        Scaffold(containerColor=Canvas,bottomBar={
+            NavigationBar(containerColor = Color(0xFF0D2118), contentColor = Teal) {
+                val bottomItems = listOf("Dashboard", "Transaction History", "Wallet", "Account & Session")
+                val bottomLabels = listOf("Home", "Transactions", "Wallet", "Profile")
+                val bottomIcons = listOf("▦", "↔", "▣", "●")
+                bottomItems.forEachIndexed { index, destination ->
+                    NavigationBarItem(
+                        selected = selected == destination || (destination == "Transaction History" && selected == "Transactions"),
+                        onClick = { selected = destination; message = "" },
+                        icon = { Text(bottomIcons[index], fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleLarge) },
+                        label = { Text(bottomLabels[index], maxLines = 1, style = MaterialTheme.typography.labelSmall) },
+                        colors = NavigationBarItemDefaults.colors(
+                            selectedIconColor = Teal,
+                            selectedTextColor = Teal,
+                            indicatorColor = Color(0xFF173A29),
+                            unselectedIconColor = Muted,
+                            unselectedTextColor = Muted
+                        )
+                    )
+                }
+            }
+        },topBar={ TopAppBar(
             navigationIcon = { IconButton(onClick = { scope.launch { drawerState.open() } }) { Text("≡", color = Color(0xFFD9FF24), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.headlineMedium) } },
             title={Column(verticalArrangement=Arrangement.spacedBy(2.dp)) { Text("Bingwa Vecta",fontWeight=FontWeight.ExtraBold,color=Color.White,letterSpacing=.5.sp,style=MaterialTheme.typography.titleLarge); Text(selected.uppercase(),style=MaterialTheme.typography.labelSmall,color=Color(0xFFB9F227),letterSpacing=1.2.sp) }},
             colors=TopAppBarDefaults.topAppBarColors(containerColor=NavyDeep)
