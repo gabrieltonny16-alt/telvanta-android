@@ -58,7 +58,7 @@ private fun TelvantaApp(db: LocalDatabase) {
         "SALES & CATALOG" to listOf("Offers", "Signature Offers", "Orders", "Transaction History", "Wallet"),
         "AUTOMATION" to listOf("Message Processing", "Auto-Reply", "EngageBot", "Auto Renewals", "Quick Dial", "SiteLink"),
         "CUSTOMERS & BRAND" to listOf("Customers", "Signature"),
-        "PERFORMANCE & DEVICES" to listOf("Statistics", "Vecta Connect"),
+        "PERFORMANCE & DEVICES" to listOf("Statistics", "Connect Pulse"),
         "SYSTEM" to listOf("Settings", "Updates", "Account & Session")
     )
     val drawerState = rememberDrawerState(DrawerValue.Closed)
@@ -223,7 +223,7 @@ private fun TelvantaApp(db: LocalDatabase) {
                         "Quick Dial" -> FeatureWorkspaceScreen("Quick Dial")
                         "Auto Renewals" -> FeatureWorkspaceScreen("Auto Renewals")
                         "Signature" -> FeatureWorkspaceScreen("Signature")
-                        "Vecta Connect" -> FeatureWorkspaceScreen("Vecta Connect")
+                        "Connect Pulse" -> FeatureWorkspaceScreen("Connect Pulse")
                         "Updates" -> UpdatesScreen()
                         "Settings" -> FeatureWorkspaceScreen("Settings")
                         else -> FeatureWorkspaceScreen(selected)
@@ -289,7 +289,7 @@ private fun FeatureWorkspaceScreen(title: String) {
             OutlinedTextField(fieldThree, { fieldThree = it }, label = { Text("Contact / support line") }, modifier = Modifier.fillMaxWidth())
             Button(onClick = { notice = "Preview only. Signature has not been saved." }, modifier = Modifier.fillMaxWidth()) { Text("Preview signature") }
         }
-        "Vecta Connect" -> {
+        "Connect Pulse" -> {
             InfoCard("Connection status", "Not paired")
             InfoCard("Last sync", "No sync recorded")
             OutlinedTextField(fieldOne, { fieldOne = it }, label = { Text("Pairing code (when available)") }, modifier = Modifier.fillMaxWidth())
