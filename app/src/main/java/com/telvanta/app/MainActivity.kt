@@ -56,7 +56,7 @@ private fun TelvantaApp(db: LocalDatabase) {
     // Keep management entries near the top so they are visible on small phones.
     val tabs = listOf(
         "Dashboard", "Settings", "Updates", "Wallet", "Offers", "Orders",
-        "Transaction History", "Quick Dial", "Auto Renewals", "Auto-Reply", "EngageBot",
+        "Transaction History", "Quick Dial", "Auto Renewals", "Auto-Reply", "EngageBot", "Message Processing",
         "Customers", "Signature Offers", "SiteLink", "Signature", "Statistics", "Vecta Connect", "Account & Session"
     )
     val drawerState = rememberDrawerState(DrawerValue.Closed)
@@ -155,6 +155,7 @@ private fun TelvantaApp(db: LocalDatabase) {
                         "Transactions", "Transaction History" -> TransactionsScreen(db){message=it}
                         "Auto-Reply" -> AutoReplyScreen()
                         "EngageBot" -> EngageBotScreen()
+                        "Message Processing" -> PlannedFeatureScreen("Message Processing", "M-PESA, Till, Paybill and SiteLink message parsing, authorized-sender checks, duplicate detection and customer/order linking. Live message access remains disabled.")
                         "Account & Session" -> AccountSessionScreen { message = it }
                         "SiteLink" -> SiteLinkScreen { message = it }
                         "Signature Offers" -> SignatureOffersScreen(db) { message = it }
