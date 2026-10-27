@@ -1,6 +1,20 @@
 package com.telvanta.app
 
 import android.os.Bundle
+import android.content.Context
+import android.app.DownloadManager
+import android.content.BroadcastReceiver
+import android.content.Intent
+import android.content.IntentFilter
+import android.net.Uri
+import android.os.Environment
+import android.content.pm.PackageManager
+import android.os.Build
+import java.net.HttpURLConnection
+import java.net.URL
+import org.json.JSONObject
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.*
@@ -148,7 +162,7 @@ private fun TelvantaApp(db: LocalDatabase) {
                         "Auto Renewals" -> PlannedFeatureScreen("Auto Renewals", "Renewal scheduling is not implemented yet.")
                         "Signature" -> PlannedFeatureScreen("Signature", "Signature import and agent signature management are not implemented yet.")
                         "Vecta Connect" -> PlannedFeatureScreen("Vecta Connect", "Phone pairing and sync are not implemented yet.")
-                        "Updates" -> PlannedFeatureScreen("Updates", "In-app update checking is not implemented yet.")
+                        "Updates" -> UpdatesScreen()
                         else -> {
                             Text("Settings",style=MaterialTheme.typography.headlineMedium,fontWeight=FontWeight.Bold)
                             InfoCard("Workspace","Bingwa Vecta stores records locally on this phone. Multi-agent accounts and encrypted sync are not implemented yet.")
@@ -199,6 +213,118 @@ private fun SignatureOffersScreen(db: LocalDatabase, onMessage: (String) -> Unit
     if (saved.isEmpty()) InfoCard("No signature offers yet", "Add your first offer above. Saved entries remain local and unverified.")
     saved.forEach { offer -> Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF12382A)), modifier = Modifier.fillMaxWidth()) { Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) { Text(offer.name, fontWeight = FontWeight.Bold, color = Navy); Text("KES " + money(offer.price) + " · " + offer.category, color = Muted); Text("Source: " + offer.source + " · " + if (offer.verified) "Operator marked verified" else "Unverified", color = Muted, style = MaterialTheme.typography.bodySmall) } } }
 }
+
+@Composable
+private fun UpdatesScreen() {
+    val context = LocalContext.current
+    var checking by remember { mutableStateOf(false) }
+    var status by remember { mutableStateOf("Checking for the latest published release…") }
+    var latestVersion by remember { mutableStateOf("") }
+    var releaseNotes by remember { mutableStateOf("") }
+    var apkUrl by remember { mutableStateOf("") }
+    var currentVersion by remember { mutableStateOf("0.1.0") }
+    var downloadId by remember { mutableStateOf<Long?>(null) }
+    val scope = rememberCoroutineScope()
+
+    fun installDownloadedApk(id: Long) {
+        try {
+            val manager = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+            val uri = manager.getUriForDownloadedFile(id)
+            if (uri == null) { status = "Download did not finish. Try again."; return }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !context.packageManager.canRequestPackageInstalls()) {
+                status = "Download complete. Allow Bingwa Vecta to install unknown apps in Android Settings, then tap Install downloaded update."
+                return
+            }
+            val intent = Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(uri, "application/vnd.android.package-archive")
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            context.startActivity(intent)
+            status = "Android installer opened. Approve the update to finish."
+        } catch (_: Exception) {
+            status = "Download is ready, but Android could not open the installer. Check app-install permission in Settings."
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        currentVersion = try { context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "unknown" } catch (_: Exception) { "unknown" }
+        checking = true
+        val result = withContext(Dispatchers.IO) {
+            try {
+                val conn = (URL("https://api.github.com/repos/gabrieltonny16-alt/telvanta-android/releases/latest").openConnection() as HttpURLConnection).apply {
+                    connectTimeout = 10000; readTimeout = 10000
+                    setRequestProperty("Accept", "application/vnd.github+json")
+                    setRequestProperty("User-Agent", "Bingwa-Vecta-Android")
+                }
+                try {
+                    if (conn.responseCode == 404) "NO_RELEASE" to ""
+                    else if (conn.responseCode !in 200..299) "ERROR" to "Release service returned HTTP " + conn.responseCode
+                    else "OK" to conn.inputStream.bufferedReader().use { it.readText() }
+                } finally { conn.disconnect() }
+            } catch (e: Exception) { "ERROR" to (e.message ?: "Network error") }
+        }
+        checking = false
+        when (result.first) {
+            "NO_RELEASE" -> status = "No published update is available yet. This app checks automatically when opened; publish a signed release to enable updates."
+            "ERROR" -> status = "Could not check updates. Check your internet connection and try again."
+            else -> try {
+                val json = JSONObject(result.second)
+                latestVersion = json.optString("tag_name", "")
+                releaseNotes = json.optString("body", "No release notes provided.")
+                val assets = json.optJSONArray("assets")
+                if (assets != null) for (i in 0 until assets.length()) {
+                    val asset = assets.getJSONObject(i)
+                    if (asset.optString("name").endsWith(".apk", ignoreCase = true)) { apkUrl = asset.optString("browser_download_url"); break }
+                }
+                status = when {
+                    latestVersion.isBlank() -> "Release information is incomplete."
+                    latestVersion.trimStart('v','V') == currentVersion.trimStart('v','V') -> "You’re using the latest published version ($currentVersion)."
+                    apkUrl.isBlank() -> "Version $latestVersion is published, but it has no APK asset attached yet."
+                    else -> "Version $latestVersion is available."
+                }
+            } catch (_: Exception) { status = "Could not read release information. Try again later." }
+        }
+    }
+
+    val receiver = remember {
+        object : BroadcastReceiver() {
+            override fun onReceive(ctx: Context?, intent: Intent?) {
+                val id = intent?.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1L) ?: -1L
+                if (id > 0 && id == downloadId) installDownloadedApk(id)
+            }
+        }
+    }
+    DisposableEffect(context) {
+        val filter = IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE)
+        if (Build.VERSION.SDK_INT >= 33) context.registerReceiver(receiver, filter, Context.RECEIVER_NOT_EXPORTED)
+        else @Suppress("DEPRECATION") context.registerReceiver(receiver, filter)
+        onDispose { try { context.unregisterReceiver(receiver) } catch (_: Exception) {} }
+    }
+
+    Text("App updates", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = Navy)
+    InfoCard("Current version", "Bingwa Vecta $currentVersion")
+    InfoCard("Update status", status)
+    if (latestVersion.isNotBlank()) {
+        InfoCard("Latest release", latestVersion)
+        InfoCard("Release notes", releaseNotes.ifBlank { "No release notes provided." })
+    }
+    Button(onClick = {
+        if (apkUrl.isBlank()) status = "No downloadable APK is available. Publish a signed release with an APK asset first."
+        else try {
+            val request = DownloadManager.Request(Uri.parse(apkUrl))
+                .setTitle("Bingwa Vecta update $latestVersion")
+                .setDescription("Downloading app update")
+                .setMimeType("application/vnd.android.package-archive")
+                .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+                .setDestinationInExternalFilesDir(context, Environment.DIRECTORY_DOWNLOADS, "bingwa-vecta-update.apk")
+            downloadId = (context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager).enqueue(request)
+            status = "Downloading version $latestVersion. Android will notify you when it is ready."
+        } catch (_: Exception) { status = "Could not start the update download. Try again." }
+    }, enabled = apkUrl.isNotBlank() && !checking, modifier = Modifier.fillMaxWidth()) { Text("Update now") }
+    OutlinedButton(onClick = { scope.launch { checking = true; status = "To check again, reopen the Updates screen or restart the app."; checking = false } }, modifier = Modifier.fillMaxWidth()) { Text("Check again") }
+    InfoCard("Android security", "Android requires your approval to install an APK update. Updates must be signed with the same certificate as the installed app.")
+}
+
 @Composable
 private fun PlannedFeatureScreen(title: String, details: String) {
     Text(title, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = Navy)
