@@ -807,6 +807,13 @@ private fun UssdAutomationSettingsScreen() {
         ).orEmpty()
         enabledListeners.split(':').any { it.startsWith(context.packageName + "/") }
     }
+    val mpesaPrefs = remember(refresh) {
+        context.getSharedPreferences(MpesaNotificationListenerService.PREFS, Context.MODE_PRIVATE)
+    }
+    val lastMpesaTitle = mpesaPrefs.getString(MpesaNotificationListenerService.KEY_TITLE, "") ?: ""
+    val lastMpesaText = mpesaPrefs.getString(MpesaNotificationListenerService.KEY_TEXT, "") ?: ""
+    val lastMpesaPackage = mpesaPrefs.getString(MpesaNotificationListenerService.KEY_PACKAGE, "") ?: ""
+    val lastMpesaTime = mpesaPrefs.getLong(MpesaNotificationListenerService.KEY_TIME, 0L)
     val lastState = prefs.getString(UssdAccessibilityService.KEY_STATE, "NOT_STARTED") ?: "NOT_STARTED"
     val lastDetail = prefs.getString(UssdAccessibilityService.KEY_DETAIL, "No USSD screen has been observed yet.") ?: ""
     val updatedAt = prefs.getLong(UssdAccessibilityService.KEY_UPDATED_AT, 0L)
@@ -838,6 +845,17 @@ private fun UssdAutomationSettingsScreen() {
         onClick = { context.startActivity(Intent("android.settings.ACTION_NOTIFICATION_LISTENER_SETTINGS")) },
         modifier = Modifier.fillMaxWidth()
     ) { Text("Open Notification Access settings") }
+
+    InfoCard(
+        "Latest M-PESA notification candidate",
+        if (lastMpesaText.isBlank()) "No matching notification captured yet. This reader only works after you enable Notification Access and a matching notification arrives."
+        else "Source: $lastMpesaPackage\n$title\n$lastMpesaText\nReceived: ${dateText(lastMpesaTime)}"
+    )
+    Text(
+        "For privacy, the latest matching notification is stored only on this device for review. It is not proof of payment and never triggers delivery.",
+        color = Muted,
+        style = MaterialTheme.typography.bodySmall
+    )
 
     HorizontalDivider(color = Color(0xFF234735))
     InfoCard(
