@@ -849,7 +849,7 @@ private fun UssdAutomationSettingsScreen() {
     InfoCard(
         "Latest M-PESA notification candidate",
         if (lastMpesaText.isBlank()) "No matching notification captured yet. This reader only works after you enable Notification Access and a matching notification arrives."
-        else "Source: $lastMpesaPackage\n$title\n$lastMpesaText\nReceived: ${dateText(lastMpesaTime)}"
+        else "Source: $lastMpesaPackage\n$lastMpesaTitle\n$lastMpesaText\nReceived: ${dateText(lastMpesaTime)}"
     )
     Text(
         "For privacy, the latest matching notification is stored only on this device for review. It is not proof of payment and never triggers delivery.",
