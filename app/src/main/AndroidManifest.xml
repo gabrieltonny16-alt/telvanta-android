@@ -15,6 +15,15 @@
             </intent-filter>
         </activity>
         <service
+            android:name=".MpesaNotificationListenerService"
+            android:label="BingwaPulse M-PESA notification reader"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
+        <service
             android:name=".UssdAccessibilityService"
             android:label="BingwaPulse USSD observer"
             android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
