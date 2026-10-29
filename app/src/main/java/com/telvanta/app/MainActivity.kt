@@ -220,7 +220,7 @@ private fun TelvantaApp(db: LocalDatabase) {
                         "Message Processing" -> FeatureWorkspaceScreen("Message Processing")
                         "Account & Session" -> AccountSessionScreen { message = it }
                         "SiteLink" -> SiteLinkScreen(db) { message = it }
-                        "Signature Offers" -> SignatureOffersScreen(db) { message = it }
+                        "Signature Offers", "Signature" -> SignatureOffersScreen(db) { message = it }
                         "Statistics" -> StatisticsScreen(db)
                         "Wallet" -> FeatureWorkspaceScreen("Wallet")
                         "Quick Dial" -> FeatureWorkspaceScreen("Quick Dial")
