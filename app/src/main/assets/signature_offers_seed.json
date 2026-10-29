@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "catalogueStatus": "imported_candidates",
   "source": "User-provided extracted text from Bingwa Nexus Signature Offers",
-  "note": "Prices and entry codes are transcribed from the supplied source and have not been independently verified against live Safaricom menus. Do not enable automated purchase based on this file alone.",
+  "note": "Contains written-extraction and screenshot-derived candidate offers. Source prices and codes are not independently verified against live Safaricom menus. Similar-looking records are preserved when their source or price differs; reconcile before purchase automation.",
   "simProfiles": [
     {
       "id": "normal_sim",
@@ -186,6 +186,180 @@
       "amountKes": 30,
       "entryCode": "*188#",
       "sourceStatus": "imported_candidate"
+    },
+    {
+      "id": "data_1gb_1h_19",
+      "category": "DATA",
+      "name": "1GB - 1 Hr",
+      "amountKes": 19,
+      "sourceStatus": "imported_candidate",
+      "reviewNote": "Screenshot offer list; exact shortcode not confirmed"
+    },
+    {
+      "id": "data_250mb_24h_20",
+      "category": "DATA",
+      "name": "250MB - 24 Hrs",
+      "amountKes": 20,
+      "sourceStatus": "imported_candidate",
+      "reviewNote": "Screenshot offer list; exact shortcode not confirmed"
+    },
+    {
+      "id": "data_1gb_1h_21",
+      "category": "DATA",
+      "name": "1GB - 1 Hr",
+      "amountKes": 21,
+      "sourceStatus": "imported_candidate",
+      "reviewNote": "Screenshot offer list; exact shortcode not confirmed"
+    },
+    {
+      "id": "data_400mb_1h_23",
+      "category": "DATA",
+      "name": "400MB - 1 Hr",
+      "amountKes": 23,
+      "sourceStatus": "imported_candidate",
+      "reviewNote": "Screenshot offer list; exact shortcode not confirmed"
+    },
+    {
+      "id": "data_1_5gb_3h_50",
+      "category": "DATA",
+      "name": "1.5GB - 3 Hrs",
+      "amountKes": 50,
+      "sourceStatus": "imported_candidate",
+      "reviewNote": "Screenshot offer list; exact shortcode not confirmed"
+    },
+    {
+      "id": "data_1gb_midnight_56",
+      "category": "DATA",
+      "name": "1GB Midnight",
+      "amountKes": 56,
+      "sourceStatus": "imported_candidate",
+      "reviewNote": "Screenshot offer list; exact shortcode not confirmed"
+    },
+    {
+      "id": "data_2_5gb_30d_250",
+      "category": "DATA",
+      "name": "2.5GB - 30 Days",
+      "amountKes": 250,
+      "sourceStatus": "imported_candidate",
+      "reviewNote": "Screenshot offer list; exact shortcode not confirmed"
+    },
+    {
+      "id": "data_21gb_30d_1005",
+      "category": "DATA",
+      "name": "21GB - 30 Days",
+      "amountKes": 1005,
+      "sourceStatus": "imported_candidate",
+      "reviewNote": "Screenshot offer list; exact shortcode not confirmed"
+    },
+    {
+      "id": "voice_350flex_2h_20",
+      "category": "VOICE",
+      "name": "350 Flex - 2 Hrs",
+      "amountKes": 20,
+      "entryCode": "*444#",
+      "sourceStatus": "imported_candidate",
+      "reviewNote": "Earlier screenshot transcription; verify live menu"
+    },
+    {
+      "id": "data_400mb_1h_20_screenshot",
+      "category": "DATA",
+      "name": "400MB - 1 Hr",
+      "amountKes": 20,
+      "entryCode": "*180*5*2#",
+      "sourceStatus": "imported_candidate",
+      "reviewNote": "Earlier screenshot transcription; verify live menu"
+    },
+    {
+      "id": "data_400mb_tunukiwa_20",
+      "category": "DATA",
+      "name": "400MB - 1 Hr Tunukiwa",
+      "amountKes": 20,
+      "entryCode": "*544#",
+      "sourceStatus": "imported_candidate",
+      "reviewNote": "Earlier screenshot transcription; verify live menu"
+    },
+    {
+      "id": "sms_1500_30d_100",
+      "category": "SMS",
+      "name": "1,500 SMS - 30 Days",
+      "amountKes": 100,
+      "entryCode": "*188#",
+      "sourceStatus": "imported_candidate",
+      "reviewNote": "Earlier screenshot transcription; verify live menu"
+    },
+    {
+      "id": "data_2gb_24h_100_screenshot",
+      "category": "DATA",
+      "name": "2GB - 24 Hrs",
+      "amountKes": 100,
+      "entryCode": "*544#",
+      "sourceStatus": "imported_candidate",
+      "reviewNote": "Earlier screenshot transcription; differs from written source code *456#; requires verification"
+    },
+    {
+      "id": "data_7gb_30d_500",
+      "category": "DATA",
+      "name": "7GB - 30 Days",
+      "amountKes": 500,
+      "entryCode": "*180*5*2#",
+      "sourceStatus": "imported_candidate",
+      "reviewNote": "Earlier screenshot transcription; verify live menu"
+    },
+    {
+      "id": "voice_22_45mins_3h",
+      "category": "VOICE",
+      "name": "45 Mins - 3 Hrs",
+      "amountKes": 22,
+      "sourceStatus": "imported_candidate",
+      "reviewNote": "Screenshot offer list; exact shortcode not confirmed"
+    },
+    {
+      "id": "voice_24_350flex_2h",
+      "category": "VOICE",
+      "name": "350 Flex - 2 Hrs",
+      "amountKes": 24,
+      "sourceStatus": "imported_candidate",
+      "reviewNote": "Screenshot offer list; exact shortcode not confirmed"
+    },
+    {
+      "id": "voice_51_60mins_midnight",
+      "category": "VOICE",
+      "name": "60 Mins - Midnight",
+      "amountKes": 51,
+      "sourceStatus": "imported_candidate",
+      "reviewNote": "Screenshot offer list; exact shortcode not confirmed"
+    },
+    {
+      "id": "voice_200_250mins_7d",
+      "category": "VOICE",
+      "name": "250 Mins - 7 Days",
+      "amountKes": 200,
+      "sourceStatus": "imported_candidate",
+      "reviewNote": "Screenshot offer list; exact shortcode not confirmed"
+    },
+    {
+      "id": "voice_501_300mins_30d",
+      "category": "VOICE",
+      "name": "300 Mins - 30 Days",
+      "amountKes": 501,
+      "sourceStatus": "imported_candidate",
+      "reviewNote": "Screenshot offer list; exact shortcode not confirmed"
+    },
+    {
+      "id": "voice_1010_800mins_30d",
+      "category": "VOICE",
+      "name": "800 Mins - 30 Days",
+      "amountKes": 1010,
+      "sourceStatus": "imported_candidate",
+      "reviewNote": "Screenshot offer list; exact shortcode not confirmed"
+    }
+  ],
+  "sources": [
+    {
+      "id": "screenshots_transcription",
+      "description": "Additional candidates transcribed from earlier screenshot discussion",
+      "status": "partially_reconciled",
+      "note": "Some values/codes need live verification; do not treat missing codes as known."
     }
   ]
 }
