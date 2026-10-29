@@ -400,20 +400,82 @@ private fun SiteLinkScreen(db: LocalDatabase, onMessage: (String) -> Unit) {
 
 @Composable
 private fun SignatureOffersScreen(db: LocalDatabase, onMessage: (String) -> Unit) {
-    var offerName by remember { mutableStateOf("") }
-    var price by remember { mutableStateOf("") }
+    data class CandidateOffer(val id: String, val category: String, val name: String, val price: Int, val code: String, val note: String)
+    val context = LocalContext.current
+    val candidates = remember {
+        runCatching {
+            val raw = context.assets.open("signature_offers_seed.json").bufferedReader().use { it.readText() }
+            val root = JSONObject(raw)
+            val rows = root.getJSONArray("offers")
+            buildList {
+                for (i in 0 until rows.length()) {
+                    val row = rows.getJSONObject(i)
+                    add(CandidateOffer(
+                        id = row.optString("id"),
+                        category = row.optString("category", "OTHER"),
+                        name = row.optString("name", "Unnamed offer"),
+                        price = row.optInt("amountKes", -1),
+                        code = row.optString("entryCode", ""),
+                        note = row.optString("reviewNote", if (row.has("entryCode")) "Candidate code — not independently verified" else "Exact entry code not captured")
+                    ))
+                }
+            }
+        }.getOrElse { emptyList() }
+    }
+    var search by remember { mutableStateOf("") }
+    var category by remember { mutableStateOf("ALL") }
+    var showSaved by remember { mutableStateOf(false) }
     var reload by remember { mutableIntStateOf(0) }
     val saved = remember(reload) { db.offers().filter { it.source.contains("signature", ignoreCase = true) } }
+    val categories = listOf("ALL", "DATA", "VOICE", "SMS", "COMBO")
+    val visible = candidates.filter {
+        (category == "ALL" || it.category.equals(category, true)) &&
+            (search.isBlank() || it.name.contains(search, true) || it.price.toString().contains(search) || it.code.contains(search, true))
+    }
     Text("Signature Offers", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = Navy)
-    InfoCard("Manage signature offers", "Create a locally saved offer marked with source Signature, or review existing offers. Provider integrations remain disabled.")
-    OutlinedTextField(offerName, { offerName = it }, label = { Text("Offer name / bundle") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
-    OutlinedTextField(price, { price = it }, label = { Text("Selling price (KES)") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
-    Button(onClick = { val amount = price.toDoubleOrNull(); if (offerName.isBlank() || amount == null || amount < 0) onMessage("Enter an offer name and a valid non-negative price.") else try { db.saveOffer(null, offerName, "Signature", amount, null, "Signature", false); offerName = ""; price = ""; reload++; onMessage("Signature offer saved locally and marked unverified.") } catch (_: Exception) { onMessage("Could not save signature offer. Check the details.") } }, modifier = Modifier.fillMaxWidth()) { Text("Save signature offer") }
-    Text("Saved signature offers (" + saved.size + ")", fontWeight = FontWeight.Bold, color = Navy)
-    if (saved.isEmpty()) InfoCard("No signature offers yet", "Add your first offer above. Saved entries remain local and unverified.")
-    saved.forEach { offer -> Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF12382A)), modifier = Modifier.fillMaxWidth()) { Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) { Text(offer.name, fontWeight = FontWeight.Bold, color = Navy); Text("KES " + money(offer.price) + " · " + offer.category, color = Muted); Text("Source: " + offer.source + " · " + if (offer.verified) "Operator marked verified" else "Unverified", color = Muted, style = MaterialTheme.typography.bodySmall) } } }
+    InfoCard("Imported candidate catalogue", "Loaded from the bundled 41-record source file. These are candidate records, not verified live Safaricom offers. Duplicate-looking prices/labels are preserved for review; no purchase or USSD action is triggered here.")
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        listOf("Candidates" to false, "Saved offers" to true).forEach { item ->
+            FilterChip(selected = showSaved == item.second, onClick = { showSaved = item.second }, label = { Text(item.first) })
+        }
+    }
+    if (!showSaved) {
+        OutlinedTextField(value = search, onValueChange = { search = it }, label = { Text("Search name, price or code") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            categories.forEach { item -> FilterChip(selected = category == item, onClick = { category = item }, label = { Text(item) }) }
+        }
+        Text("Showing ${visible.size} of ${candidates.size} candidate records", color = Muted, style = MaterialTheme.typography.labelMedium)
+        if (candidates.isEmpty()) InfoCard("Catalogue unavailable", "The bundled candidate catalogue could not be read. No data was imported.")
+        visible.forEach { offer ->
+            Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF12382A)), modifier = Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = androidx.compose.ui.Alignment.Top) {
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                            Text(offer.name, fontWeight = FontWeight.Bold, color = Navy)
+                            Text(offer.category, color = Teal, style = MaterialTheme.typography.labelSmall)
+                        }
+                        Text(if (offer.price >= 0) "KES ${offer.price}" else "Price unknown", color = Color(0xFFD9FF24), fontWeight = FontWeight.ExtraBold)
+                    }
+                    Text("Entry code: " + if (offer.code.isBlank()) "Not captured" else offer.code, color = Navy)
+                    Text(offer.note, color = Muted, style = MaterialTheme.typography.bodySmall)
+                    Text("Status: CANDIDATE · NOT VERIFIED", color = Color(0xFFFFC857), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall)
+                }
+            }
+        }
+    } else {
+        Text("Saved signature offers (${saved.size})", fontWeight = FontWeight.Bold, color = Navy)
+        if (saved.isEmpty()) InfoCard("No saved offers yet", "Candidate records are shown separately so unverified source entries do not silently become active offers.")
+        saved.forEach { offer ->
+            Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF12382A)), modifier = Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                    Text(offer.name, fontWeight = FontWeight.Bold, color = Navy)
+                    Text("KES " + money(offer.price) + " · " + offer.category, color = Muted)
+                    Text("Source: " + offer.source + " · " + if (offer.verified) "Operator marked verified" else "Unverified", color = Muted, style = MaterialTheme.typography.bodySmall)
+                }
+            }
+        }
+    }
 }
-
 @Composable
 private fun UpdatesScreen() {
     val context = LocalContext.current
