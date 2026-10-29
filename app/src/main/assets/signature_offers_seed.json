@@ -1,0 +1,191 @@
+{
+  "schemaVersion": 1,
+  "catalogueStatus": "imported_candidates",
+  "source": "User-provided extracted text from Bingwa Nexus Signature Offers",
+  "note": "Prices and entry codes are transcribed from the supplied source and have not been independently verified against live Safaricom menus. Do not enable automated purchase based on this file alone.",
+  "simProfiles": [
+    {
+      "id": "normal_sim",
+      "name": "Normal SIM",
+      "reportedCount": 1,
+      "description": "Ordinary Safaricom line — standard menus"
+    },
+    {
+      "id": "notification_sim",
+      "name": "Notification SIM",
+      "reportedCount": 16,
+      "description": "Line registered under a Till — agent menus"
+    }
+  ],
+  "offers": [
+    {
+      "id": "data_400mb_gift_7d_tunukiwa_50",
+      "category": "DATA",
+      "name": "400MB Gift 7 Days Tunukiwa",
+      "amountKes": 50,
+      "entryCode": "*544#",
+      "sourceStatus": "imported_candidate"
+    },
+    {
+      "id": "data_2gb_24h_100",
+      "category": "DATA",
+      "name": "2GB - 24 Hrs",
+      "amountKes": 100,
+      "entryCode": "*456#",
+      "sourceStatus": "imported_candidate"
+    },
+    {
+      "id": "data_250mb_50sms_whatsapp_24h_20",
+      "category": "COMBO",
+      "name": "250MB+50SMS+WhatsApp - 24 Hrs",
+      "amountKes": 20,
+      "entryCode": "*544#",
+      "sourceStatus": "imported_candidate"
+    },
+    {
+      "id": "data_1_5gb_3h_repeat_50",
+      "category": "DATA",
+      "name": "1.5GB 3hr buy many times",
+      "amountKes": 50,
+      "entryCode": "*544#",
+      "sourceStatus": "imported_candidate"
+    },
+    {
+      "id": "data_900mb_midnight_55",
+      "category": "DATA",
+      "name": "900mbs till midnight",
+      "amountKes": 55,
+      "entryCode": "*544#",
+      "sourceStatus": "imported_candidate"
+    },
+    {
+      "id": "data_1gb_1h_baze_20",
+      "category": "COMBO",
+      "name": "1GB 1HR + BAZE",
+      "amountKes": 20,
+      "entryCode": "*544#",
+      "sourceStatus": "imported_candidate"
+    },
+    {
+      "id": "data_1_5gb_50sms_whatsapp_24h_99",
+      "category": "COMBO",
+      "name": "1.5GB+50SMS+WhatsApp - 24 Hrs",
+      "amountKes": 99,
+      "entryCode": "*544#",
+      "sourceStatus": "imported_candidate"
+    },
+    {
+      "id": "data_1gb_1h_repeat_20",
+      "category": "DATA",
+      "name": "1GB 1HR buy many times",
+      "amountKes": 20,
+      "entryCode": "*544#",
+      "sourceStatus": "imported_candidate"
+    },
+    {
+      "id": "data_750mb_50sms_whatsapp_24h_50",
+      "category": "COMBO",
+      "name": "750MB+50SMS+WhatsApp - 24 Hrs",
+      "amountKes": 50,
+      "entryCode": "*544#",
+      "sourceStatus": "imported_candidate"
+    },
+    {
+      "id": "data_1gb_1h_20",
+      "category": "DATA",
+      "name": "1GB - 1 Hr",
+      "amountKes": 20,
+      "entryCode": "*544#",
+      "sourceStatus": "imported_candidate"
+    },
+    {
+      "id": "data_1gb_1h_tunukiwa_repeat_20",
+      "category": "DATA",
+      "name": "1GB 1HR tunukiwa multiple times",
+      "amountKes": 20,
+      "entryCode": "*456#",
+      "sourceStatus": "imported_candidate"
+    },
+    {
+      "id": "voice_250mins_7d_200",
+      "category": "VOICE",
+      "name": "250 Mins - 7 Days",
+      "amountKes": 200,
+      "entryCode": "*444#",
+      "sourceStatus": "imported_candidate"
+    },
+    {
+      "id": "voice_50mins_50sms_midnight_54",
+      "category": "COMBO",
+      "name": "50 Mins + 50 SMS - Midnight",
+      "amountKes": 54,
+      "entryCode": "*444#",
+      "sourceStatus": "imported_candidate"
+    },
+    {
+      "id": "voice_45mins_3h_22",
+      "category": "VOICE",
+      "name": "45 Mins - 3 Hrs",
+      "amountKes": 22,
+      "entryCode": "*544#",
+      "sourceStatus": "imported_candidate"
+    },
+    {
+      "id": "voice_60mins_midnight_50",
+      "category": "VOICE",
+      "name": "60 Mins - Midnight",
+      "amountKes": 50,
+      "entryCode": "*544#",
+      "sourceStatus": "imported_candidate"
+    },
+    {
+      "id": "voice_43mins_3h_20",
+      "category": "VOICE",
+      "name": "43 Mins - 3 Hrs",
+      "amountKes": 20,
+      "entryCode": "*444#",
+      "sourceStatus": "imported_candidate"
+    },
+    {
+      "id": "voice_1250mins_30d_tunukiwa_1000",
+      "category": "VOICE",
+      "name": "1250 Mins 30 Days Tunukiwa",
+      "amountKes": 1000,
+      "entryCode": "*444#",
+      "sourceStatus": "imported_candidate"
+    },
+    {
+      "id": "voice_50mins_50sms_midnight_50",
+      "category": "COMBO",
+      "name": "50 Mins + 50SMS - Midnight",
+      "amountKes": 50,
+      "entryCode": "*444#",
+      "sourceStatus": "imported_candidate",
+      "reviewNote": "Similar label to the KES 54 entry; preserve as a separate source record pending verification."
+    },
+    {
+      "id": "sms_20_daily_5",
+      "category": "SMS",
+      "name": "20 SMS - Daily",
+      "amountKes": 5,
+      "entryCode": "*188#",
+      "sourceStatus": "imported_candidate"
+    },
+    {
+      "id": "sms_200_daily_10",
+      "category": "SMS",
+      "name": "200 SMS - Daily",
+      "amountKes": 10,
+      "entryCode": "*188#",
+      "sourceStatus": "imported_candidate"
+    },
+    {
+      "id": "sms_1000_7d_30",
+      "category": "SMS",
+      "name": "1000 SMS - 7 Days",
+      "amountKes": 30,
+      "entryCode": "*188#",
+      "sourceStatus": "imported_candidate"
+    }
+  ]
+}
