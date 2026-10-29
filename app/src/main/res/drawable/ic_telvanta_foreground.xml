@@ -4,27 +4,12 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <path
-        android:fillColor="#FFFFFFFF"
-        android:pathData="M27,28 L81,28 L81,39 L60,39 L60,79 L48,79 L48,39 L27,39 Z" />
-    <path
-        android:fillColor="#00000000"
-        android:strokeColor="#FF35D0B0"
-        android:strokeWidth="5"
-        android:strokeLineCap="round"
-        android:strokeLineJoin="round"
-        android:pathData="M22,68 C27,58 35,53 44,51" />
-    <path
-        android:fillColor="#00000000"
-        android:strokeColor="#FF35D0B0"
-        android:strokeWidth="5"
-        android:strokeLineCap="round"
-        android:strokeLineJoin="round"
-        android:pathData="M64,51 C73,53 81,58 86,68" />
-    <path
-        android:fillColor="#FF35D0B0"
-        android:pathData="M18,79 L25,79 L25,86 L18,86 Z" />
-    <path
-        android:fillColor="#FF35D0B0"
-        android:pathData="M83,79 L90,79 L90,86 L83,86 Z" />
+    <!-- Vecta's clean V mark stays inside Android's adaptive-icon safe zone. -->
+    <path android:fillColor="#FFFFFFFF" android:pathData="M20,27 L35,27 L53,66 L73,27 L88,27 L62,81 L47,81 Z" />
+    <path android:fillColor="#FF00D66B" android:pathData="M20,27 L29,27 L49,69 L43,69 Z" />
+    <path android:fillColor="#FFB9F227" android:pathData="M68,27 L78,27 L58,69 L52,69 Z" />
+    <!-- Orbit sweep -->
+    <path android:fillColor="#00000000" android:strokeColor="#FF00E676" android:strokeWidth="6" android:strokeLineCap="round" android:strokeLineJoin="round" android:pathData="M17,70 C32,58 55,52 83,49 C73,62 52,73 29,77" />
+    <path android:fillColor="#00000000" android:strokeColor="#FFB9F227" android:strokeWidth="3.5" android:strokeLineCap="round" android:pathData="M76,17 C84,19 90,25 93,34" />
+    <path android:fillColor="#FFB9F227" android:pathData="M82,9 C94,12 101,22 104,34 L99,35 C96,25 90,17 81,14 Z" />
 </vector>

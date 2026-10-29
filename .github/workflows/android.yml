@@ -1,7 +1,7 @@
-name: Android debug build
+name: BingwaPulse Android build
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "main", "feature/vecta-branding" ]
   pull_request:
     branches: [ "main" ]
   workflow_dispatch:
@@ -30,9 +30,11 @@ jobs:
           "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install "platforms;android-35" "build-tools;35.0.0"
       - name: Build debug APK
         run: gradle --no-daemon assembleDebug
-      - name: Upload debug APK
+      - name: Name APK
+        run: cp app/build/outputs/apk/debug/app-debug.apk BingwaPulse-debug.apk
+      - name: Upload BingwaPulse APK
         uses: actions/upload-artifact@v4
         with:
-          name: telvanta-android-debug
-          path: app/build/outputs/apk/debug/app-debug.apk
+          name: bingwapulse-android-debug
+          path: BingwaPulse-debug.apk
           if-no-files-found: error
