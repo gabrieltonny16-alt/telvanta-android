@@ -532,6 +532,7 @@ private fun SignatureOffersScreen(db: LocalDatabase, onMessage: (String) -> Unit
                 }
             }
         }
+    }
     downloadCandidate?.let { candidate ->
         AlertDialog(
             onDismissRequest = { downloadCandidate = null },
