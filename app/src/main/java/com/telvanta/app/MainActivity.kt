@@ -149,36 +149,92 @@ private fun BingwaPulseApp(db: LocalDatabase) {
                     when(selected) {
                         "Dashboard" -> {
                             var dashboardView by remember { mutableStateOf("Overview") }
-                            val orderCount = db.count("orders")
+                            val orders = remember { db.orders() }
+                            val orderCount = orders.size
+                            val pendingCount = orders.count { it.status == "PENDING" }
+                            val failedCount = orders.count { it.status == "FAILED" }
+                            val deliveredCount = orders.count { it.status == "DELIVERED_MANUALLY_RECORDED" }
                             val customerCount = db.count("customers")
                             val offerCount = db.count("offers")
                             val transactionCount = db.count("transactions")
+                            val recordedValue = orders.filter { it.status == "DELIVERED_MANUALLY_RECORDED" }.sumOf { it.price }
                             val hour = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
-                            val greeting = if (hour < 12) "Good Morning" else if (hour < 17) "Good Afternoon" else "Good Evening"
-                            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                                Surface(color = Color(0xFF062416), shape = MaterialTheme.shapes.extraLarge, modifier = Modifier.fillMaxWidth()) {
+                            val greeting = if (hour < 12) "Good morning" else if (hour < 17) "Good afternoon" else "Good evening"
+                            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                                Surface(
+                                    color = Color(0xFF07351F),
+                                    shape = RoundedCornerShape(26.dp),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
                                     Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                                        Text(greeting + ", Gabriel", color = Navy, fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.headlineSmall)
-                                        Text(SimpleDateFormat("EEEE, MMMM d", Locale.getDefault()).format(Date()), color = Muted)
-                                        HorizontalDivider(color = Color(0xFF16452B))
-                                        Text("Workspace status", color = Muted)
-                                        Text("Local records only", color = Teal, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleLarge)
-                                        Text("Wallet, airtime balance and live provider status are not connected.", color = Muted, style = MaterialTheme.typography.bodySmall)
-                                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                            DashboardMetric("Orders", orderCount, Color(0xFF00D66B), Modifier.weight(1f))
-                                            DashboardMetric("Customers", customerCount, Color(0xFF38BDF8), Modifier.weight(1f))
-                                            DashboardMetric("Offers", offerCount, Color(0xFFFFB020), Modifier.weight(1f))
+                                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                                            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                                Text(greeting, color = Color(0xFFB7FF24), style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+                                                Text("Gabriel", color = Color.White, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.ExtraBold)
+                                                Text(SimpleDateFormat("EEEE, d MMMM", Locale.getDefault()).format(Date()), color = Color(0xFFB7CDBF), style = MaterialTheme.typography.bodySmall)
+                                            }
+                                            Surface(color = Color(0xFF0D5731), shape = RoundedCornerShape(18.dp)) {
+                                                Text("B", color = Color(0xFFB7FF24), fontWeight = FontWeight.Black, style = MaterialTheme.typography.headlineMedium, modifier = Modifier.padding(horizontal = 17.dp, vertical = 10.dp))
+                                            }
                                         }
-                                        Text("Transactions recorded locally: " + transactionCount, color = Muted, style = MaterialTheme.typography.bodySmall)
+                                        HorizontalDivider(color = Color(0xFF286443))
+                                        Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                            Surface(color = Color(0xFF00D66B), shape = RoundedCornerShape(50)) { Spacer(Modifier.size(8.dp)) }
+                                            Text("LOCAL WORKSPACE ACTIVE", color = Color(0xFFE4F8EB), style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                                        }
+                                        Text("Your business records are stored on this device. Provider, wallet and live payment connections are not active.", color = Color(0xFFB7CDBF), style = MaterialTheme.typography.bodySmall)
                                     }
                                 }
-                                Surface(color = Color(0xFF062416), shape = RoundedCornerShape(18.dp), modifier = Modifier.fillMaxWidth()) {
-                                    Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                        Text("Airtime balance", color = Muted)
-                                        Text("Not connected", color = Navy, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleLarge)
-                                        Text("Airtime usage will appear here when a verified device/provider connection is implemented.", color = Muted, style = MaterialTheme.typography.bodySmall)
+
+                                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                                    Text("Business overview", color = Navy, fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.titleLarge)
+                                    Text("ALL-TIME", color = Color(0xFFB7FF24), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall, letterSpacing = 1.sp)
+                                }
+                                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(9.dp)) {
+                                    DashboardMetric("Orders", orderCount, Color(0xFFB7FF24), Modifier.weight(1f))
+                                    DashboardMetric("Customers", customerCount, Color(0xFF67DFA0), Modifier.weight(1f))
+                                    DashboardMetric("Offers", offerCount, Color(0xFF8CCBFF), Modifier.weight(1f))
+                                }
+
+                                Card(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(22.dp),
+                                    colors = CardDefaults.cardColors(containerColor = Color(0xFF092719))
+                                ) {
+                                    Column(Modifier.padding(17.dp), verticalArrangement = Arrangement.spacedBy(13.dp)) {
+                                        Text("Order status", color = Navy, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+                                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                            DashboardMetric("Pending", pendingCount, Color(0xFFFFC857), Modifier.weight(1f))
+                                            DashboardMetric("Delivered*", deliveredCount, Color(0xFF00D66B), Modifier.weight(1f))
+                                            DashboardMetric("Failed", failedCount, Color(0xFFFF8A80), Modifier.weight(1f))
+                                        }
+                                        Text("*Manually recorded as delivered; not independently verified by the app.", color = Muted, style = MaterialTheme.typography.labelSmall)
                                     }
                                 }
+
+                                Card(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(22.dp),
+                                    colors = CardDefaults.cardColors(containerColor = Color(0xFF092719))
+                                ) {
+                                    Column(Modifier.padding(17.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                        Text("Recorded delivery value", color = Muted, style = MaterialTheme.typography.labelLarge)
+                                        Text("KES ${money(recordedValue)}", color = Color(0xFFB7FF24), fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.headlineMedium)
+                                        Text("Based only on orders manually marked delivered. Not verified revenue.", color = Muted, style = MaterialTheme.typography.bodySmall)
+                                        Text("$transactionCount transaction notes recorded locally", color = Muted, style = MaterialTheme.typography.labelSmall)
+                                    }
+                                }
+
+                                Text("Quick actions", color = Navy, fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.titleLarge)
+                                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                    QuickAction("＋", "New order", Modifier.weight(1f)) { selected = "Orders" }
+                                    QuickAction("＋", "Add customer", Modifier.weight(1f)) { selected = "Customers" }
+                                }
+                                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                    QuickAction("▤", "Manage offers", Modifier.weight(1f)) { selected = "Offers" }
+                                    QuickAction("↔", "Transactions", Modifier.weight(1f)) { selected = "Transaction History" }
+                                }
+
                                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                                     listOf("Overview", "Transactions", "Analytics").forEach { view ->
                                         val active = dashboardView == view
@@ -193,18 +249,7 @@ private fun BingwaPulseApp(db: LocalDatabase) {
                                 when (dashboardView) {
                                     "Transactions" -> TransactionsScreen(db) { message = it }
                                     "Analytics" -> StatisticsScreen(db)
-                                    else -> {
-                                        Text("Quick actions", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = Navy)
-                                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                                            QuickAction("＋", "Add offer", Modifier.weight(1f)) { selected = "Offers" }
-                                            QuickAction("＋", "Add customer", Modifier.weight(1f)) { selected = "Customers" }
-                                        }
-                                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                                            QuickAction("↗", "New order", Modifier.weight(1f)) { selected = "Orders" }
-                                            QuickAction("≡", "Message review", Modifier.weight(1f)) { selected = "Message Processing" }
-                                        }
-                                        InfoCard("Payment and delivery safety", "Only locally recorded information is shown here. No payment is considered verified and no bundle is marked delivered by this dashboard.")
-                                    }
+                                    else -> InfoCard("Operational safety", "BingwaPulse currently stores and displays local records. It does not verify M-PESA payments, submit USSD purchases or automatically deliver bundles.")
                                 }
                             }
                         }
