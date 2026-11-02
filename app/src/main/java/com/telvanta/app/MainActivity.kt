@@ -475,6 +475,8 @@ private fun SignatureOffersScreen(db: LocalDatabase, onMessage: (String) -> Unit
     var simProfile by remember { mutableStateOf("ALL") }
     var showSaved by remember { mutableStateOf(false) }
     var reload by remember { mutableIntStateOf(0) }
+    var downloadCandidate by remember { mutableStateOf<CandidateOffer?>(null) }
+    var downloadPrice by remember { mutableStateOf("") }
     val saved = remember(reload) { db.offers().filter { it.source.contains("signature", ignoreCase = true) } }
     val categories = listOf("ALL", "DATA", "VOICE", "SMS", "COMBO")
     val visible = candidates.filter {
@@ -514,6 +516,7 @@ private fun SignatureOffersScreen(db: LocalDatabase, onMessage: (String) -> Unit
                     if (offer.tags.isNotBlank()) Text("Tags: ${offer.tags}", color = Muted, style = MaterialTheme.typography.bodySmall)
                     Text(offer.note, color = Muted, style = MaterialTheme.typography.bodySmall)
                     Text("Status: CANDIDATE · NOT VERIFIED", color = Color(0xFFFFC857), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall)
+                    Button(onClick = { downloadCandidate = offer; downloadPrice = if (offer.price >= 0) offer.price.toString() else "" }, modifier = Modifier.fillMaxWidth()) { Text("Download to My Offers") }
                 }
             }
         }
@@ -529,6 +532,41 @@ private fun SignatureOffersScreen(db: LocalDatabase, onMessage: (String) -> Unit
                 }
             }
         }
+    downloadCandidate?.let { candidate ->
+        AlertDialog(
+            onDismissRequest = { downloadCandidate = null },
+            title = { Text("Set selling price") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(candidate.name, fontWeight = FontWeight.Bold)
+                    Text(if (candidate.price >= 0) "Signature reference price: KES ${candidate.price}" else "Signature reference price was not captured.")
+                    OutlinedTextField(
+                        value = downloadPrice,
+                        onValueChange = { downloadPrice = it.filter { ch -> ch.isDigit() || ch == '.' } },
+                        label = { Text("Your selling price (KES)") },
+                        singleLine = true
+                    )
+                    Text("The offer will be added to My Offers using this price.", style = MaterialTheme.typography.bodySmall, color = Muted)
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    val price = downloadPrice.toDoubleOrNull()
+                    if (price == null || price <= 0.0) onMessage("Enter a valid selling price greater than zero.")
+                    else try {
+                        db.saveOffer(null, candidate.name, candidate.category, price,
+                            if (candidate.price >= 0) candidate.price.toDouble() else null,
+                            "Signature import · ${candidate.simProfile} SIM", false, false)
+                        reload++
+                        downloadCandidate = null
+                        onMessage("${candidate.name} added to My Offers at KES ${money(price)}.")
+                    } catch (e: Exception) {
+                        onMessage(e.message ?: "Could not download this offer. Check whether its selling price is already used.")
+                    }
+                }) { Text("Download offer") }
+            },
+            dismissButton = { TextButton(onClick = { downloadCandidate = null }) { Text("Cancel") } }
+        )
     }
 }
 @Composable
