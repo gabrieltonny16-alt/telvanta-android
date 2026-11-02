@@ -445,7 +445,7 @@ private fun SiteLinkScreen(db: LocalDatabase, onMessage: (String) -> Unit) {
 
 @Composable
 private fun SignatureOffersScreen(db: LocalDatabase, onMessage: (String) -> Unit) {
-    data class CandidateOffer(val id: String, val category: String, val name: String, val price: Int, val code: String, val note: String)
+    data class CandidateOffer(val id: String, val simProfile: String, val category: String, val name: String, val duration: String, val price: Int, val code: String, val tags: String, val note: String)
     val context = LocalContext.current
     val candidates = remember {
         runCatching {
@@ -457,10 +457,13 @@ private fun SignatureOffersScreen(db: LocalDatabase, onMessage: (String) -> Unit
                     val row = rows.getJSONObject(i)
                     add(CandidateOffer(
                         id = row.optString("id"),
+                        simProfile = row.optString("simProfile", "any"),
                         category = row.optString("category", "OTHER"),
                         name = row.optString("name", "Unnamed offer"),
+                        duration = row.optString("duration", "Duration not captured"),
                         price = row.optInt("amountKes", -1),
                         code = row.optString("entryCode", ""),
+                        tags = row.optString("tags", ""),
                         note = row.optString("reviewNote", if (row.has("entryCode")) "Candidate code — not independently verified" else "Exact entry code not captured")
                     ))
                 }
@@ -469,16 +472,18 @@ private fun SignatureOffersScreen(db: LocalDatabase, onMessage: (String) -> Unit
     }
     var search by remember { mutableStateOf("") }
     var category by remember { mutableStateOf("ALL") }
+    var simProfile by remember { mutableStateOf("ALL") }
     var showSaved by remember { mutableStateOf(false) }
     var reload by remember { mutableIntStateOf(0) }
     val saved = remember(reload) { db.offers().filter { it.source.contains("signature", ignoreCase = true) } }
     val categories = listOf("ALL", "DATA", "VOICE", "SMS", "COMBO")
     val visible = candidates.filter {
         (category == "ALL" || it.category.equals(category, true)) &&
+            (simProfile == "ALL" || it.simProfile.equals(simProfile, true)) &&
             (search.isBlank() || it.name.contains(search, true) || it.price.toString().contains(search) || it.code.contains(search, true))
     }
     Text("Signature Offers", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = Navy)
-    InfoCard("Imported candidate catalogue", "Loaded from the bundled 41-record source file. These are candidate records, not verified live Safaricom offers. Duplicate-looking prices/labels are preserved for review; no purchase or USSD action is triggered here.")
+    InfoCard("44 extracted Signature Offers", "Any SIM, Normal SIM and Notification SIM offers from your supplied extraction. Entries remain unverified candidates; no USSD action or purchase is triggered.")
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         listOf("Candidates" to false, "Saved offers" to true).forEach { item ->
             FilterChip(selected = showSaved == item.second, onClick = { showSaved = item.second }, label = { Text(item.first) })
@@ -489,6 +494,9 @@ private fun SignatureOffersScreen(db: LocalDatabase, onMessage: (String) -> Unit
         Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             categories.forEach { item -> FilterChip(selected = category == item, onClick = { category = item }, label = { Text(item) }) }
         }
+        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            listOf("ALL" to "All SIMs", "any" to "Any SIM", "normal" to "Normal SIM", "notification" to "Notification SIM").forEach { item -> FilterChip(selected = simProfile == item.first, onClick = { simProfile = item.first }, label = { Text(item.second) }) }
+        }
         Text("Showing ${visible.size} of ${candidates.size} candidate records", color = Muted, style = MaterialTheme.typography.labelMedium)
         if (candidates.isEmpty()) InfoCard("Catalogue unavailable", "The bundled candidate catalogue could not be read. No data was imported.")
         visible.forEach { offer ->
@@ -497,11 +505,13 @@ private fun SignatureOffersScreen(db: LocalDatabase, onMessage: (String) -> Unit
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = androidx.compose.ui.Alignment.Top) {
                         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                             Text(offer.name, fontWeight = FontWeight.Bold, color = Navy)
-                            Text(offer.category, color = Teal, style = MaterialTheme.typography.labelSmall)
+                            Text("${offer.category} · ${offer.duration}", color = Teal, style = MaterialTheme.typography.labelSmall)
+                            Text(when(offer.simProfile) { "normal" -> "NORMAL SIM"; "notification" -> "NOTIFICATION SIM"; else -> "ANY SIM" }, color = Muted, style = MaterialTheme.typography.labelSmall)
                         }
                         Text(if (offer.price >= 0) "KES ${offer.price}" else "Price unknown", color = Color(0xFFB7FF24), fontWeight = FontWeight.ExtraBold)
                     }
-                    Text("Entry code: " + if (offer.code.isBlank()) "Not captured" else offer.code, color = Navy)
+                    Text("Dial: " + if (offer.code.isBlank()) "Not captured" else offer.code, color = Navy)
+                    if (offer.tags.isNotBlank()) Text("Tags: ${offer.tags}", color = Muted, style = MaterialTheme.typography.bodySmall)
                     Text(offer.note, color = Muted, style = MaterialTheme.typography.bodySmall)
                     Text("Status: CANDIDATE · NOT VERIFIED", color = Color(0xFFFFC857), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall)
                 }
