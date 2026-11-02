@@ -1,365 +1,564 @@
 {
-  "schemaVersion": 1,
-  "catalogueStatus": "imported_candidates",
-  "source": "User-provided extracted text from Bingwa Nexus Signature Offers",
-  "note": "Contains written-extraction and screenshot-derived candidate offers. Source prices and codes are not independently verified against live Safaricom menus. Similar-looking records are preserved when their source or price differs; reconcile before purchase automation.",
+  "schemaVersion": 2,
+  "catalogueStatus": "user_supplied_candidates_unverified",
+  "source": "User-provided extracted text from Signature Offers images",
+  "note": "44 entries supplied by the user, including Any SIM, Normal SIM and Notification SIM profiles. Candidate codes, prices and availability are not independently verified; preserve duplicates/conflicts for review. No automatic USSD or fulfilment is enabled.",
   "simProfiles": [
     {
-      "id": "normal_sim",
+      "id": "any",
+      "name": "Any SIM",
+      "reportedCount": 23,
+      "description": "Reported to work on both SIM types"
+    },
+    {
+      "id": "normal",
       "name": "Normal SIM",
-      "reportedCount": 1,
+      "reportedCount": 2,
       "description": "Ordinary Safaricom line — standard menus"
     },
     {
-      "id": "notification_sim",
+      "id": "notification",
       "name": "Notification SIM",
-      "reportedCount": 16,
+      "reportedCount": 9,
       "description": "Line registered under a Till — agent menus"
     }
   ],
   "offers": [
     {
-      "id": "data_400mb_gift_7d_tunukiwa_50",
+      "id": "any_1gb_1_hr_20_1",
+      "simProfile": "any",
       "category": "DATA",
-      "name": "400MB Gift 7 Days Tunukiwa",
-      "amountKes": 50,
-      "entryCode": "*544#",
-      "sourceStatus": "imported_candidate"
-    },
-    {
-      "id": "data_2gb_24h_100",
-      "category": "DATA",
-      "name": "2GB - 24 Hrs",
-      "amountKes": 100,
-      "entryCode": "*456#",
-      "sourceStatus": "imported_candidate"
-    },
-    {
-      "id": "data_250mb_50sms_whatsapp_24h_20",
-      "category": "COMBO",
-      "name": "250MB+50SMS+WhatsApp - 24 Hrs",
-      "amountKes": 20,
-      "entryCode": "*544#",
-      "sourceStatus": "imported_candidate"
-    },
-    {
-      "id": "data_1_5gb_3h_repeat_50",
-      "category": "DATA",
-      "name": "1.5GB 3hr buy many times",
-      "amountKes": 50,
-      "entryCode": "*544#",
-      "sourceStatus": "imported_candidate"
-    },
-    {
-      "id": "data_900mb_midnight_55",
-      "category": "DATA",
-      "name": "900mbs till midnight",
-      "amountKes": 55,
-      "entryCode": "*544#",
-      "sourceStatus": "imported_candidate"
-    },
-    {
-      "id": "data_1gb_1h_baze_20",
-      "category": "COMBO",
-      "name": "1GB 1HR + BAZE",
-      "amountKes": 20,
-      "entryCode": "*544#",
-      "sourceStatus": "imported_candidate"
-    },
-    {
-      "id": "data_1_5gb_50sms_whatsapp_24h_99",
-      "category": "COMBO",
-      "name": "1.5GB+50SMS+WhatsApp - 24 Hrs",
-      "amountKes": 99,
-      "entryCode": "*544#",
-      "sourceStatus": "imported_candidate"
-    },
-    {
-      "id": "data_1gb_1h_repeat_20",
-      "category": "DATA",
-      "name": "1GB 1HR buy many times",
-      "amountKes": 20,
-      "entryCode": "*544#",
-      "sourceStatus": "imported_candidate"
-    },
-    {
-      "id": "data_750mb_50sms_whatsapp_24h_50",
-      "category": "COMBO",
-      "name": "750MB+50SMS+WhatsApp - 24 Hrs",
-      "amountKes": 50,
-      "entryCode": "*544#",
-      "sourceStatus": "imported_candidate"
-    },
-    {
-      "id": "data_1gb_1h_20",
-      "category": "DATA",
-      "name": "1GB - 1 Hr",
-      "amountKes": 20,
-      "entryCode": "*544#",
-      "sourceStatus": "imported_candidate"
-    },
-    {
-      "id": "data_1gb_1h_tunukiwa_repeat_20",
-      "category": "DATA",
-      "name": "1GB 1HR tunukiwa multiple times",
-      "amountKes": 20,
-      "entryCode": "*456#",
-      "sourceStatus": "imported_candidate"
-    },
-    {
-      "id": "voice_250mins_7d_200",
-      "category": "VOICE",
-      "name": "250 Mins - 7 Days",
-      "amountKes": 200,
-      "entryCode": "*444#",
-      "sourceStatus": "imported_candidate"
-    },
-    {
-      "id": "voice_50mins_50sms_midnight_54",
-      "category": "COMBO",
-      "name": "50 Mins + 50 SMS - Midnight",
-      "amountKes": 54,
-      "entryCode": "*444#",
-      "sourceStatus": "imported_candidate"
-    },
-    {
-      "id": "voice_45mins_3h_22",
-      "category": "VOICE",
-      "name": "45 Mins - 3 Hrs",
-      "amountKes": 22,
-      "entryCode": "*544#",
-      "sourceStatus": "imported_candidate"
-    },
-    {
-      "id": "voice_60mins_midnight_50",
-      "category": "VOICE",
-      "name": "60 Mins - Midnight",
-      "amountKes": 50,
-      "entryCode": "*544#",
-      "sourceStatus": "imported_candidate"
-    },
-    {
-      "id": "voice_43mins_3h_20",
-      "category": "VOICE",
-      "name": "43 Mins - 3 Hrs",
-      "amountKes": 20,
-      "entryCode": "*444#",
-      "sourceStatus": "imported_candidate"
-    },
-    {
-      "id": "voice_1250mins_30d_tunukiwa_1000",
-      "category": "VOICE",
-      "name": "1250 Mins 30 Days Tunukiwa",
-      "amountKes": 1000,
-      "entryCode": "*444#",
-      "sourceStatus": "imported_candidate"
-    },
-    {
-      "id": "voice_50mins_50sms_midnight_50",
-      "category": "COMBO",
-      "name": "50 Mins + 50SMS - Midnight",
-      "amountKes": 50,
-      "entryCode": "*444#",
-      "sourceStatus": "imported_candidate",
-      "reviewNote": "Similar label to the KES 54 entry; preserve as a separate source record pending verification."
-    },
-    {
-      "id": "sms_20_daily_5",
-      "category": "SMS",
-      "name": "20 SMS - Daily",
-      "amountKes": 5,
-      "entryCode": "*188#",
-      "sourceStatus": "imported_candidate"
-    },
-    {
-      "id": "sms_200_daily_10",
-      "category": "SMS",
-      "name": "200 SMS - Daily",
-      "amountKes": 10,
-      "entryCode": "*188#",
-      "sourceStatus": "imported_candidate"
-    },
-    {
-      "id": "sms_1000_7d_30",
-      "category": "SMS",
-      "name": "1000 SMS - 7 Days",
-      "amountKes": 30,
-      "entryCode": "*188#",
-      "sourceStatus": "imported_candidate"
-    },
-    {
-      "id": "data_1gb_1h_19",
-      "category": "DATA",
-      "name": "1GB - 1 Hr",
-      "amountKes": 19,
-      "sourceStatus": "imported_candidate",
-      "reviewNote": "Screenshot offer list; exact shortcode not confirmed"
-    },
-    {
-      "id": "data_250mb_24h_20",
-      "category": "DATA",
-      "name": "250MB - 24 Hrs",
-      "amountKes": 20,
-      "sourceStatus": "imported_candidate",
-      "reviewNote": "Screenshot offer list; exact shortcode not confirmed"
-    },
-    {
-      "id": "data_1gb_1h_21",
-      "category": "DATA",
-      "name": "1GB - 1 Hr",
-      "amountKes": 21,
-      "sourceStatus": "imported_candidate",
-      "reviewNote": "Screenshot offer list; exact shortcode not confirmed"
-    },
-    {
-      "id": "data_400mb_1h_23",
-      "category": "DATA",
-      "name": "400MB - 1 Hr",
-      "amountKes": 23,
-      "sourceStatus": "imported_candidate",
-      "reviewNote": "Screenshot offer list; exact shortcode not confirmed"
-    },
-    {
-      "id": "data_1_5gb_3h_50",
-      "category": "DATA",
-      "name": "1.5GB - 3 Hrs",
-      "amountKes": 50,
-      "sourceStatus": "imported_candidate",
-      "reviewNote": "Screenshot offer list; exact shortcode not confirmed"
-    },
-    {
-      "id": "data_1gb_midnight_56",
-      "category": "DATA",
-      "name": "1GB Midnight",
-      "amountKes": 56,
-      "sourceStatus": "imported_candidate",
-      "reviewNote": "Screenshot offer list; exact shortcode not confirmed"
-    },
-    {
-      "id": "data_2_5gb_30d_250",
-      "category": "DATA",
-      "name": "2.5GB - 30 Days",
-      "amountKes": 250,
-      "sourceStatus": "imported_candidate",
-      "reviewNote": "Screenshot offer list; exact shortcode not confirmed"
-    },
-    {
-      "id": "data_21gb_30d_1005",
-      "category": "DATA",
-      "name": "21GB - 30 Days",
-      "amountKes": 1005,
-      "sourceStatus": "imported_candidate",
-      "reviewNote": "Screenshot offer list; exact shortcode not confirmed"
-    },
-    {
-      "id": "voice_350flex_2h_20",
-      "category": "VOICE",
-      "name": "350 Flex - 2 Hrs",
-      "amountKes": 20,
-      "entryCode": "*444#",
-      "sourceStatus": "imported_candidate",
-      "reviewNote": "Earlier screenshot transcription; verify live menu"
-    },
-    {
-      "id": "data_400mb_1h_20_screenshot",
-      "category": "DATA",
-      "name": "400MB - 1 Hr",
+      "name": "1GB",
+      "duration": "1 Hr",
       "amountKes": 20,
       "entryCode": "*180*5*2#",
+      "tags": "DATA, BINGWA",
       "sourceStatus": "imported_candidate",
-      "reviewNote": "Earlier screenshot transcription; verify live menu"
+      "reviewNote": "User-provided extracted offer; not independently verified against a live Safaricom menu."
     },
     {
-      "id": "data_400mb_tunukiwa_20",
+      "id": "any_350_flex_2_hrs_20_2",
+      "simProfile": "any",
+      "category": "VOICE",
+      "name": "350 Flex",
+      "duration": "2 Hrs",
+      "amountKes": 20,
+      "entryCode": "*444#",
+      "tags": "VOICE",
+      "sourceStatus": "imported_candidate",
+      "reviewNote": "User-provided extracted offer; not independently verified against a live Safaricom menu."
+    },
+    {
+      "id": "any_250mb_24_hrs_20_3",
+      "simProfile": "any",
       "category": "DATA",
-      "name": "400MB - 1 Hr Tunukiwa",
+      "name": "250MB",
+      "duration": "24 Hrs",
+      "amountKes": 20,
+      "entryCode": "*180*5*2#",
+      "tags": "DATA, BINGWA",
+      "sourceStatus": "imported_candidate",
+      "reviewNote": "User-provided extracted offer; not independently verified against a live Safaricom menu."
+    },
+    {
+      "id": "any_750mb_50_sms_24_hrs_50_4",
+      "simProfile": "any",
+      "category": "COMBO",
+      "name": "750MB + 50 SMS",
+      "duration": "24 Hrs",
+      "amountKes": 50,
+      "entryCode": "*180*5*2#",
+      "tags": "DATA, BINGWA",
+      "sourceStatus": "imported_candidate",
+      "reviewNote": "User-provided extracted offer; not independently verified against a live Safaricom menu."
+    },
+    {
+      "id": "any_400mb_7_days_50_5",
+      "simProfile": "any",
+      "category": "DATA",
+      "name": "400MB",
+      "duration": "7 Days",
+      "amountKes": 50,
+      "entryCode": "*180*5*2#",
+      "tags": "DATA, BINGWA",
+      "sourceStatus": "imported_candidate",
+      "reviewNote": "User-provided extracted offer; not independently verified against a live Safaricom menu."
+    },
+    {
+      "id": "any_1_5gb_24_hrs_99_6",
+      "simProfile": "any",
+      "category": "DATA",
+      "name": "1.5GB",
+      "duration": "24 Hrs",
+      "amountKes": 99,
+      "entryCode": "*180*5*2#",
+      "tags": "DATA, BINGWA",
+      "sourceStatus": "imported_candidate",
+      "reviewNote": "User-provided extracted offer; not independently verified against a live Safaricom menu."
+    },
+    {
+      "id": "any_1gb_till_midnight_55_7",
+      "simProfile": "any",
+      "category": "DATA",
+      "name": "1GB",
+      "duration": "Till Midnight",
+      "amountKes": 55,
+      "entryCode": "*180*5*2#",
+      "tags": "DATA, BINGWA",
+      "sourceStatus": "imported_candidate",
+      "reviewNote": "User-provided extracted offer; not independently verified against a live Safaricom menu."
+    },
+    {
+      "id": "any_400mb_1_hr_20_8",
+      "simProfile": "any",
+      "category": "DATA",
+      "name": "400MB",
+      "duration": "1 Hr",
+      "amountKes": 20,
+      "entryCode": "*180*5*2#",
+      "tags": "DATA, BINGWA",
+      "sourceStatus": "imported_candidate",
+      "reviewNote": "User-provided extracted offer; not independently verified against a live Safaricom menu."
+    },
+    {
+      "id": "any_1_5gb_3_hrs_50_9",
+      "simProfile": "any",
+      "category": "DATA",
+      "name": "1.5GB",
+      "duration": "3 Hrs",
+      "amountKes": 50,
+      "entryCode": "*180*5*2#",
+      "tags": "DATA, BINGWA",
+      "sourceStatus": "imported_candidate",
+      "reviewNote": "User-provided extracted offer; not independently verified against a live Safaricom menu."
+    },
+    {
+      "id": "any_400mb_1hr_tunukiwa_1_hr_20_10",
+      "simProfile": "any",
+      "category": "DATA",
+      "name": "400MB 1Hr Tunukiwa",
+      "duration": "1 Hr",
       "amountKes": 20,
       "entryCode": "*544#",
+      "tags": "DATA",
       "sourceStatus": "imported_candidate",
-      "reviewNote": "Earlier screenshot transcription; verify live menu"
+      "reviewNote": "User-provided extracted offer; not independently verified against a live Safaricom menu."
     },
     {
-      "id": "sms_1500_30d_100",
+      "id": "any_1500_sms_30_days_100_11",
+      "simProfile": "any",
       "category": "SMS",
-      "name": "1,500 SMS - 30 Days",
+      "name": "1500 SMS",
+      "duration": "30 Days",
       "amountKes": 100,
       "entryCode": "*188#",
+      "tags": "SMS",
       "sourceStatus": "imported_candidate",
-      "reviewNote": "Earlier screenshot transcription; verify live menu"
+      "reviewNote": "User-provided extracted offer; not independently verified against a live Safaricom menu."
     },
     {
-      "id": "data_2gb_24h_100_screenshot",
+      "id": "any_2_5gb_30_days_250_12",
+      "simProfile": "any",
       "category": "DATA",
-      "name": "2GB - 24 Hrs",
-      "amountKes": 100,
-      "entryCode": "*544#",
+      "name": "2.5GB",
+      "duration": "30 Days",
+      "amountKes": 250,
+      "entryCode": "*180*5*2#",
+      "tags": "DATA, BINGWA",
       "sourceStatus": "imported_candidate",
-      "reviewNote": "Earlier screenshot transcription; differs from written source code *456#; requires verification"
+      "reviewNote": "User-provided extracted offer; not independently verified against a live Safaricom menu."
     },
     {
-      "id": "data_7gb_30d_500",
-      "category": "DATA",
-      "name": "7GB - 30 Days",
+      "id": "any_300_mins_30_days_500_13",
+      "simProfile": "any",
+      "category": "VOICE",
+      "name": "300 Mins",
+      "duration": "30 Days",
       "amountKes": 500,
       "entryCode": "*180*5*2#",
+      "tags": "VOICE, BINGWA",
       "sourceStatus": "imported_candidate",
-      "reviewNote": "Earlier screenshot transcription; verify live menu"
+      "reviewNote": "User-provided extracted offer; not independently verified against a live Safaricom menu."
     },
     {
-      "id": "voice_22_45mins_3h",
-      "category": "VOICE",
-      "name": "45 Mins - 3 Hrs",
-      "amountKes": 22,
+      "id": "any_7gb_30_days_500_14",
+      "simProfile": "any",
+      "category": "DATA",
+      "name": "7GB",
+      "duration": "30 Days",
+      "amountKes": 500,
+      "entryCode": "*180*5*2#",
+      "tags": "DATA, BINGWA",
       "sourceStatus": "imported_candidate",
-      "reviewNote": "Screenshot offer list; exact shortcode not confirmed"
+      "reviewNote": "User-provided extracted offer; not independently verified against a live Safaricom menu."
     },
     {
-      "id": "voice_24_350flex_2h",
+      "id": "any_800_mins_30_days_1000_15",
+      "simProfile": "any",
       "category": "VOICE",
-      "name": "350 Flex - 2 Hrs",
-      "amountKes": 24,
+      "name": "800 Mins",
+      "duration": "30 Days",
+      "amountKes": 1000,
+      "entryCode": "*180*5*2#",
+      "tags": "VOICE, BINGWA",
       "sourceStatus": "imported_candidate",
-      "reviewNote": "Screenshot offer list; exact shortcode not confirmed"
+      "reviewNote": "User-provided extracted offer; not independently verified against a live Safaricom menu."
     },
     {
-      "id": "voice_51_60mins_midnight",
-      "category": "VOICE",
-      "name": "60 Mins - Midnight",
-      "amountKes": 51,
+      "id": "any_21gb_30_days_1000_16",
+      "simProfile": "any",
+      "category": "DATA",
+      "name": "21GB",
+      "duration": "30 Days",
+      "amountKes": 1000,
+      "entryCode": "*180*5*2#",
+      "tags": "DATA, BINGWA",
       "sourceStatus": "imported_candidate",
-      "reviewNote": "Screenshot offer list; exact shortcode not confirmed"
+      "reviewNote": "User-provided extracted offer; not independently verified against a live Safaricom menu."
     },
     {
-      "id": "voice_200_250mins_7d",
-      "category": "VOICE",
-      "name": "250 Mins - 7 Days",
+      "id": "any_8gb_400_mins_30_days_1000_17",
+      "simProfile": "any",
+      "category": "COMBO",
+      "name": "8GB + 400 Mins",
+      "duration": "30 Days",
+      "amountKes": 1000,
+      "entryCode": "*180*5*2#",
+      "tags": "DATA, BINGWA",
+      "sourceStatus": "imported_candidate",
+      "reviewNote": "User-provided extracted offer; not independently verified against a live Safaricom menu."
+    },
+    {
+      "id": "any_2gb_24_hrs_100_18",
+      "simProfile": "any",
+      "category": "DATA",
+      "name": "2GB",
+      "duration": "24 Hrs",
+      "amountKes": 100,
+      "entryCode": "*544#",
+      "tags": "DATA, GIFT",
+      "sourceStatus": "imported_candidate",
+      "reviewNote": "User-provided extracted offer; not independently verified against a live Safaricom menu."
+    },
+    {
+      "id": "any_3500_sms_30_days_200_19",
+      "simProfile": "any",
+      "category": "SMS",
+      "name": "3500 SMS",
+      "duration": "30 Days",
       "amountKes": 200,
+      "entryCode": "*188#",
+      "tags": "SMS, GIFT",
       "sourceStatus": "imported_candidate",
-      "reviewNote": "Screenshot offer list; exact shortcode not confirmed"
+      "reviewNote": "User-provided extracted offer; not independently verified against a live Safaricom menu."
     },
     {
-      "id": "voice_501_300mins_30d",
+      "id": "any_43_mins_3_hrs_20_20",
+      "simProfile": "any",
       "category": "VOICE",
-      "name": "300 Mins - 30 Days",
-      "amountKes": 501,
+      "name": "43 Mins",
+      "duration": "3 Hrs",
+      "amountKes": 20,
+      "entryCode": "*444#",
+      "tags": "VOICE, TUNUKIWA",
       "sourceStatus": "imported_candidate",
-      "reviewNote": "Screenshot offer list; exact shortcode not confirmed"
+      "reviewNote": "User-provided extracted offer; not independently verified against a live Safaricom menu."
     },
     {
-      "id": "voice_1010_800mins_30d",
-      "category": "VOICE",
-      "name": "800 Mins - 30 Days",
-      "amountKes": 1010,
+      "id": "any_1gb_1hr_tunukiwa_multiple_times_1_hr_20_21",
+      "simProfile": "any",
+      "category": "DATA",
+      "name": "1GB 1HR tunukiwa multiple times",
+      "duration": "1 Hr",
+      "amountKes": 20,
+      "entryCode": "*456#",
+      "tags": "DATA, GIFT",
       "sourceStatus": "imported_candidate",
-      "reviewNote": "Screenshot offer list; exact shortcode not confirmed"
+      "reviewNote": "User-provided extracted offer; not independently verified against a live Safaricom menu."
+    },
+    {
+      "id": "any_1250_mins_30_days_tunukiwa_30_days_1000_22",
+      "simProfile": "any",
+      "category": "VOICE",
+      "name": "1250 Mins 30 Days Tunukiwa",
+      "duration": "30 Days",
+      "amountKes": 1000,
+      "entryCode": "*444#",
+      "tags": "VOICE, TUNUKIWA",
+      "sourceStatus": "imported_candidate",
+      "reviewNote": "User-provided extracted offer; not independently verified against a live Safaricom menu."
+    },
+    {
+      "id": "any_50_mins_50sms_midnight_50_23",
+      "simProfile": "any",
+      "category": "COMBO",
+      "name": "50 Mins + 50SMS",
+      "duration": "Midnight",
+      "amountKes": 50,
+      "entryCode": "*444#",
+      "tags": "VOICE",
+      "sourceStatus": "imported_candidate",
+      "reviewNote": "User-provided extracted offer; not independently verified against a live Safaricom menu."
+    },
+    {
+      "id": "normal_1gb_1_hr_20_24",
+      "simProfile": "normal",
+      "category": "DATA",
+      "name": "1GB",
+      "duration": "1 Hr",
+      "amountKes": 20,
+      "entryCode": "*544#",
+      "tags": "DATA, GIFT",
+      "sourceStatus": "imported_candidate",
+      "reviewNote": "User-provided extracted offer; not independently verified against a live Safaricom menu."
+    },
+    {
+      "id": "normal_45_mins_3_hrs_22_25",
+      "simProfile": "normal",
+      "category": "VOICE",
+      "name": "45 Mins",
+      "duration": "3 Hrs",
+      "amountKes": 22,
+      "entryCode": "*544#",
+      "tags": "VOICE",
+      "sourceStatus": "imported_candidate",
+      "reviewNote": "User-provided extracted offer; not independently verified against a live Safaricom menu."
+    },
+    {
+      "id": "notification_20_sms_daily_5_26",
+      "simProfile": "notification",
+      "category": "SMS",
+      "name": "20 SMS",
+      "duration": "Daily",
+      "amountKes": 5,
+      "entryCode": "*188#",
+      "tags": "SMS",
+      "sourceStatus": "imported_candidate",
+      "reviewNote": "User-provided extracted offer; not independently verified against a live Safaricom menu."
+    },
+    {
+      "id": "notification_200_sms_daily_10_27",
+      "simProfile": "notification",
+      "category": "SMS",
+      "name": "200 SMS",
+      "duration": "Daily",
+      "amountKes": 10,
+      "entryCode": "*188#",
+      "tags": "SMS",
+      "sourceStatus": "imported_candidate",
+      "reviewNote": "User-provided extracted offer; not independently verified against a live Safaricom menu."
+    },
+    {
+      "id": "notification_1000_sms_7_days_30_28",
+      "simProfile": "notification",
+      "category": "SMS",
+      "name": "1000 SMS",
+      "duration": "7 Days",
+      "amountKes": 30,
+      "entryCode": "*188#",
+      "tags": "SMS",
+      "sourceStatus": "imported_candidate",
+      "reviewNote": "User-provided extracted offer; not independently verified against a live Safaricom menu."
+    },
+    {
+      "id": "notification_1_5gb_50sms_whatsapp_24_hrs_99_29",
+      "simProfile": "notification",
+      "category": "COMBO",
+      "name": "1.5GB + 50SMS + WhatsApp",
+      "duration": "24 Hrs",
+      "amountKes": 99,
+      "entryCode": "*544#",
+      "tags": "DATA, PATA MORE",
+      "sourceStatus": "imported_candidate",
+      "reviewNote": "User-provided extracted offer; not independently verified against a live Safaricom menu."
+    },
+    {
+      "id": "notification_1gb_1hr_buy_many_times_1_hr_20_30",
+      "simProfile": "notification",
+      "category": "DATA",
+      "name": "1GB 1HR buy many times",
+      "duration": "1 Hr",
+      "amountKes": 20,
+      "entryCode": "*544#",
+      "tags": "DATA",
+      "sourceStatus": "imported_candidate",
+      "reviewNote": "User-provided extracted offer; not independently verified against a live Safaricom menu."
+    },
+    {
+      "id": "notification_750mb_50sms_whatsapp_24_hrs_50_31",
+      "simProfile": "notification",
+      "category": "COMBO",
+      "name": "750MB + 50SMS + WhatsApp",
+      "duration": "24 Hrs",
+      "amountKes": 50,
+      "entryCode": "*544#",
+      "tags": "DATA, PATA MORE",
+      "sourceStatus": "imported_candidate",
+      "reviewNote": "User-provided extracted offer; not independently verified against a live Safaricom menu."
+    },
+    {
+      "id": "notification_250mb_50sms_whatsapp_24_hrs_20_32",
+      "simProfile": "notification",
+      "category": "COMBO",
+      "name": "250MB + 50SMS + WhatsApp",
+      "duration": "24 Hrs",
+      "amountKes": 20,
+      "entryCode": "*544#",
+      "tags": "DATA, PATA MORE",
+      "sourceStatus": "imported_candidate",
+      "reviewNote": "User-provided extracted offer; not independently verified against a live Safaricom menu."
+    },
+    {
+      "id": "notification_1_5gb_3hr_buy_many_times_3_hrs_50_33",
+      "simProfile": "notification",
+      "category": "DATA",
+      "name": "1.5GB 3hr buy many times",
+      "duration": "3 Hrs",
+      "amountKes": 50,
+      "entryCode": "*544#",
+      "tags": "DATA",
+      "sourceStatus": "imported_candidate",
+      "reviewNote": "User-provided extracted offer; not independently verified against a live Safaricom menu."
+    },
+    {
+      "id": "notification_900mb_till_midnight_55_34",
+      "simProfile": "notification",
+      "category": "DATA",
+      "name": "900MB",
+      "duration": "Till Midnight",
+      "amountKes": 55,
+      "entryCode": "*544#",
+      "tags": "DATA",
+      "sourceStatus": "imported_candidate",
+      "reviewNote": "Partial bottom-of-image entry; confirm exact offer details before use."
+    },
+    {
+      "id": "any_250_mins_7_days_200_35",
+      "simProfile": "any",
+      "category": "VOICE",
+      "name": "250 Mins",
+      "duration": "7 Days",
+      "amountKes": 200,
+      "entryCode": "*444#",
+      "tags": "VOICE, TUNUKIWA",
+      "sourceStatus": "imported_candidate",
+      "reviewNote": "User-provided extracted offer; not independently verified against a live Safaricom menu."
+    },
+    {
+      "id": "any_50_mins_50_sms_midnight_54_36",
+      "simProfile": "any",
+      "category": "COMBO",
+      "name": "50 Mins + 50 SMS",
+      "duration": "Midnight",
+      "amountKes": 54,
+      "entryCode": "*444#",
+      "tags": "VOICE",
+      "sourceStatus": "imported_candidate",
+      "reviewNote": "Conflicts with a similar KES 50 midnight entry; retained separately pending verification."
+    },
+    {
+      "id": "any_45_mins_3_hrs_22_37",
+      "simProfile": "any",
+      "category": "VOICE",
+      "name": "45 Mins",
+      "duration": "3 Hrs",
+      "amountKes": 22,
+      "entryCode": "*544#",
+      "tags": "VOICE",
+      "sourceStatus": "imported_candidate",
+      "reviewNote": "User-provided extracted offer; not independently verified against a live Safaricom menu."
+    },
+    {
+      "id": "any_60_mins_midnight_50_38",
+      "simProfile": "any",
+      "category": "VOICE",
+      "name": "60 Mins",
+      "duration": "Midnight",
+      "amountKes": 50,
+      "entryCode": "*544#",
+      "tags": "VOICE",
+      "sourceStatus": "imported_candidate",
+      "reviewNote": "User-provided extracted offer; not independently verified against a live Safaricom menu."
+    },
+    {
+      "id": "any_60mb_15_sms_24_hrs_12_39",
+      "simProfile": "any",
+      "category": "COMBO",
+      "name": "60MB + 15 SMS",
+      "duration": "24 Hrs",
+      "amountKes": 12,
+      "entryCode": "*544#",
+      "tags": "DATA, PATA MORE",
+      "sourceStatus": "imported_candidate",
+      "reviewNote": "User-provided extracted offer; not independently verified against a live Safaricom menu."
+    },
+    {
+      "id": "any_2gb_24_hrs_100_40",
+      "simProfile": "any",
+      "category": "DATA",
+      "name": "2GB",
+      "duration": "24 Hrs",
+      "amountKes": 100,
+      "entryCode": "*456#",
+      "tags": "DATA, GIFT",
+      "sourceStatus": "imported_candidate",
+      "reviewNote": "User-provided extracted offer; not independently verified against a live Safaricom menu."
+    },
+    {
+      "id": "any_900mb_till_midnight_55_41",
+      "simProfile": "any",
+      "category": "DATA",
+      "name": "900MB",
+      "duration": "Till Midnight",
+      "amountKes": 55,
+      "entryCode": "*544#",
+      "tags": "DATA",
+      "sourceStatus": "imported_candidate",
+      "reviewNote": "User-provided extracted offer; not independently verified against a live Safaricom menu."
+    },
+    {
+      "id": "any_1gb_1hr_baze_1_hr_20_42",
+      "simProfile": "any",
+      "category": "DATA",
+      "name": "1GB 1HR + BAZE",
+      "duration": "1 Hr",
+      "amountKes": 20,
+      "entryCode": "*544#",
+      "tags": "DATA",
+      "sourceStatus": "imported_candidate",
+      "reviewNote": "User-provided extracted offer; not independently verified against a live Safaricom menu."
+    },
+    {
+      "id": "any_400mb_gift_7_days_tunukiwa_7_days_50_43",
+      "simProfile": "any",
+      "category": "DATA",
+      "name": "400MB Gift 7 Days Tunukiwa",
+      "duration": "7 Days",
+      "amountKes": 50,
+      "entryCode": "*544#",
+      "tags": "DATA",
+      "sourceStatus": "imported_candidate",
+      "reviewNote": "User-provided extracted offer; not independently verified against a live Safaricom menu."
+    },
+    {
+      "id": "any_10mb_7_sms_24_hrs_6_44",
+      "simProfile": "any",
+      "category": "COMBO",
+      "name": "10MB + 7 SMS",
+      "duration": "24 Hrs",
+      "amountKes": 6,
+      "entryCode": "*544#",
+      "tags": "DATA, PATA MORE",
+      "sourceStatus": "imported_candidate",
+      "reviewNote": "User-provided extracted offer; not independently verified against a live Safaricom menu."
     }
   ],
   "sources": [
     {
-      "id": "screenshots_transcription",
-      "description": "Additional candidates transcribed from earlier screenshot discussion",
-      "status": "partially_reconciled",
-      "note": "Some values/codes need live verification; do not treat missing codes as known."
+      "id": "user_extracted_images_2026_11_02",
+      "description": "User-provided extraction of Signature Offers across images",
+      "status": "candidate_unverified",
+      "note": "All records require live menu verification before automation."
     }
   ]
 }
