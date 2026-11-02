@@ -1,6 +1,6 @@
-# Telvanta Android
+# Bingwa Vecta Android
 
-**Your Bundles. Your Business. Automated.**
+**Power Every Connection.**
 
 Independent, offline-first Android app for telecom distribution workflows.
 
@@ -18,7 +18,7 @@ Open this repository in Android Studio, allow Gradle sync, then run the app on a
 1. Verify the Android build and local persistence.
 2. Implement offers, customers, orders, transactions, and settings screens.
 3. Add safe offline queue and reconciliation rules.
-4. Build Telvanta Connect's authenticated nearby connection.
+4. Build Vecta Connect's authenticated nearby connection.
 5. Add optional remote sync and Signature Offer downloads after security review.
 
 ## Safety rules
