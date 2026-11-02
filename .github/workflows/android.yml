@@ -34,6 +34,12 @@ jobs:
         run: |
           cp app/build/outputs/apk/debug/app-debug.apk BingwaPulse-debug.apk
           cp connectpulse/build/outputs/apk/debug/connectpulse-debug.apk Connect-Pulse-debug.apk
+      - name: Verify APK signatures and package metadata
+        run: |
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs BingwaPulse-debug.apk
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging BingwaPulse-debug.apk | head -n 8
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs Connect-Pulse-debug.apk
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging Connect-Pulse-debug.apk | head -n 8
       - name: Upload BingwaPulse APK
         uses: actions/upload-artifact@v4
         with:
