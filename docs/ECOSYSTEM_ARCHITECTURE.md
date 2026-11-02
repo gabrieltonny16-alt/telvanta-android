@@ -14,6 +14,23 @@ The primary business-management app. It owns the operator experience for:
 - reporting and audit history
 - SiteLink configuration and publishing controls
 
+#### Dashboard interface baseline
+Preserve these dashboard actions and navigation as the current product baseline:
+- Quick actions: **New order**, **Add customer**, **Manage offers**, **Transactions**
+- Dashboard tabs: **Overview**, **Transactions**, **Analytics**
+- Bottom navigation: **Home**, **Transactions**, **Wallet**, **Profile**
+
+These are distinct navigation layers: dashboard tabs organize the dashboard content; bottom navigation switches the app's main areas.
+
+#### Current operational truth
+The current BingwaPulse dashboard stores and displays local records using an offline/local-only data setup. It does **not** currently:
+- verify M-Pesa payments with Safaricom or another trusted payment source
+- submit USSD purchases automatically
+- automatically deliver bundles to customers
+- synchronize business records through a production cloud backend
+
+Any payment, order, or transaction shown by the current local app must be labelled according to its actual local status. A local record or notification is not proof of verified payment or successful bundle fulfilment.
+
 ### 2. BingwaPulse Website (management web)
 The browser-based management interface for the same business platform and account data as BingwaPulse Android. It is not the public customer storefront.
 
