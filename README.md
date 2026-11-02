@@ -1,4 +1,4 @@
-# Telvanta Android
+BingwaPulse
 
 **Your Bundles. Your Business. Automated.**
 
