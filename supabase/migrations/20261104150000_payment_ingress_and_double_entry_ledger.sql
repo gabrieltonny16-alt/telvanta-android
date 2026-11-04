@@ -154,7 +154,7 @@ returns trigger language plpgsql
 set search_path = public, pg_temp
 as $$
 begin
-  raise exception 'Ledger entries are immutable; post a reversal instead' using errcode='55000';
+  raise exception 'Ledger records are immutable; post a reversal instead' using errcode='55000';
 end;
 $$;
 revoke all on function private.prevent_ledger_entry_mutation() from public, anon, authenticated;
