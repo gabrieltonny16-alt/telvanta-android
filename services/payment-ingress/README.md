@@ -63,7 +63,7 @@ that starts a purchase or emits an Android dispatch event.
 
 1. Apply the additive SQL migration to the intended Supabase/PostgreSQL environment after review.
 2. Create one active `payment_ingress_channels` row per registered merchant shortcode.
-3. Configure `DATABASE_URL`, `REDIS_URL`, `SMS_INGRESS_HMAC_SECRET`, and optional
+3. Configure `DATABASE_URL`, `REDIS_CLUSTER_ADDRS`, `REDIS_PASSWORD`, optional `REDIS_USERNAME` / `REDIS_TLS`, `SMS_INGRESS_HMAC_SECRET`, and optional
    `DARAJA_ALLOWED_CIDRS` from a secret manager. Never place database credentials in Android.
 4. Run `go mod tidy && go test ./... && go vet ./...`.
 5. Run `go run ./cmd/server` or build the supplied Dockerfile.
