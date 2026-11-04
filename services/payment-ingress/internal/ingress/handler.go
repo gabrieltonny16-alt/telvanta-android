@@ -19,9 +19,14 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
+type RedisLocker interface {
+	SetNX(context.Context, string, interface{}, time.Duration) *redis.BoolCmd
+	Eval(context.Context, string, []string, ...interface{}) *redis.Cmd
+}
+
 type Handler struct {
 	DB *pgxpool.Pool
-	Redis *redis.Client
+	Redis RedisLocker
 	SMSSecret []byte
 	AllowedDarajaCIDRs []*net.IPNet
 }
