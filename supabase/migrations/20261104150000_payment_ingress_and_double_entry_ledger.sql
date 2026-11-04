@@ -123,6 +123,32 @@ after insert or update or delete on public.balance_ledger_entries
 deferrable initially deferred
 for each row execute function private.assert_ledger_batch_balanced();
 
+create or replace function private.assert_ledger_batch_balanced_from_batch()
+returns trigger language plpgsql
+set search_path = public, pg_temp
+as $
+declare
+  v_count integer;
+  v_debits bigint;
+  v_credits bigint;
+begin
+  select count(*), coalesce(sum(debit_minor),0), coalesce(sum(credit_minor),0)
+    into v_count, v_debits, v_credits
+  from public.balance_ledger_entries
+  where business_id=new.business_id and batch_id=new.id;
+  if v_count < 2 or v_debits <> v_credits then
+    raise exception 'Ledger batch % must contain at least two balanced entries (debits %, credits %)', new.id, v_debits, v_credits
+      using errcode='23514';
+  end if;
+  return null;
+end;
+$;
+revoke all on function private.assert_ledger_batch_balanced_from_batch() from public, anon, authenticated;
+create constraint trigger balance_ledger_batch_requires_entries
+after insert on public.balance_ledger_batches
+deferrable initially deferred
+for each row execute function private.assert_ledger_batch_balanced_from_batch();
+
 create or replace function private.prevent_ledger_entry_mutation()
 returns trigger language plpgsql
 set search_path = public, pg_temp
@@ -169,3 +195,7 @@ revoke all on public.payment_ingress_channels,public.payment_ingress_events,
 grant select,insert,update on public.payment_ingress_events to service_role;
 grant select on public.payment_ingress_channels to service_role;
 grant select,insert on public.balance_ledger_accounts,public.balance_ledger_batches,public.balance_ledger_entries to service_role;
+
+create trigger balance_ledger_batches_immutable
+before update or delete on public.balance_ledger_batches
+for each row execute function private.prevent_ledger_entry_mutation();
