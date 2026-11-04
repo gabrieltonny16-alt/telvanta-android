@@ -1,6 +1,9 @@
 -- Phase 1: payment ingress deduplication and immutable double-entry ledger.
 -- Additive migration; does not mark any payment as verified or dispatch any order.
 
+alter table public.orders
+  add constraint orders_business_id_id_unique unique (business_id,id);
+
 create table public.payment_ingress_channels (
   id uuid primary key default gen_random_uuid(),
   business_id uuid not null references public.businesses(id) on delete cascade,
@@ -29,7 +32,7 @@ create table public.payment_ingress_events (
     check (verification_status in ('unverified','verified','rejected','ambiguous')),
   matched_order_id uuid,
   created_at timestamptz not null default now(),
-  unique (business_id, provider, transaction_ref),
+  unique (business_id, transaction_ref),
   unique (business_id, id),
   foreign key (business_id, matched_order_id)
     references public.orders(business_id, id) on delete restrict
@@ -37,10 +40,7 @@ create table public.payment_ingress_events (
 create index payment_ingress_events_unmatched_idx
   on public.payment_ingress_events(business_id, occurred_at desc)
   where matched_order_id is null;
-create index payment_ingress_events_receipt_idx
-  on public.payment_ingress_events(transaction_ref);
 
--- Every ledger transaction is a batch. Entries are immutable, in integer KES minor units.
 create table public.balance_ledger_accounts (
   id uuid primary key default gen_random_uuid(),
   business_id uuid not null references public.businesses(id) on delete restrict,
@@ -87,7 +87,6 @@ create table public.balance_ledger_entries (
 create index balance_ledger_entries_account_idx on public.balance_ledger_entries(business_id, account_id, created_at desc);
 create index balance_ledger_entries_order_idx on public.balance_ledger_entries(business_id, order_id, created_at desc);
 
--- Deferred validation allows all lines in a journal batch to be inserted in one transaction.
 create or replace function private.assert_ledger_batch_balanced()
 returns trigger language plpgsql
 set search_path = public, pg_temp
@@ -116,7 +115,6 @@ after insert or update or delete on public.balance_ledger_entries
 deferrable initially deferred
 for each row execute function private.assert_ledger_batch_balanced();
 
--- Posted journal lines cannot be mutated. Corrections must be new reversal batches.
 create or replace function private.prevent_ledger_entry_mutation()
 returns trigger language plpgsql
 set search_path = public, pg_temp
@@ -156,12 +154,10 @@ create policy "managers view ledger entries"
 on public.balance_ledger_entries for select to authenticated
 using (public.has_business_role(business_id,array['owner','business_admin','agent_manager']));
 
-grant select on public.payment_ingress_channels, public.payment_ingress_events,
-  public.balance_ledger_accounts, public.balance_ledger_batches, public.balance_ledger_entries to authenticated;
-revoke all on public.payment_ingress_channels, public.payment_ingress_events,
-  public.balance_ledger_accounts, public.balance_ledger_batches, public.balance_ledger_entries from anon;
-
--- Backend service role is the only writer for ingress and ledger posting.
-grant select, insert, update on public.payment_ingress_events to service_role;
+grant select on public.payment_ingress_channels,public.payment_ingress_events,
+  public.balance_ledger_accounts,public.balance_ledger_batches,public.balance_ledger_entries to authenticated;
+revoke all on public.payment_ingress_channels,public.payment_ingress_events,
+  public.balance_ledger_accounts,public.balance_ledger_batches,public.balance_ledger_entries from anon;
+grant select,insert,update on public.payment_ingress_events to service_role;
 grant select on public.payment_ingress_channels to service_role;
-grant select, insert on public.balance_ledger_accounts, public.balance_ledger_batches, public.balance_ledger_entries to service_role;
+grant select,insert on public.balance_ledger_accounts,public.balance_ledger_batches,public.balance_ledger_entries to service_role;
