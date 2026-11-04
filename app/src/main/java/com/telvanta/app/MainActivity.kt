@@ -62,6 +62,7 @@ class MainActivity : ComponentActivity() {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun BingwaPulseApp(db: LocalDatabase) {
+    val context = LocalContext.current
     var selected by remember { mutableStateOf("Dashboard") }
     var message by remember { mutableStateOf("") }
     val navGroups = listOf(
@@ -112,15 +113,16 @@ private fun BingwaPulseApp(db: LocalDatabase) {
                         label = { Text("Sign out", color = Color(0xFFFFB4AB), fontWeight = FontWeight.SemiBold) },
                         selected = false,
                         onClick = {
-                            selected = "Settings"
-                            message = "Sign out is not available yet: account login and session management are not implemented in this local-only build."
-                            scope.launch { drawerState.close() }
+                            SecureSessionStore(context).clear()
+                            context.startActivity(Intent(context, AuthActivity::class.java).apply {
+                                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                            })
                         },
                         colors = NavigationDrawerItemDefaults.colors(unselectedTextColor = Color(0xFFFFB4AB)),
                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 2.dp)
                     )
                     Spacer(Modifier.height(12.dp))
-                    Text("Offline core · local records", color = Muted, style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp))
+                    Text("Account secured · local records remain on this device", color = Muted, style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp))
                     }
                 }
             }
