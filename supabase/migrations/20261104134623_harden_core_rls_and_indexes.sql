@@ -1,0 +1,60 @@
+-- Harden helper functions and bootstrap owner membership without an exposed SECURITY DEFINER RPC.
+create schema if not exists private;
+alter function public.is_business_member(uuid) set schema private;
+alter function public.has_business_role(uuid,text[]) set schema private;
+revoke all on schema private from public,anon;
+grant usage on schema private to authenticated;
+revoke all on function private.is_business_member(uuid) from public,anon;
+revoke all on function private.has_business_role(uuid,text[]) from public,anon;
+grant execute on function private.is_business_member(uuid) to authenticated;
+grant execute on function private.has_business_role(uuid,text[]) to authenticated;
+drop function public.create_business(text,text);
+create policy "users can create a business" on public.businesses for insert to authenticated with check(created_by=(select auth.uid()));
+create or replace function private.bootstrap_business_owner() returns trigger
+language plpgsql security definer set search_path=public,pg_temp as $$
+begin
+ if new.created_by is distinct from (select auth.uid()) then raise exception 'Business creator must match authenticated user' using errcode='42501'; end if;
+ insert into public.business_memberships(business_id,user_id,role) values(new.id,new.created_by,'owner');
+ insert into public.audit_logs(business_id,actor_user_id,action,entity_type,entity_id) values(new.id,new.created_by,'business.created','business',new.id);
+ return new;
+end; $$;
+revoke all on function private.bootstrap_business_owner() from public,anon,authenticated;
+create trigger businesses_bootstrap_owner after insert on public.businesses for each row execute function private.bootstrap_business_owner();
+
+drop policy "managers manage providers" on public.providers;
+create policy "managers insert providers" on public.providers for insert to authenticated with check(private.has_business_role(business_id,array['owner','business_admin','agent_manager']));
+create policy "managers update providers" on public.providers for update to authenticated using(private.has_business_role(business_id,array['owner','business_admin','agent_manager'])) with check(private.has_business_role(business_id,array['owner','business_admin','agent_manager']));
+create policy "managers delete providers" on public.providers for delete to authenticated using(private.has_business_role(business_id,array['owner','business_admin','agent_manager']));
+drop policy "managers manage offers" on public.offers;
+create policy "managers insert offers" on public.offers for insert to authenticated with check(private.has_business_role(business_id,array['owner','business_admin','agent_manager']));
+create policy "managers update offers" on public.offers for update to authenticated using(private.has_business_role(business_id,array['owner','business_admin','agent_manager'])) with check(private.has_business_role(business_id,array['owner','business_admin','agent_manager']));
+create policy "managers delete offers" on public.offers for delete to authenticated using(private.has_business_role(business_id,array['owner','business_admin','agent_manager']));
+drop policy "managers manage agent offers" on public.agent_offers;
+create policy "managers insert agent offers" on public.agent_offers for insert to authenticated with check(private.has_business_role(business_id,array['owner','business_admin','agent_manager']));
+create policy "managers update agent offers" on public.agent_offers for update to authenticated using(private.has_business_role(business_id,array['owner','business_admin','agent_manager'])) with check(private.has_business_role(business_id,array['owner','business_admin','agent_manager']));
+create policy "managers delete agent offers" on public.agent_offers for delete to authenticated using(private.has_business_role(business_id,array['owner','business_admin','agent_manager']));
+drop policy "managers manage devices" on public.devices;
+create policy "managers insert devices" on public.devices for insert to authenticated with check(private.has_business_role(business_id,array['owner','business_admin','agent_manager']));
+create policy "managers update devices" on public.devices for update to authenticated using(private.has_business_role(business_id,array['owner','business_admin','agent_manager'])) with check(private.has_business_role(business_id,array['owner','business_admin','agent_manager']));
+create policy "managers delete devices" on public.devices for delete to authenticated using(private.has_business_role(business_id,array['owner','business_admin','agent_manager']));
+drop policy "managers manage site links" on public.site_links;
+create policy "managers insert site links" on public.site_links for insert to authenticated with check(private.has_business_role(business_id,array['owner','business_admin','agent_manager']));
+create policy "managers update site links" on public.site_links for update to authenticated using(private.has_business_role(business_id,array['owner','business_admin','agent_manager'])) with check(private.has_business_role(business_id,array['owner','business_admin','agent_manager']));
+create policy "managers delete site links" on public.site_links for delete to authenticated using(private.has_business_role(business_id,array['owner','business_admin','agent_manager']));
+create index if not exists agent_offers_agent_user_idx on public.agent_offers(agent_user_id);
+create index if not exists audit_logs_actor_user_idx on public.audit_logs(actor_user_id);
+create index if not exists businesses_created_by_idx on public.businesses(created_by);
+create index if not exists customers_created_by_idx on public.customers(created_by);
+create index if not exists device_heartbeats_business_idx on public.device_heartbeats(business_id);
+create index if not exists devices_assigned_user_idx on public.devices(assigned_user_id);
+create index if not exists dispatch_outbox_business_idx on public.dispatch_outbox(business_id);
+create index if not exists dispatch_outbox_device_idx on public.dispatch_outbox(device_id);
+create index if not exists dispatch_outbox_order_idx on public.dispatch_outbox(order_id);
+create index if not exists offers_provider_idx on public.offers(provider_id);
+create index if not exists order_events_actor_user_idx on public.order_events(actor_user_id);
+create index if not exists order_events_business_idx on public.order_events(business_id);
+create index if not exists orders_customer_idx on public.orders(customer_id);
+create index if not exists orders_device_idx on public.orders(device_id);
+create index if not exists orders_offer_idx on public.orders(offer_id);
+create index if not exists payments_order_idx on public.payments(order_id);
+create index if not exists site_links_agent_user_idx on public.site_links(agent_user_id);
