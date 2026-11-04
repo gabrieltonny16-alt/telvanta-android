@@ -25,7 +25,7 @@ type Handler struct {
 	SMSSecret []byte
 	AllowedDarajaCIDRs []*net.IPNet
 }
-type response struct { Result string `json:"result"`; Reference string `json:"reference,omitempty"` }
+type response struct { Result string `json:"result"`; Reference string `json:"reference,omitempty"` }\ntype darajaAck struct { ResultCode int `json:"ResultCode"`; ResultDesc string `json:"ResultDesc"` }
 
 func (h *Handler) Callback(w http.ResponseWriter,r *http.Request) {
 	if r.Method!=http.MethodPost { http.Error(w,"method not allowed",http.StatusMethodNotAllowed); return }
@@ -56,7 +56,7 @@ func (h *Handler) Callback(w http.ResponseWriter,r *http.Request) {
 	lockToken:=randomToken()
 	locked,err:=h.Redis.SetNX(ctx,lockKey,lockToken,24*time.Hour).Result()
 	if err!=nil { http.Error(w,"ingress temporarily unavailable",http.StatusServiceUnavailable); return }
-	if !locked { writeJSON(w,http.StatusOK,response{Result:"duplicate_ignored",Reference:p.TransactionRef}); return }
+	if !locked { respondAccepted(w,source,p.TransactionRef,true); return }
 
 	tx,err:=h.DB.BeginTx(ctx,pgx.TxOptions{IsoLevel:pgx.ReadCommitted})
 	if err!=nil { releaseLock(ctx,h.Redis,lockKey,lockToken); http.Error(w,"ingress temporarily unavailable",http.StatusServiceUnavailable); return }
@@ -72,10 +72,10 @@ func (h *Handler) Callback(w http.ResponseWriter,r *http.Request) {
 		returning id::text
 	`,businessID,p.Provider,p.TransactionRef,p.AmountMinor,p.ShortCode,payer,nullableString(p.RawMSISDN),p.OccurredAt,
 		map[bool]string{true:"sms_candidate",false:"daraja_callback"}[source=="sms"],hex.EncodeToString(rawHash[:])).Scan(&insertedID)
-	if errors.Is(err,pgx.ErrNoRows) { writeJSON(w,http.StatusOK,response{Result:"duplicate_ignored",Reference:p.TransactionRef}); return }
+	if errors.Is(err,pgx.ErrNoRows) { respondAccepted(w,source,p.TransactionRef,true); return }
 	if err!=nil { releaseLock(ctx,h.Redis,lockKey,lockToken); http.Error(w,"could not record payment notification",http.StatusServiceUnavailable); return }
 	if err=tx.Commit(ctx); err!=nil { releaseLock(ctx,h.Redis,lockKey,lockToken); http.Error(w,"could not commit payment notification",http.StatusServiceUnavailable); return }
-	writeJSON(w,http.StatusAccepted,response{Result:"recorded_unverified",Reference:p.TransactionRef})
+	respondAccepted(w,source,p.TransactionRef,false)
 }
 func verifySMSHMAC(body []byte,shortcode,supplied string,secret []byte) bool {
 	if len(secret)==0 || supplied=="" || shortcode=="" { return false }
@@ -90,4 +90,10 @@ func writeJSON(w http.ResponseWriter,status int,v any) { w.Header().Set("Content
 func releaseLock(ctx context.Context,client *redis.Client,key,token string) {
 	const script=`if redis.call("get",KEYS[1])==ARGV[1] then return redis.call("del",KEYS[1]) else return 0 end`
 	_=client.Eval(ctx,script,[]string{key},token).Err()
+}
+
+func respondAccepted(w http.ResponseWriter,source,reference string,duplicate bool) {
+	if source!="sms" { writeJSON(w,http.StatusOK,darajaAck{ResultCode:0,ResultDesc:"Accepted"}); return }
+	result:="recorded_unverified"; if duplicate { result="duplicate_ignored" }
+	writeJSON(w,http.StatusAccepted,response{Result:result,Reference:reference})
 }
