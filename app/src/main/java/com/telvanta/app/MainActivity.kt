@@ -20,6 +20,10 @@ import androidx.activity.compose.setContent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.Image
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -139,7 +143,7 @@ private fun BingwaPulseApp(db: LocalDatabase) {
             }
         },topBar={ TopAppBar(
             navigationIcon = { IconButton(onClick = { scope.launch { drawerState.open() } }) { Text("≡", color = Color(0xFFB7FF24), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.headlineMedium) } },
-            title={Row(verticalAlignment=androidx.compose.ui.Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(10.dp)) { Surface(color=Color(0xFF082A1A),shape=RoundedCornerShape(12.dp)) { Text("B",color=Color(0xFFB7FF24),fontWeight=FontWeight.Black,style=MaterialTheme.typography.titleLarge,modifier=Modifier.padding(horizontal=10.dp,vertical=5.dp)) }; Column(verticalArrangement=Arrangement.spacedBy(2.dp)) { Text("BingwaPulse",fontWeight=FontWeight.ExtraBold,color=Color.White,letterSpacing=.2.sp,style=MaterialTheme.typography.titleLarge); Text(selected.uppercase(),style=MaterialTheme.typography.labelSmall,color=Color(0xFFB7FF24),letterSpacing=1.2.sp) } }},
+            title={Row(verticalAlignment=androidx.compose.ui.Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(10.dp)) { Image(painter = painterResource(R.drawable.bingwapulse_original), contentDescription = "BingwaPulse original icon", contentScale = ContentScale.Crop, modifier = Modifier.size(42.dp).clip(RoundedCornerShape(12.dp))); Column(verticalArrangement=Arrangement.spacedBy(2.dp)) { Text("BingwaPulse",fontWeight=FontWeight.ExtraBold,color=Color.White,letterSpacing=.2.sp,style=MaterialTheme.typography.titleLarge); Text(selected.uppercase(),style=MaterialTheme.typography.labelSmall,color=Color(0xFFB7FF24),letterSpacing=1.2.sp) } }},
             colors=TopAppBarDefaults.topAppBarColors(containerColor=NavyDeep)
         ) }) { padding ->
             LazyColumn(Modifier.fillMaxSize().padding(padding).padding(horizontal=16.dp),verticalArrangement=Arrangement.spacedBy(14.dp),contentPadding=PaddingValues(vertical=16.dp)) {
@@ -173,9 +177,7 @@ private fun BingwaPulseApp(db: LocalDatabase) {
                                                 Text("Gabriel", color = Color.White, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.ExtraBold)
                                                 Text(SimpleDateFormat("EEEE, d MMMM", Locale.getDefault()).format(Date()), color = Color(0xFFB7CDBF), style = MaterialTheme.typography.bodySmall)
                                             }
-                                            Surface(color = Color(0xFF0D5731), shape = RoundedCornerShape(18.dp)) {
-                                                Text("B", color = Color(0xFFB7FF24), fontWeight = FontWeight.Black, style = MaterialTheme.typography.headlineMedium, modifier = Modifier.padding(horizontal = 17.dp, vertical = 10.dp))
-                                            }
+                                            Image(painter = painterResource(R.drawable.bingwapulse_original), contentDescription = "BingwaPulse original icon", contentScale = ContentScale.Crop, modifier = Modifier.size(76.dp).clip(RoundedCornerShape(20.dp)))
                                         }
                                         HorizontalDivider(color = Color(0xFF286443))
                                         Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
