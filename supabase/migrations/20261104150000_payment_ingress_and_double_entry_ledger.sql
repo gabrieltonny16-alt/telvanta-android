@@ -3,6 +3,8 @@
 
 alter table public.orders
   add constraint orders_business_id_id_unique unique (business_id,id);
+alter table public.providers
+  add constraint providers_business_id_id_unique unique (business_id,id);
 
 create table public.payment_ingress_channels (
   id uuid primary key default gen_random_uuid(),
@@ -57,6 +59,8 @@ create table public.balance_ledger_batches (
   id uuid primary key default gen_random_uuid(),
   business_id uuid not null references public.businesses(id) on delete restrict,
   order_id uuid,
+  provider_id uuid,
+  agent_user_id uuid,
   source_type text not null check (source_type in ('payment','order','provider_float','agent_commission','adjustment','reversal')),
   source_ref text not null,
   currency text not null default 'KES' check (currency='KES'),
@@ -65,7 +69,11 @@ create table public.balance_ledger_batches (
   created_at timestamptz not null default now(),
   unique (business_id, source_type, source_ref),
   unique (business_id, id),
-  foreign key (business_id, order_id) references public.orders(business_id, id) on delete restrict
+  foreign key (business_id, order_id) references public.orders(business_id, id) on delete restrict,
+  foreign key (business_id, provider_id) references public.providers(business_id, id) on delete restrict,
+  foreign key (business_id, agent_user_id) references public.business_memberships(business_id, user_id) on delete restrict,
+  check (source_type <> 'provider_float' or provider_id is not null),
+  check (source_type <> 'agent_commission' or agent_user_id is not null)
 );
 
 create table public.balance_ledger_entries (
