@@ -1,29 +1,33 @@
-# Bingwa Vecta Android
+# BingwaPulse Ecosystem
 
 **Power Every Connection.**
 
-Independent, offline-first Android app for telecom distribution workflows.
+BingwaPulse is an independent, multi-agent telecom business platform for Android, management web, SiteLink customer storefronts and the ConnectPulse companion.
 
-## Current foundation
-- Native Android app using Kotlin and Jetpack Compose.
-- Local SQLite database for saved offers, customers, and orders.
-- No network permission in the initial app foundation.
-- No live payments, STK Push, USSD execution, SMS sending, or automatic fulfilment.
-- Offline records are local to this device until secure sync is implemented and tested.
+## Current implementation
+
+- Existing Kotlin / Jetpack Compose Android app and ConnectPulse Android module.
+- Supabase project created and connected to the Android build using a public publishable key.
+- Email/password sign-in and account creation entry point.
+- First-business onboarding with owner membership bootstrap.
+- Session data encrypted with Android Keystore AES-GCM.
+- Supabase backend foundation with 15 RLS-protected tables for businesses, team roles, providers, offers, customers, devices, orders, payments, audit and dispatch.
+- Realtime publication configured for orders, order events, offers, agent offers, devices and SiteLink configuration.
+- Transactional order status events and a deduplicated dispatch outbox event when an order becomes QUEUED.
 
 ## Build
-Open this repository in Android Studio, allow Gradle sync, then run the app on an Android device or emulator. GitHub Actions is configured to build a debug APK on pushes and pull requests.
 
-## Planned sequence
-1. Verify the Android build and local persistence.
-2. Implement offers, customers, orders, transactions, and settings screens.
-3. Add safe offline queue and reconciliation rules.
-4. Build Vecta Connect's authenticated nearby connection.
-5. Add optional remote sync and Signature Offer downloads after security review.
+GitHub Actions builds both Android applications on pushes to `feature/vecta-branding`. Check the latest workflow run before treating an APK as ready.
 
-## Safety rules
-- Never claim delivery without authoritative confirmation.
-- Never retry uncertain fulfilment automatically.
-- Never collect or store M-PESA PINs.
-- Test mode must not make live purchases or send real messages.
-- Never put API keys or credentials in source control.
+## Important operational boundaries
+
+- A payment notification is evidence, not proof of verified payment.
+- The dispatch outbox is durable but FCM delivery is not yet configured.
+- Worker claim/acknowledgement and reconciliation still need implementation.
+- USSD screen observation is not automated bundle purchasing.
+- No live payment collection, STK Push, paid messaging or automatic fulfilment is enabled.
+- Management website, public SiteLink storefront and ConnectPulse recovery are not yet complete.
+- No service-role or secret API key may be placed in Android or browser code.
+- Do not retry an order whose fulfilment state is UNKNOWN without reconciliation.
+
+See [Backend Foundation](docs/BACKEND_FOUNDATION.md) for the actual database migrations, security checks and remaining work.
