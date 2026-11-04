@@ -30,7 +30,8 @@ type Handler struct {
 	SMSSecret []byte
 	AllowedDarajaCIDRs []*net.IPNet
 }
-type response struct { Result string `json:"result"`; Reference string `json:"reference,omitempty"` }\ntype darajaAck struct { ResultCode int `json:"ResultCode"`; ResultDesc string `json:"ResultDesc"` }
+type response struct { Result string `json:"result"`; Reference string `json:"reference,omitempty"` }
+type darajaAck struct { ResultCode int `json:"ResultCode"`; ResultDesc string `json:"ResultDesc"` }
 
 func (h *Handler) Callback(w http.ResponseWriter,r *http.Request) {
 	if r.Method!=http.MethodPost { http.Error(w,"method not allowed",http.StatusMethodNotAllowed); return }
