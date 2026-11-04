@@ -35,7 +35,7 @@ func main() {
 		_, block, err := net.ParseCIDR(raw); if err != nil { log.Fatalf("invalid DARAJA_ALLOWED_CIDRS entry: %v",err) }
 		cidrs=append(cidrs,block)
 	}
-	h := &ingress.Handler{DB:pool,Redis:rdb,SMSSecret:[]byte(os.Getenv("SMS_INGRESS_HMAC_SECRET")),SMSShortcode:os.Getenv("SMS_RECEIVING_SHORTCODE"),AllowedDarajaCIDRs:cidrs}
+	h := &ingress.Handler{DB:pool,Redis:rdb,SMSSecret:[]byte(os.Getenv("SMS_INGRESS_HMAC_SECRET")),AllowedDarajaCIDRs:cidrs}
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/v1/payments/callback",h.Callback)
 	mux.HandleFunc("/healthz",func(w http.ResponseWriter,r *http.Request){ w.WriteHeader(http.StatusNoContent) })
