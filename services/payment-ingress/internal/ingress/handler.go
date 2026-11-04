@@ -93,7 +93,7 @@ func ipAllowed(ip net.IP,cidrs []*net.IPNet) bool { for _,n:=range cidrs { if ip
 func nullableString(v *string) any { if v==nil { return nil }; return *v }
 func randomToken() string { var b [24]byte; if _,err:=rand.Read(b[:]); err!=nil { panic("secure random source unavailable") }; return hex.EncodeToString(b[:]) }
 func writeJSON(w http.ResponseWriter,status int,v any) { w.Header().Set("Content-Type","application/json"); w.WriteHeader(status); _=json.NewEncoder(w).Encode(v) }
-func releaseLock(ctx context.Context,client *redis.Client,key,token string) {
+func releaseLock(ctx context.Context,client RedisLocker,key,token string) {
 	const script=`if redis.call("get",KEYS[1])==ARGV[1] then return redis.call("del",KEYS[1]) else return 0 end`
 	_=client.Eval(ctx,script,[]string{key},token).Err()
 }
