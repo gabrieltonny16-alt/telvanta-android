@@ -9,7 +9,6 @@ import org.json.JSONObject
 import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
-import java.net.URLEncoder
 import java.security.KeyStore
 import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
@@ -29,7 +28,7 @@ class SecureSessionStore(context: Context) {
     private val prefs = context.getSharedPreferences("bingwapulse_secure_session", Context.MODE_PRIVATE)
     private val alias = "bingwapulse.session.aes"
 
-    fun hasSession(): Boolean = load() != null
+    fun hasSession(): Boolean = load()?.expiresAtEpochSeconds?.let { it > System.currentTimeMillis() / 1000L + 60L } == true
 
     fun save(session: BingwaSession) {
         val json = JSONObject()
