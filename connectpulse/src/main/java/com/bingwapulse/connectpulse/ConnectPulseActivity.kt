@@ -3,7 +3,6 @@ package com.bingwapulse.connectpulse
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -37,8 +36,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -84,17 +81,12 @@ private fun ConnectPulseHome() {
             modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 22.dp, vertical = 24.dp),
             verticalArrangement = Arrangement.spacedBy(18.dp)
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(15.dp)) {
-                Image(
-                    painter = painterResource(R.drawable.connectpulse_original),
-                    contentDescription = "Original ConnectPulse dancer icon",
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.size(82.dp).clip(RoundedCornerShape(23.dp))
-                )
-                Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                    Text("CONNECTPULSE", color = White, fontWeight = FontWeight.Black, fontSize = 23.sp, letterSpacing = 1.1.sp)
-                    Text("MOVE. CONNECT. CONTROL.", color = Cyan, fontWeight = FontWeight.Bold, fontSize = 10.sp, letterSpacing = 1.4.sp)
-                    Text("BingwaPulse companion", color = Muted, fontSize = 13.sp)
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text("CONNECTPULSE", color = White, fontWeight = FontWeight.Black, fontSize = 28.sp, letterSpacing = 2.sp)
+                Text("MOVE. CONNECT. CONTROL.", color = Cyan, fontWeight = FontWeight.Bold, fontSize = 11.sp, letterSpacing = 1.8.sp)
+                Text("BingwaPulse companion", color = Muted, fontSize = 13.sp)
+                Row(horizontalArrangement = Arrangement.spacedBy(5.dp), verticalAlignment = Alignment.CenterVertically) {
+                    repeat(3) { index -> Spacer(Modifier.size(width = (22 - index * 4).dp, height = 3.dp).clip(CircleShape).background(if (index == 0) Cyan else ElectricBlue)) }
                 }
             }
 
