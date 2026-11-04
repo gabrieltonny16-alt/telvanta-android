@@ -1,6 +1,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <application
         android:allowBackup="false"
+        android:icon="@drawable/connectpulse_original"
+        android:roundIcon="@drawable/connectpulse_original"
         android:label="Connect Pulse"
         android:theme="@android:style/Theme.Material.Light.NoActionBar">
         <activity
