@@ -46,7 +46,16 @@ private val Canvas = Color(0xFF010905)
 
 class MainActivity : ComponentActivity() {
     private lateinit var localDb: LocalDatabase
-    override fun onCreate(savedInstanceState: Bundle?) { super.onCreate(savedInstanceState); localDb = LocalDatabase(this); setContent { BingwaPulseApp(localDb) } }
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        if (!SecureSessionStore(this).hasSession()) {
+            startActivity(Intent(this, AuthActivity::class.java))
+            finish()
+            return
+        }
+        localDb = LocalDatabase(this)
+        setContent { BingwaPulseApp(localDb) }
+    }
     override fun onDestroy() { if (::localDb.isInitialized) localDb.close(); super.onDestroy() }
 }
 
