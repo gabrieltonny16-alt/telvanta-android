@@ -1,0 +1,33 @@
+name: Payment ingress checks
+
+on:
+  push:
+    branches: [feature/vecta-branding]
+    paths:
+      - "services/payment-ingress/**"
+      - "supabase/migrations/**"
+      - ".github/workflows/payment-ingress.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "services/payment-ingress/**"
+      - "supabase/migrations/**"
+
+permissions:
+  contents: read
+
+jobs:
+  go-test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/payment-ingress
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.23.x"
+          cache-dependency-path: services/payment-ingress/go.mod
+      - run: go mod tidy
+      - run: go test ./...
+      - run: go vet ./...
