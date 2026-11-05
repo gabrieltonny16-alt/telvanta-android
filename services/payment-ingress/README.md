@@ -9,7 +9,7 @@ never posts ledger entries, and never dispatches Android USSD work.
 - `cmd/server`: HTTP server and health endpoint.
 - `internal/ingress/parser.go`: C2B JSON and common M-PESA SMS parsing.
 - `internal/ingress/handler.go`: tenant routing, Redis SET NX lock, PostgreSQL idempotency insert.
-- `../../supabase/migrations/20261104150000_payment_ingress_and_double_entry_ledger.sql`: additive tenant-safe schema.
+- `../../supabase/migrations/20261105100210_payment_ingress_and_double_entry_ledger.sql`: additive tenant-safe schema.
 
 ## Callback route
 
@@ -63,22 +63,22 @@ that starts a purchase or emits an Android dispatch event.
 
 1. Apply the additive SQL migration to the intended Supabase/PostgreSQL environment after review.
 2. Create one active `payment_ingress_channels` row per registered merchant shortcode.
-3. Configure `DATABASE_URL`, `REDIS_CLUSTER_ADDRS`, `REDIS_PASSWORD`, optional `REDIS_USERNAME` / `REDIS_TLS`, `SMS_INGRESS_HMAC_SECRET`, and optional
-   `DARAJA_ALLOWED_CIDRS` from a secret manager. Never place database credentials in Android.
+3. Configure `DATABASE_URL`, `REDIS_CLUSTER_ADDRS`, `REDIS_PASSWORD`, optional `REDIS_USERNAME` / `REDIS_TLS`, `SMS_INGRESS_HMAC_SECRET`, and `DARAJA_ALLOWED_CIDRS` from a secret manager. The service refuses to start without a non-empty allowlist containing the exact Safaricom-confirmed CIDRs. Never place database or Redis credentials in Android.
 4. Run `go mod tidy && go test ./... && go vet ./...`.
 5. Run `go run ./cmd/server` or build the supplied Dockerfile.
-6. Expose the endpoint only through HTTPS. Since standard Daraja C2B callbacks do not carry
-   an application HMAC signature, protect the origin with a trusted edge/network policy and
-   configure Safaricom's callback URL only after the receiving shortcode is approved.
+6. Expose the endpoint only through HTTPS. Standard Daraja C2B callbacks do not carry an
+   application HMAC signature, so the service checks the direct peer IP against the required
+   Safaricom-confirmed CIDR allowlist. Do not rely on forwarded IP headers from an untrusted proxy.
+   Register the callback only after the receiving shortcode and network path are approved.
 
 ## Not included yet
 
 - STK Push callback schema and checkout-request-to-tenant correlation.
 - Daraja transaction-status reconciliation.
-- Payment-to-order matching and human review workflow.
+- Automatic payment-to-order matching and the owner review/approval interface.
 - Ledger posting service / account bootstrap.
-- Android SMS relay pairing and signed delivery.
-- Any live M-PESA payment initiation or USSD bundle purchase.
+- Android worker dispatch, validated menu navigation and bundle fulfilment.
+- STK Push, live payment initiation or live USSD purchases.
 
 These are intentionally separate phases. Do not interpret HTTP 202 as proof that money has
 settled or as permission to dial a USSD code.
