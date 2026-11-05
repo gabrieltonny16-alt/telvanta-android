@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"regexp"
 	"strings"
 	"time"
 
@@ -34,12 +35,16 @@ func main() {
 		_,block,e:=net.ParseCIDR(raw); if e!=nil { log.Fatalf("invalid DARAJA_ALLOWED_CIDRS entry: %v",e) }
 		cidrs=append(cidrs,block)
 	}
-	if len(cidrs)==0 {
-		log.Fatal("DARAJA_ALLOWED_CIDRS must contain Safaricom-confirmed source CIDRs; refusing to accept unsigned C2B callbacks")
+	callbackPathToken:=required("DARAJA_CALLBACK_PATH_TOKEN")
+	if len(callbackPathToken)<43 || len(callbackPathToken)>128 ||
+		!regexp.MustCompile("^[A-Za-z0-9_-]+$").MatchString(callbackPathToken) {
+		log.Fatal("DARAJA_CALLBACK_PATH_TOKEN must be a high-entropy URL-safe token of at least 43 characters")
 	}
 	h:=&ingress.Handler{DB:pool,Redis:rdb,SMSSecret:[]byte(os.Getenv("SMS_INGRESS_HMAC_SECRET")),AllowedDarajaCIDRs:cidrs}
 	mux:=http.NewServeMux()
-	mux.HandleFunc("/api/v1/payments/callback",h.Callback)
+	// The callback path token is a server-only capability secret. Never log or
+	// include it in Android/browser code. Safaricom must register this exact URL.
+	mux.HandleFunc("/api/v1/inbound/"+callbackPathToken,h.Callback)
 	mux.HandleFunc("/healthz",func(w http.ResponseWriter,r *http.Request){ w.WriteHeader(http.StatusNoContent) })
 	addr:=os.Getenv("HTTP_ADDR"); if addr=="" { addr=":8080" }
 	server:=&http.Server{Addr:addr,Handler:securityHeaders(mux),ReadHeaderTimeout:5*time.Second,ReadTimeout:10*time.Second,WriteTimeout:10*time.Second,IdleTimeout:60*time.Second}
