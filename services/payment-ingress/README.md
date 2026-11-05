@@ -15,7 +15,7 @@ never posts ledger entries, and never dispatches Android USSD work.
 
 ## Callback route
 
-`POST /api/v1/payments/callback`
+`POST /api/v1/inbound/<DARAJA_CALLBACK_PATH_TOKEN>`
 
 ### Safaricom C2B confirmation JSON
 
@@ -74,14 +74,25 @@ that starts a purchase or emits an Android dispatch event.
    application HMAC signature. An optional confirmed CIDR list adds network restriction; the
    handler uses the direct peer IP and does not trust forwarded IP headers.
 
+## Current payment/order staging
+
+When a C2B callback and a local notification candidate agree on exact business, receipt and
+amount, the database reconciles the full sender number if available. If that number is known
+and an owner has configured one enabled, current offer rule for the exact amount, the database
+creates an idempotent `payments` record and an order in `REVIEW_REQUIRED`. A candidate or a
+C2B callback is not final settlement proof. This staging path does not mark an order `PAID`,
+does not transition it to `QUEUED`, does not create a dispatch outbox event, and does not call USSD.
+Masked, partial, conflicting, stale or ambiguous evidence is left unallocated or flagged.
+
 ## Not included yet
 
+- Owner-facing review and an explicit payment verification/approval workflow.
+- Safaricom Transaction Status API reconciliation.
+- Double-entry ledger posting service / account bootstrap.
+- Android worker pairing, device claims/leases, push dispatch and acknowledgements.
+- Tested SIM-specific USSD scripts, menu execution and delivery-result reconciliation.
 - STK Push callback schema and checkout-request-to-tenant correlation.
-- Daraja transaction-status reconciliation.
-- Automatic payment-to-order matching and the owner review/approval interface.
-- Ledger posting service / account bootstrap.
-- Android worker dispatch, validated menu navigation and bundle fulfilment.
-- STK Push, live payment initiation or live USSD purchases.
+- Live payment initiation or automated live USSD purchases.
 
 These are intentionally separate phases. Do not interpret HTTP 202 as proof that money has
 settled or as permission to dial a USSD code.
