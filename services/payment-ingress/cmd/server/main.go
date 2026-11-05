@@ -34,6 +34,9 @@ func main() {
 		_,block,e:=net.ParseCIDR(raw); if e!=nil { log.Fatalf("invalid DARAJA_ALLOWED_CIDRS entry: %v",e) }
 		cidrs=append(cidrs,block)
 	}
+	if len(cidrs)==0 {
+		log.Fatal("DARAJA_ALLOWED_CIDRS must contain Safaricom-confirmed source CIDRs; refusing to accept unsigned C2B callbacks")
+	}
 	h:=&ingress.Handler{DB:pool,Redis:rdb,SMSSecret:[]byte(os.Getenv("SMS_INGRESS_HMAC_SECRET")),AllowedDarajaCIDRs:cidrs}
 	mux:=http.NewServeMux()
 	mux.HandleFunc("/api/v1/payments/callback",h.Callback)
