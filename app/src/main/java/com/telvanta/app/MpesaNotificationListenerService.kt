@@ -3,15 +3,25 @@ package com.telvanta.app
 import android.app.Notification
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
+import java.math.BigDecimal
+import java.security.MessageDigest
+import java.util.concurrent.Executors
 
 /**
- * Opt-in local M-PESA notification reader.
+ * Opt-in M-PESA notification reader and authenticated relay.
  *
- * It extracts best-effort candidates from the notification text for review.
- * These values are NOT authenticated payment proof and never trigger fulfilment.
- * A complete sender number is only retained when it appears after "from".
+ * Notifications are untrusted evidence. They are uploaded under the signed-in user's
+ * Supabase JWT and are stored as UNVERIFIED candidates. They never mark a payment paid,
+ * create an order, or start a USSD purchase.
  */
 class MpesaNotificationListenerService : NotificationListenerService() {
+    private val relayExecutor = Executors.newSingleThreadExecutor()
+
+    override fun onListenerConnected() {
+        super.onListenerConnected()
+        retryLatestCandidate()
+    }
+
     override fun onNotificationPosted(sbn: StatusBarNotification) {
         val packageName = sbn.packageName.orEmpty()
         val extras = sbn.notification.extras ?: return
@@ -28,26 +38,23 @@ class MpesaNotificationListenerService : NotificationListenerService() {
             .joinToString("\n")
             .take(1600)
 
-        val combined = text
         val source = (packageName + " " + title).lowercase()
-        val message = combined.lowercase()
+        val message = text.lowercase()
         val looksLikeMpesa = source.contains("safaricom") ||
             source.contains("mpesa") || source.contains("m-pesa") ||
             message.contains("m-pesa") || message.contains("mpesa") ||
             (message.contains("confirmed") && (message.contains("ksh") || message.contains("kes")))
+        if (!looksLikeMpesa || text.isBlank()) return
 
-        if (!looksLikeMpesa || combined.isBlank()) return
-
-        val receipt = extractReceipt(combined)
-        val amount = extractAmount(combined)
-        val sender = extractSenderPhone(combined)
+        val receipt = extractReceipt(text)
+        val amount = extractAmount(text)
+        val sender = extractSenderPhone(text)
         val completeness = when {
             receipt != null && amount != null && sender != null -> "REVIEW_READY"
             receipt != null || amount != null || sender != null -> "PARTIAL_CANDIDATE"
             else -> "RAW_NOTIFICATION_ONLY"
         }
 
-        // Keep the original text and extracted values locally for owner review only.
         getSharedPreferences(PREFS, MODE_PRIVATE).edit()
             .putString(KEY_PACKAGE, packageName)
             .putString(KEY_TITLE, title.take(120))
@@ -57,25 +64,112 @@ class MpesaNotificationListenerService : NotificationListenerService() {
             .putString(KEY_SENDER_PHONE, sender.orEmpty())
             .putString(KEY_CANDIDATE_STATUS, completeness)
             .putLong(KEY_TIME, sbn.postTime)
+            .putString(KEY_SYNC_STATUS, "QUEUED")
             .apply()
+
+        enqueueRelay(packageName, title, text, receipt, amount, sender, completeness, sbn.postTime)
+    }
+
+    private fun retryLatestCandidate() {
+        val prefs = getSharedPreferences(PREFS, MODE_PRIVATE)
+        val rawText = prefs.getString(KEY_TEXT, "").orEmpty()
+        if (rawText.isBlank()) return
+        val status = prefs.getString(KEY_SYNC_STATUS, "").orEmpty()
+        if (status == "SYNCED_UNVERIFIED") return
+        enqueueRelay(
+            prefs.getString(KEY_PACKAGE, "").orEmpty(),
+            prefs.getString(KEY_TITLE, "").orEmpty(),
+            rawText,
+            prefs.getString(KEY_RECEIPT, "").orEmpty().ifBlank { null },
+            prefs.getString(KEY_AMOUNT, "").orEmpty().ifBlank { null },
+            prefs.getString(KEY_SENDER_PHONE, "").orEmpty().ifBlank { null },
+            prefs.getString(KEY_CANDIDATE_STATUS, "RAW_NOTIFICATION_ONLY").orEmpty(),
+            prefs.getLong(KEY_TIME, 0L)
+        )
+    }
+
+    private fun enqueueRelay(
+        sourcePackage: String,
+        title: String,
+        rawText: String,
+        receipt: String?,
+        amount: String?,
+        sender: String?,
+        candidateStatus: String,
+        postedAt: Long
+    ) {
+        relayExecutor.execute {
+            val prefs = getSharedPreferences(PREFS, MODE_PRIVATE)
+            try {
+                val store = SecureSessionStore(applicationContext)
+                var session = store.load()
+                if (session == null) {
+                    prefs.edit().putString(KEY_SYNC_STATUS, "SIGN_IN_REQUIRED").apply()
+                    return@execute
+                }
+
+                val api = BingwaSupabaseApi()
+                if (session.expiresAtEpochSeconds <= System.currentTimeMillis() / 1000L + 60L) {
+                    session = api.refreshSession(session)
+                    store.save(session)
+                }
+                val businessId = session.businessId
+                    ?: api.firstBusinessId(session)
+                    ?: throw IllegalStateException("No active business workspace is linked to this account.")
+                if (session.businessId == null) store.save(session.copy(businessId = businessId))
+
+                val amountMinor = amount?.let {
+                    BigDecimal(it).movePointRight(2).longValueExact()
+                }?.takeIf { it > 0L }
+                val fingerprintInput = listOf(
+                    businessId, sourcePackage, title, receipt.orEmpty(),
+                    amount.orEmpty(), sender.orEmpty(), rawText, postedAt.toString()
+                ).joinToString("\n")
+                val fingerprint = sha256(fingerprintInput)
+
+                api.submitMpesaNotificationCandidate(
+                    session = session.copy(businessId = businessId),
+                    businessId = businessId,
+                    sourcePackage = sourcePackage,
+                    title = title,
+                    rawText = rawText,
+                    receiptCandidate = receipt,
+                    amountMinor = amountMinor,
+                    senderPhoneCandidate = sender,
+                    notificationHash = fingerprint,
+                    candidateStatus = candidateStatus,
+                    postedAtEpochMillis = postedAt
+                )
+                prefs.edit()
+                    .putString(KEY_SYNC_STATUS, "SYNCED_UNVERIFIED")
+                    .putLong(KEY_SYNCED_AT, System.currentTimeMillis())
+                    .remove(KEY_SYNC_ERROR)
+                    .apply()
+            } catch (error: Exception) {
+                prefs.edit()
+                    .putString(KEY_SYNC_STATUS, "RETRY_PENDING")
+                    .putString(KEY_SYNC_ERROR, error.message?.take(180).orEmpty())
+                    .apply()
+            }
+        }
     }
 
     private fun extractReceipt(text: String): String? {
         val confirmed = Regex(
-            """\b([A-Z0-9]{8,12})\s+confirmed\b""",
+            """\\b([A-Z0-9]{8,16})\\s+confirmed\\b""",
             RegexOption.IGNORE_CASE
         ).find(text)?.groupValues?.getOrNull(1)
         if (!confirmed.isNullOrBlank()) return confirmed.uppercase()
 
         return Regex(
-            """\b(?:receipt|transaction(?:\s+id)?|reference)\s*(?:no\.?|:)?\s*([A-Z0-9]{8,12})\b""",
+            """\\b(?:receipt|transaction(?:\\s+id)?|reference)\\s*(?:no\\.?|:)?\\s*([A-Z0-9]{8,16})\\b""",
             RegexOption.IGNORE_CASE
         ).find(text)?.groupValues?.getOrNull(1)?.uppercase()
     }
 
     private fun extractAmount(text: String): String? {
         val raw = Regex(
-            """\b(?:KES|KSH)\s*([0-9][0-9,]*(?:\.[0-9]{1,2})?)""",
+            """\\b(?:KES|KSH)\\.?\\s*([0-9][0-9,]*(?:\\.[0-9]{1,2})?)""",
             RegexOption.IGNORE_CASE
         ).find(text)?.groupValues?.getOrNull(1) ?: return null
         return raw.replace(",", "")
@@ -84,15 +178,25 @@ class MpesaNotificationListenerService : NotificationListenerService() {
     private fun extractSenderPhone(text: String): String? {
         val fromIndex = text.indexOf("from", ignoreCase = true)
         if (fromIndex < 0) return null
-        val senderSection = text.substring(fromIndex, minOf(text.length, fromIndex + 140))
+        val senderSection = text.substring(fromIndex, minOf(text.length, fromIndex + 180))
         val candidate = Regex(
-            """(?<![0-9])(?:\+?254[17][0-9]{8}|0[17][0-9]{8})(?![0-9])"""
+            """(?<![0-9])(?:\\+?254[17][0-9]{8}|0[17][0-9]{8})(?![0-9])"""
         ).find(senderSection)?.value ?: return null
         return when {
             candidate.startsWith("+") -> candidate.substring(1)
             candidate.startsWith("0") -> "254" + candidate.substring(1)
             else -> candidate
         }
+    }
+
+    private fun sha256(value: String): String =
+        MessageDigest.getInstance("SHA-256")
+            .digest(value.toByteArray(Charsets.UTF_8))
+            .joinToString("") { "%02x".format(it) }
+
+    override fun onDestroy() {
+        relayExecutor.shutdown()
+        super.onDestroy()
     }
 
     companion object {
@@ -105,5 +209,8 @@ class MpesaNotificationListenerService : NotificationListenerService() {
         const val KEY_SENDER_PHONE = "sender_phone_candidate"
         const val KEY_CANDIDATE_STATUS = "candidate_status"
         const val KEY_TIME = "posted_at"
+        const val KEY_SYNC_STATUS = "sync_status"
+        const val KEY_SYNCED_AT = "synced_at"
+        const val KEY_SYNC_ERROR = "sync_error"
     }
 }
