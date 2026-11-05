@@ -58,20 +58,20 @@ class MpesaNotificationListenerService : NotificationListenerService() {
 
     private fun extractReceipt(text: String): String? {
         val confirmed = Regex(
-            """\\b([A-Z0-9]{8,12})\\s+confirmed\\b""",
+            """\b([A-Z0-9]{8,12})\s+confirmed\b""",
             RegexOption.IGNORE_CASE
         ).find(text)?.groupValues?.getOrNull(1)
         if (!confirmed.isNullOrBlank()) return confirmed.uppercase()
 
         return Regex(
-            """\\b(?:receipt|transaction(?:\\s+id)?|reference)\\s*(?:no\\.?|:)?\\s*([A-Z0-9]{8,12})\\b""",
+            """\b(?:receipt|transaction(?:\s+id)?|reference)\s*(?:no\.?|:)?\s*([A-Z0-9]{8,12})\b""",
             RegexOption.IGNORE_CASE
         ).find(text)?.groupValues?.getOrNull(1)?.uppercase()
     }
 
     private fun extractAmount(text: String): String? {
         val raw = Regex(
-            """\\b(?:KES|KSH)\\s*([0-9][0-9,]*(?:\\.[0-9]{1,2})?)""",
+            """\b(?:KES|KSH)\s*([0-9][0-9,]*(?:\.[0-9]{1,2})?)""",
             RegexOption.IGNORE_CASE
         ).find(text)?.groupValues?.getOrNull(1) ?: return null
         return raw.replace(",", "")
@@ -82,7 +82,7 @@ class MpesaNotificationListenerService : NotificationListenerService() {
         if (fromIndex < 0) return null
         val senderSection = text.substring(fromIndex, minOf(text.length, fromIndex + 140))
         val candidate = Regex(
-            """(?<![0-9])(?:\\+?254[17][0-9]{8}|0[17][0-9]{8})(?![0-9])"""
+            """(?<![0-9])(?:\+?254[17][0-9]{8}|0[17][0-9]{8})(?![0-9])"""
         ).find(senderSection)?.value ?: return null
         return when {
             candidate.startsWith("+") -> candidate.substring(1)
