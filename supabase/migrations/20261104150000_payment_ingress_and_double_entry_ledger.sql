@@ -170,23 +170,23 @@ alter table public.balance_ledger_entries enable row level security;
 
 create policy "business managers view payment ingress channels"
 on public.payment_ingress_channels for select to authenticated
-using (public.has_business_role(business_id,array['owner','business_admin','agent_manager']));
+using (private.has_business_role(business_id,array['owner','business_admin','agent_manager']));
 create policy "owners manage payment ingress channels"
 on public.payment_ingress_channels for all to authenticated
-using (public.has_business_role(business_id,array['owner','business_admin']))
-with check (public.has_business_role(business_id,array['owner','business_admin']));
+using (private.has_business_role(business_id,array['owner','business_admin']))
+with check (private.has_business_role(business_id,array['owner','business_admin']));
 create policy "managers view payment ingress events"
 on public.payment_ingress_events for select to authenticated
-using (public.has_business_role(business_id,array['owner','business_admin','agent_manager']));
+using (private.has_business_role(business_id,array['owner','business_admin','agent_manager']));
 create policy "managers view ledger accounts"
 on public.balance_ledger_accounts for select to authenticated
-using (public.has_business_role(business_id,array['owner','business_admin','agent_manager']));
+using (private.has_business_role(business_id,array['owner','business_admin','agent_manager']));
 create policy "managers view ledger batches"
 on public.balance_ledger_batches for select to authenticated
-using (public.has_business_role(business_id,array['owner','business_admin','agent_manager']));
+using (private.has_business_role(business_id,array['owner','business_admin','agent_manager']));
 create policy "managers view ledger entries"
 on public.balance_ledger_entries for select to authenticated
-using (public.has_business_role(business_id,array['owner','business_admin','agent_manager']));
+using (private.has_business_role(business_id,array['owner','business_admin','agent_manager']));
 
 grant select on public.payment_ingress_channels,public.payment_ingress_events,
   public.balance_ledger_accounts,public.balance_ledger_batches,public.balance_ledger_entries to authenticated;
