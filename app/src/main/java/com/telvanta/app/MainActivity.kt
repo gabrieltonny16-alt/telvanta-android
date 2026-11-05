@@ -350,7 +350,24 @@ private fun FeatureWorkspaceScreen(title: String) {
                     Text(item, color = Navy)
                 }
             }
-            Button(onClick = { notice = "Draft only. No dialler or USSD session was launched." }, modifier = Modifier.fillMaxWidth()) { Text("Preview dial action") }
+            Button(onClick = {
+                val code = fieldOne.trim()
+                val inner = if (code.length >= 2) code.substring(1, code.length - 1) else ""
+                val valid = code.length in 3..20 &&
+                    code.startsWith("*") && code.endsWith("#") &&
+                    inner.all { it.isDigit() || it == '*' }
+                if (!valid) {
+                    notice = "Enter a valid USSD code beginning with * and ending with #."
+                } else {
+                    try {
+                        context.startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:" + Uri.encode(code))))
+                        notice = "Phone dialler opened. Check the code and selected SIM, then tap Call yourself. No menu choice or purchase is submitted by BingwaPulse."
+                    } catch (_: Exception) {
+                        notice = "No compatible phone dialler was found."
+                    }
+                }
+            }, modifier = Modifier.fillMaxWidth()) { Text("Open phone dialler") }
+            InfoCard("Manual confirmation", "BingwaPulse opens the phone dialler with the USSD code. You must review it, choose the SIM and press Call. It will not automatically call or buy a bundle.")
         }
         "Auto Renewals" -> {
             OutlinedTextField(fieldOne, { fieldOne = it }, label = { Text("Customer phone") }, modifier = Modifier.fillMaxWidth())
