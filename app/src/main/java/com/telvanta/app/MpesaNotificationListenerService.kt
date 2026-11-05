@@ -18,13 +18,17 @@ class MpesaNotificationListenerService : NotificationListenerService() {
         val title = extras.getCharSequence(Notification.EXTRA_TITLE)?.toString().orEmpty()
         val bigText = extras.getCharSequence(Notification.EXTRA_BIG_TEXT)?.toString().orEmpty()
         val normalText = extras.getCharSequence(Notification.EXTRA_TEXT)?.toString().orEmpty()
-        val text = listOf(bigText, normalText)
+        val subText = extras.getCharSequence(Notification.EXTRA_SUB_TEXT)?.toString().orEmpty()
+        val summaryText = extras.getCharSequence(Notification.EXTRA_SUMMARY_TEXT)?.toString().orEmpty()
+        val textLines = extras.getCharSequenceArray(Notification.EXTRA_TEXT_LINES)
+            ?.joinToString("\n") { it.toString() }.orEmpty()
+        val text = listOf(bigText, normalText, subText, summaryText, textLines, title)
             .filter { it.isNotBlank() }
             .distinct()
             .joinToString("\n")
             .take(1600)
 
-        val combined = "$title\n$text"
+        val combined = text
         val source = (packageName + " " + title).lowercase()
         val message = combined.lowercase()
         val looksLikeMpesa = source.contains("safaricom") ||
@@ -32,7 +36,7 @@ class MpesaNotificationListenerService : NotificationListenerService() {
             message.contains("m-pesa") || message.contains("mpesa") ||
             (message.contains("confirmed") && (message.contains("ksh") || message.contains("kes")))
 
-        if (!looksLikeMpesa || text.isBlank()) return
+        if (!looksLikeMpesa || combined.isBlank()) return
 
         val receipt = extractReceipt(combined)
         val amount = extractAmount(combined)
