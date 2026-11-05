@@ -994,6 +994,9 @@ private fun UssdAutomationSettingsScreen() {
     val mpesaAmountCandidate = mpesaPrefs.getString(MpesaNotificationListenerService.KEY_AMOUNT, "").orEmpty()
     val mpesaSenderCandidate = mpesaPrefs.getString(MpesaNotificationListenerService.KEY_SENDER_PHONE, "").orEmpty()
     val mpesaCandidateStatus = mpesaPrefs.getString(MpesaNotificationListenerService.KEY_CANDIDATE_STATUS, "NO_NOTIFICATION").orEmpty()
+    val mpesaSyncStatus = mpesaPrefs.getString(MpesaNotificationListenerService.KEY_SYNC_STATUS, "NOT_SENT").orEmpty()
+    val mpesaSyncError = mpesaPrefs.getString(MpesaNotificationListenerService.KEY_SYNC_ERROR, "").orEmpty()
+    val mpesaSyncedAt = mpesaPrefs.getLong(MpesaNotificationListenerService.KEY_SYNCED_AT, 0L)
     val lastState = prefs.getString(UssdAccessibilityService.KEY_STATE, "NOT_STARTED") ?: "NOT_STARTED"
     val lastDetail = prefs.getString(UssdAccessibilityService.KEY_DETAIL, "No USSD screen has been observed yet.") ?: ""
     val updatedAt = prefs.getLong(UssdAccessibilityService.KEY_UPDATED_AT, 0L)
@@ -1018,7 +1021,7 @@ private fun UssdAutomationSettingsScreen() {
     HorizontalDivider(color = Color(0xFF16452B))
     InfoCard(
         "Notification access (different permission)",
-        if (listenerAccessEnabled) "ENABLED. BingwaPulse can inspect matching posted M-PESA notifications and extract best-effort receipt, amount and sender-number candidates for local review."
+        if (listenerAccessEnabled) "ENABLED. BingwaPulse reads matching posted M-PESA notifications, extracts best-effort fields and relays unverified candidates to your signed-in business workspace."
         else "NOT ENABLED. Turn on Notification Access below to let BingwaPulse inspect posted confirmations. Android requires you to grant this special access manually."
     )
     OutlinedButton(
@@ -1029,10 +1032,12 @@ private fun UssdAutomationSettingsScreen() {
     InfoCard(
         "Latest M-PESA confirmation candidate",
         if (lastMpesaText.isBlank()) "No matching notification captured yet. Enable Notification Access, then let a Till confirmation arrive as a notification."
-        else "Candidate status: $mpesaCandidateStatus\nReceipt: ${mpesaReceiptCandidate.ifBlank { "Not identified" }}\nAmount: ${mpesaAmountCandidate.ifBlank { "Not identified" }}\nSender phone: ${mpesaSenderCandidate.ifBlank { "Not identified in full" }}\nSource: $lastMpesaPackage\n$lastMpesaTitle\n$lastMpesaText\nReceived: ${dateText(lastMpesaTime)}"
+        else "Candidate status: $mpesaCandidateStatus\nRelay status: $mpesaSyncStatus\nReceipt: ${mpesaReceiptCandidate.ifBlank { "Not identified" }}\nAmount: ${mpesaAmountCandidate.ifBlank { "Not identified" }}\nSender phone: ${mpesaSenderCandidate.ifBlank { "Not identified in full" }}\nSource: $lastMpesaPackage\n$lastMpesaTitle\n$lastMpesaText\nReceived: ${dateText(lastMpesaTime)}" +
+            (if (mpesaSyncedAt > 0L) "\nLast relayed: ${dateText(mpesaSyncedAt)}" else "") +
+            (if (mpesaSyncError.isNotBlank()) "\nRelay note: $mpesaSyncError" else "")
     )
     Text(
-        "Extracted fields are unverified candidates, stored only on this device. A partial/masked phone number is not accepted as the sender. This screen does not confirm payment or trigger USSD delivery.",
+        "A successful relay means only that an unverified notification candidate reached the database. It is not proof of payment. The backend links a candidate to a callback only when receipt and amount agree; conflicting phone numbers are flagged. No USSD delivery is triggered.",
         color = Muted,
         style = MaterialTheme.typography.bodySmall
     )
