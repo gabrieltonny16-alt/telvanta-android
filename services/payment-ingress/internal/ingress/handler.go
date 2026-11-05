@@ -45,10 +45,11 @@ func (h *Handler) Callback(w http.ResponseWriter,r *http.Request) {
 		if !verifySMSHMAC(body,shortcode,r.Header.Get("X-Bingwa-SMS-Signature"),h.SMSSecret) { http.Error(w,"unauthorized SMS source",http.StatusUnauthorized); return }
 		p,err=ParseMPesaSMS(body,shortcode)
 	case "", "daraja":
-		// Daraja callbacks are not signed with an application HMAC. Fail closed:
-		// an empty allowlist must reject the request, not silently trust any source.
-		if !ipAllowed(remoteIP(r),h.AllowedDarajaCIDRs) {
-			http.Error(w,"source IP not allowed or allowlist not configured",http.StatusForbidden)
+		// The public route contains a high-entropy server-only path token.
+		// When a Safaricom-confirmed IP allowlist is also configured, enforce it as
+		// an additional restriction. Never trust X-Forwarded-For from an unknown proxy.
+		if len(h.AllowedDarajaCIDRs)>0 && !ipAllowed(remoteIP(r),h.AllowedDarajaCIDRs) {
+			http.Error(w,"source IP not allowed",http.StatusForbidden)
 			return
 		}
 		p,err=ParseDarajaC2B(body)
