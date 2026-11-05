@@ -957,6 +957,7 @@ private fun dateText(value:Long)=SimpleDateFormat("dd MMM yyyy, HH:mm",Locale.ge
 private fun UssdAutomationSettingsScreen() {
     val context = LocalContext.current
     var refresh by remember { mutableIntStateOf(0) }
+    var relayNotice by remember { mutableStateOf("") }
     val prefs = remember(refresh) {
         context.getSharedPreferences(UssdAccessibilityService.PREFS, Context.MODE_PRIVATE)
     }
@@ -1029,6 +1030,20 @@ private fun UssdAutomationSettingsScreen() {
         onClick = { context.startActivity(Intent("android.settings.ACTION_NOTIFICATION_LISTENER_SETTINGS")) },
         modifier = Modifier.fillMaxWidth()
     ) { Text("Open Notification Access settings") }
+    Button(
+        onClick = {
+            context.sendBroadcast(
+                Intent(MpesaNotificationListenerService.ACTION_RETRY_RELAY)
+                    .setPackage(context.packageName)
+            )
+            relayNotice = "Retry requested for the latest saved M-PESA notification. Refresh the status below in a moment."
+        },
+        enabled = listenerAccessEnabled,
+        modifier = Modifier.fillMaxWidth()
+    ) { Text("Retry latest M-PESA relay") }
+    if (relayNotice.isNotBlank()) {
+        Text(relayNotice, color = Teal, fontWeight = FontWeight.SemiBold)
+    }
 
     InfoCard(
         "Latest M-PESA confirmation candidate",
