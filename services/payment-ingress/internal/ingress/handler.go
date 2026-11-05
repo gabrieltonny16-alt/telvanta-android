@@ -45,7 +45,12 @@ func (h *Handler) Callback(w http.ResponseWriter,r *http.Request) {
 		if !verifySMSHMAC(body,shortcode,r.Header.Get("X-Bingwa-SMS-Signature"),h.SMSSecret) { http.Error(w,"unauthorized SMS source",http.StatusUnauthorized); return }
 		p,err=ParseMPesaSMS(body,shortcode)
 	case "", "daraja":
-		if len(h.AllowedDarajaCIDRs)>0 && !ipAllowed(remoteIP(r),h.AllowedDarajaCIDRs) { http.Error(w,"source IP not allowed",http.StatusForbidden); return }
+		// Daraja callbacks are not signed with an application HMAC. Fail closed:
+		// an empty allowlist must reject the request, not silently trust any source.
+		if !ipAllowed(remoteIP(r),h.AllowedDarajaCIDRs) {
+			http.Error(w,"source IP not allowed or allowlist not configured",http.StatusForbidden)
+			return
+		}
 		p,err=ParseDarajaC2B(body)
 	default:
 		http.Error(w,"unsupported ingress source",http.StatusBadRequest); return
