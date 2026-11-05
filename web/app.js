@@ -288,7 +288,7 @@ function ruleModal() {
   const choices = state.offers.map(o => '<option value="' + escapeHtml(o.id) + '">' + escapeHtml(o.name) + " · " + escapeHtml(o.category) + "</option>").join("");
   openModal("Add amount-to-offer rule", "The rule stays inactive. Use a real USSD entry code confirmed on your Safaricom SIM. This does not enable automatic buying.", {
     kind: "rule",
-    html: '<label>Offer<select name="offer_id" required>' + choices + '</select></label><label>Customer payment amount (KES)<input name="amount_kes" type="number" min="1" step="1" required></label><label>Confirmed USSD entry code<input name="menu_entry_code" placeholder="e.g. *xxx#" pattern="\*[0-9*]+#" required></label><p class="empty-note">Menu steps and verification remain empty. Automatic fulfilment remains disabled until the real menu flow is captured and reviewed.</p>'
+    html: '<label>Offer<select name="offer_id" required>' + choices + '</select></label><label>Customer payment amount (KES)<input name="amount_kes" type="number" min="1" step="1" required></label><label>Confirmed USSD entry code<input name="menu_entry_code" placeholder="e.g. *xxx#" pattern="\\*[0-9*]+#" required></label><p class="empty-note">Menu steps and verification remain empty. Automatic fulfilment remains disabled until the real menu flow is captured and reviewed.</p>'
   }, "Save inactive rule");
 }
 async function submitModal(form) {
