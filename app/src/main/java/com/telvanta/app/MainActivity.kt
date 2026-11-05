@@ -322,6 +322,7 @@ private fun ConnectPulseScreen() {
 
 @Composable
 private fun FeatureWorkspaceScreen(title: String) {
+    val context = LocalContext.current
     var fieldOne by remember(title) { mutableStateOf("") }
     var fieldTwo by remember(title) { mutableStateOf("") }
     var fieldThree by remember(title) { mutableStateOf("") }
