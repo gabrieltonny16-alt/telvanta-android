@@ -63,13 +63,14 @@ that starts a purchase or emits an Android dispatch event.
 
 1. Apply the additive SQL migration to the intended Supabase/PostgreSQL environment after review.
 2. Create one active `payment_ingress_channels` row per registered merchant shortcode.
-3. Configure `DATABASE_URL`, `REDIS_CLUSTER_ADDRS`, `REDIS_PASSWORD`, optional `REDIS_USERNAME` / `REDIS_TLS`, `SMS_INGRESS_HMAC_SECRET`, and `DARAJA_ALLOWED_CIDRS` from a secret manager. The service refuses to start without a non-empty allowlist containing the exact Safaricom-confirmed CIDRs. Never place database or Redis credentials in Android.
+3. Configure `DATABASE_URL`, `REDIS_CLUSTER_ADDRS`, `REDIS_PASSWORD`, optional `REDIS_USERNAME` / `REDIS_TLS`, `SMS_INGRESS_HMAC_SECRET`, and a high-entropy `DARAJA_CALLBACK_PATH_TOKEN` in a server-side secret manager. The token must be at least 43 URL-safe characters. Keep it out of Android, browsers, screenshots and logs. `DARAJA_ALLOWED_CIDRS` is an optional extra restriction only when Safaricom confirms the ranges.
 4. Run `go mod tidy && go test ./... && go vet ./...`.
 5. Run `go run ./cmd/server` or build the supplied Dockerfile.
-6. Expose the endpoint only through HTTPS. Standard Daraja C2B callbacks do not carry an
-   application HMAC signature, so the service checks the direct peer IP against the required
-   Safaricom-confirmed CIDR allowlist. Do not rely on forwarded IP headers from an untrusted proxy.
-   Register the callback only after the receiving shortcode and network path are approved.
+6. Expose the endpoint only through HTTPS. Register the exact URL ending in
+   `/api/v1/inbound/<DARAJA_CALLBACK_PATH_TOKEN>` with Safaricom. The high-entropy path token
+   authenticates the callback endpoint because the standard C2B callback does not carry an
+   application HMAC signature. An optional confirmed CIDR list adds network restriction; the
+   handler uses the direct peer IP and does not trust forwarded IP headers.
 
 ## Not included yet
 
