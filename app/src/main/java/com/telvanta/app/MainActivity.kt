@@ -990,6 +990,10 @@ private fun UssdAutomationSettingsScreen() {
     val lastMpesaText = mpesaPrefs.getString(MpesaNotificationListenerService.KEY_TEXT, "") ?: ""
     val lastMpesaPackage = mpesaPrefs.getString(MpesaNotificationListenerService.KEY_PACKAGE, "") ?: ""
     val lastMpesaTime = mpesaPrefs.getLong(MpesaNotificationListenerService.KEY_TIME, 0L)
+    val mpesaReceiptCandidate = mpesaPrefs.getString(MpesaNotificationListenerService.KEY_RECEIPT, "").orEmpty()
+    val mpesaAmountCandidate = mpesaPrefs.getString(MpesaNotificationListenerService.KEY_AMOUNT, "").orEmpty()
+    val mpesaSenderCandidate = mpesaPrefs.getString(MpesaNotificationListenerService.KEY_SENDER_PHONE, "").orEmpty()
+    val mpesaCandidateStatus = mpesaPrefs.getString(MpesaNotificationListenerService.KEY_CANDIDATE_STATUS, "NO_NOTIFICATION").orEmpty()
     val lastState = prefs.getString(UssdAccessibilityService.KEY_STATE, "NOT_STARTED") ?: "NOT_STARTED"
     val lastDetail = prefs.getString(UssdAccessibilityService.KEY_DETAIL, "No USSD screen has been observed yet.") ?: ""
     val updatedAt = prefs.getLong(UssdAccessibilityService.KEY_UPDATED_AT, 0L)
@@ -1014,8 +1018,8 @@ private fun UssdAutomationSettingsScreen() {
     HorizontalDivider(color = Color(0xFF16452B))
     InfoCard(
         "Notification access (different permission)",
-        if (listenerAccessEnabled) "Notification access is enabled for this app. The M-PESA notification reader is not implemented yet."
-        else "Not enabled. This special Android setting is separate from app notification permission. It allows a future opt-in reader to receive posted notifications; it is not enabled automatically."
+        if (listenerAccessEnabled) "ENABLED. BingwaPulse can inspect matching posted M-PESA notifications and extract best-effort receipt, amount and sender-number candidates for local review."
+        else "NOT ENABLED. Turn on Notification Access below to let BingwaPulse inspect posted confirmations. Android requires you to grant this special access manually."
     )
     OutlinedButton(
         onClick = { context.startActivity(Intent("android.settings.ACTION_NOTIFICATION_LISTENER_SETTINGS")) },
@@ -1023,12 +1027,12 @@ private fun UssdAutomationSettingsScreen() {
     ) { Text("Open Notification Access settings") }
 
     InfoCard(
-        "Latest M-PESA notification candidate",
-        if (lastMpesaText.isBlank()) "No matching notification captured yet. This reader only works after you enable Notification Access and a matching notification arrives."
-        else "Source: $lastMpesaPackage\n$lastMpesaTitle\n$lastMpesaText\nReceived: ${dateText(lastMpesaTime)}"
+        "Latest M-PESA confirmation candidate",
+        if (lastMpesaText.isBlank()) "No matching notification captured yet. Enable Notification Access, then let a Till confirmation arrive as a notification."
+        else "Candidate status: $mpesaCandidateStatus\nReceipt: ${mpesaReceiptCandidate.ifBlank { "Not identified" }}\nAmount: ${mpesaAmountCandidate.ifBlank { "Not identified" }}\nSender phone: ${mpesaSenderCandidate.ifBlank { "Not identified in full" }}\nSource: $lastMpesaPackage\n$lastMpesaTitle\n$lastMpesaText\nReceived: ${dateText(lastMpesaTime)}"
     )
     Text(
-        "For privacy, the latest matching notification is stored only on this device for review. It is not proof of payment and never triggers delivery.",
+        "Extracted fields are unverified candidates, stored only on this device. A partial/masked phone number is not accepted as the sender. This screen does not confirm payment or trigger USSD delivery.",
         color = Muted,
         style = MaterialTheme.typography.bodySmall
     )
