@@ -126,7 +126,7 @@ for each row execute function private.assert_ledger_batch_balanced();
 create or replace function private.assert_ledger_batch_balanced_from_batch()
 returns trigger language plpgsql
 set search_path = public, pg_temp
-as $
+as $$
 declare
   v_count integer;
   v_debits bigint;
@@ -142,7 +142,7 @@ begin
   end if;
   return null;
 end;
-$;
+$$;
 revoke all on function private.assert_ledger_batch_balanced_from_batch() from public, anon, authenticated;
 create constraint trigger balance_ledger_batch_requires_entries
 after insert on public.balance_ledger_batches
