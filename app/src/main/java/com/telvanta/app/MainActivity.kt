@@ -343,13 +343,7 @@ private fun FeatureWorkspaceScreen(title: String) {
         "Quick Dial" -> {
             OutlinedTextField(fieldOne, { fieldOne = it }, label = { Text("USSD code (e.g. *123#)") }, modifier = Modifier.fillMaxWidth())
             OutlinedTextField(fieldTwo, { fieldTwo = it }, label = { Text("Action / offer label") }, modifier = Modifier.fillMaxWidth())
-            Text("SIM preference", fontWeight = FontWeight.Bold)
-            listOf("Not configured", "SIM 1", "SIM 2", "Ask each time").forEach { item ->
-                Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-                    RadioButton(selected = option == item, onClick = { option = item })
-                    Text(item, color = Navy)
-                }
-            }
+            InfoCard("SIM selection", "Choose SIM 1 or SIM 2 in the Android phone dialler or the carrier prompt. BingwaPulse does not override your phone's SIM setting.")
             Button(onClick = {
                 val code = fieldOne.trim()
                 val inner = if (code.length >= 2) code.substring(1, code.length - 1) else ""
