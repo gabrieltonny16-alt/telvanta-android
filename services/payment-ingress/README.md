@@ -9,7 +9,9 @@ never posts ledger entries, and never dispatches Android USSD work.
 - `cmd/server`: HTTP server and health endpoint.
 - `internal/ingress/parser.go`: C2B JSON and common M-PESA SMS parsing.
 - `internal/ingress/handler.go`: tenant routing, Redis SET NX lock, PostgreSQL idempotency insert.
-- `../../supabase/migrations/20261105100210_payment_ingress_and_double_entry_ledger.sql`: additive tenant-safe schema.
+- `../../supabase/migrations/20261105100210_payment_ingress_and_double_entry_ledger.sql`: payment ingress + immutable ledger schema.
+- `../../supabase/migrations/20261105102524_mpesa_notification_relay_and_offer_rules.sql`: unverified notification evidence and exact amount-to-offer rules.
+- `../../supabase/migrations/20261105104137_mpesa_payment_order_staging.sql`: idempotent payment/order staging to `REVIEW_REQUIRED`.
 
 ## Callback route
 
