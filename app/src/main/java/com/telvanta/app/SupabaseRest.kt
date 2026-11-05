@@ -144,6 +144,45 @@ class BingwaSupabaseApi {
         return array.getJSONObject(0).getString("id")
     }
 
+    /**
+     * Relay a locally observed M-PESA notification as unverified evidence.
+     * The access token is user-scoped; database RLS verifies membership and ownership.
+     * This method never marks a payment verified and never creates or dispatches an order.
+     */
+    fun submitMpesaNotificationCandidate(
+        session: BingwaSession,
+        businessId: String,
+        sourcePackage: String,
+        title: String,
+        rawText: String,
+        receiptCandidate: String?,
+        amountMinor: Long?,
+        senderPhoneCandidate: String?,
+        notificationHash: String,
+        candidateStatus: String,
+        postedAtEpochMillis: Long
+    ) {
+        require(businessId.isNotBlank() && notificationHash.matches(Regex("^[0-9a-f]{64}$")))
+        val body = JSONObject()
+            .put("business_id", businessId)
+            .put("source_package", sourcePackage.take(160))
+            .put("notification_title", title.take(120))
+            .put("raw_notification_text", rawText.take(1600))
+            .put("notification_hash", notificationHash)
+            .put("candidate_status", candidateStatus)
+            .put("notification_posted_at", java.time.Instant.ofEpochMilli(postedAtEpochMillis).toString())
+        if (!receiptCandidate.isNullOrBlank()) body.put("receipt_candidate", receiptCandidate)
+        if (amountMinor != null && amountMinor > 0L) body.put("amount_minor", amountMinor)
+        if (!senderPhoneCandidate.isNullOrBlank()) body.put("sender_phone_candidate", senderPhoneCandidate)
+
+        request(
+            "POST", "/rest/v1/payment_notification_candidates",
+            body = body,
+            token = session.accessToken,
+            prefer = "resolution=ignore-duplicates,return=minimal"
+        )
+    }
+
     private fun parseSession(json: JSONObject, existingBusinessId: String? = null): BingwaSession {
         val user = json.optJSONObject("user") ?: throw IOException("The authentication response did not include a user.")
         val access = json.optString("access_token")
