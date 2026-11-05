@@ -60,9 +60,5 @@ jobs:
           if gh release view bingwapulse-latest >/dev/null 2>&1; then
             gh release upload bingwapulse-latest BingwaPulse-debug.apk Connect-Pulse-debug.apk --clobber
           else
-            gh release create bingwapulse-latest BingwaPulse-debug.apk Connect-Pulse-debug.apk \\
-              --target "$GITHUB_SHA" \\
-              --title "BingwaPulse and Connect Pulse - Latest Debug APKs" \\
-              --notes "Latest verified debug APKs from the feature/vecta-branding branch. These are test builds, not Play Store releases." \\
-              --prerelease
+            gh release create bingwapulse-latest BingwaPulse-debug.apk Connect-Pulse-debug.apk --target "$GITHUB_SHA" --title "BingwaPulse and Connect Pulse - Latest Debug APKs" --notes "Latest verified debug APKs from the feature/vecta-branding branch. These are test builds, not Play Store releases." --prerelease
           fi
