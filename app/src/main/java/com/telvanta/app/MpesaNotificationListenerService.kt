@@ -1,6 +1,11 @@
 package com.telvanta.app
 
 import android.app.Notification
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
+import android.os.Build
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import java.math.BigDecimal
@@ -16,10 +21,35 @@ import java.util.concurrent.Executors
  */
 class MpesaNotificationListenerService : NotificationListenerService() {
     private val relayExecutor = Executors.newSingleThreadExecutor()
+    private var retryReceiverRegistered = false
+
+    private val retryReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (intent?.action == ACTION_RETRY_RELAY) retryLatestCandidate()
+        }
+    }
 
     override fun onListenerConnected() {
         super.onListenerConnected()
+        if (!retryReceiverRegistered) {
+            val filter = IntentFilter(ACTION_RETRY_RELAY)
+            if (Build.VERSION.SDK_INT >= 33) {
+                registerReceiver(retryReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
+            } else {
+                @Suppress("DEPRECATION")
+                registerReceiver(retryReceiver, filter)
+            }
+            retryReceiverRegistered = true
+        }
         retryLatestCandidate()
+    }
+
+    override fun onListenerDisconnected() {
+        if (retryReceiverRegistered) {
+            runCatching { unregisterReceiver(retryReceiver) }
+            retryReceiverRegistered = false
+        }
+        super.onListenerDisconnected()
     }
 
     override fun onNotificationPosted(sbn: StatusBarNotification) {
@@ -200,6 +230,7 @@ class MpesaNotificationListenerService : NotificationListenerService() {
     }
 
     companion object {
+        const val ACTION_RETRY_RELAY = "com.telvanta.app.action.RETRY_MPESA_RELAY"
         const val PREFS = "bingwapulse_mpesa_notifications"
         const val KEY_PACKAGE = "source_package"
         const val KEY_TITLE = "title"
