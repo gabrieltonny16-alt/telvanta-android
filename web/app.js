@@ -7,7 +7,7 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
 });
 
 const $ = (id) => document.getElementById(id);
-const state = { session: null, business: null, role: null, page: "overview", metrics: {}, orders: [], offers: [], providers: [], customers: [], payments: [], candidates: [], rules: [], channels: [], devices: [] };
+const state = { session: null, business: null, role: null, page: "overview", metrics: {}, orders: [], offers: [], providers: [], customers: [], payments: [], candidates: [], rules: [], channels: [], devices: [], siteLinks: [], agentOffers: [] };
 let createAccountMode = false;
 let toastTimer;
 
@@ -110,13 +110,13 @@ function renderOrders() {
 }
 function renderOffers() {
   const providerRows = state.providers.map(p => "<tr><td><strong>" + escapeHtml(p.name) + "</strong></td><td>" + escapeHtml(p.adapter_key) + "</td><td>" + statusPill(p.status) + "</td><td>" + when(p.created_at) + "</td></tr>");
-  const offerRows = state.offers.map(o => "<tr><td><strong>" + escapeHtml(o.name) + "</strong><small class='muted-cell'>" + escapeHtml(o.code || o.external_offer_ref) + "</small></td><td>" + escapeHtml(o.category) + "</td><td>" + escapeHtml(o.providers?.name || "—") + "</td><td>" + kes(o.provider_cost_kes) + "</td><td>" + statusPill(o.is_active ? "active" : "inactive") + "</td></tr>");
+  const offerRows = state.offers.map(o => "<tr><td><strong>" + escapeHtml(o.name) + "</strong><small class='muted-cell'>" + escapeHtml(o.code || o.external_offer_ref) + "</small></td><td>" + escapeHtml(o.category) + "</td><td>" + escapeHtml(o.providers?.name || "—") + "</td><td>" + kes(o.provider_cost_kes) + "</td><td>" + statusPill(o.is_active ? "active" : "inactive") + "</td><td><button class='button outline small' data-action='toggle-offer' data-id='" + escapeHtml(o.id) + "'>" + (o.is_active ? "Pause" : "Activate") + "</button></td></tr>");
   const canManage = ["owner", "business_admin", "agent_manager"].includes(state.role);
   $("pageContent").innerHTML = `
     <div class="section-heading"><div><h2>Offer catalogue</h2><p>Keep provider and offer details accurate for your business.</p></div><div class="action-row">${canManage ? '<button class="button outline small" data-action="new-provider">Add provider</button><button class="button primary small" data-action="new-offer">Add offer</button>' : ""}</div></div>
     ${tableMarkup(["Provider", "Connection type", "Status", "Created"], providerRows, "No providers yet", "Add a provider before creating offers.")}
     <div class="section-heading"><div><h2>Offers</h2><p>Offers are business-specific and start inactive until you enable them.</p></div></div>
-    ${tableMarkup(["Offer", "Category", "Provider", "Provider cost", "Status"], offerRows, "No offers configured", "Add verified offer details for this workspace.")}
+    ${tableMarkup(["Offer", "Category", "Provider", "Provider cost", "Status", "Action"], offerRows, "No offers configured", "Add verified offer details for this workspace.")}
     <p class="empty-note">Do not invent offer prices, menu codes or provider routes. Only add details you have confirmed.</p>`;
 }
 function renderCustomers() {
@@ -155,6 +155,29 @@ function renderAutomation() {
     ${tableMarkup(["Device", "Platform", "Status", "Last seen"], deviceRows, "No Android worker paired", "Install BingwaPulse Android and complete the device-pairing setup when it is available.")}
     <p class="empty-note">This is a readiness view only. No background purchases, automatic USSD confirmations or live payment actions are enabled.</p>`;
 }
+function renderSiteLinks() {
+  const currentUser = state.session?.user?.id;
+  const ownLink = state.siteLinks.find(link => link.agent_user_id === currentUser);
+  const linkRows = state.siteLinks.map(link => {
+    const target = new URL("./sitelink/", location.href);
+    target.searchParams.set("slug", link.slug);
+    return "<tr><td><strong>" + escapeHtml(link.display_name || state.business.name) + "</strong><small class='muted-cell'>" + escapeHtml(link.slug) + "</small></td><td>" + statusPill(link.is_active ? "active" : "paused") + "</td><td><button class='button outline small' data-action='copy-sitelink' data-url='" + escapeHtml(target.toString()) + "'>Copy link</button> <button class='button subtle small' data-action='toggle-sitelink' data-id='" + escapeHtml(link.id) + "'>" + (link.is_active ? "Pause" : "Activate") + "</button></td></tr>";
+  });
+  const agentRows = state.agentOffers.filter(row => row.agent_user_id === currentUser).map(row =>
+    "<tr><td><strong>" + escapeHtml(row.offers?.name || "Offer") + "</strong><small class='muted-cell'>" + escapeHtml(row.offers?.category || "") + "</small></td><td>" + kes(row.selling_price_kes) + "</td><td>" + statusPill(row.is_published ? "published" : "hidden") + "</td><td><button class='button outline small' data-action='toggle-agent-offer' data-id='" + escapeHtml(row.id) + "'>" + (row.is_published ? "Hide" : "Publish") + "</button></td></tr>"
+  );
+  const canManage = ["owner", "business_admin", "agent_manager"].includes(state.role);
+  const createButton = canManage && !ownLink ? '<button class="button primary small" data-action="new-sitelink">Create my SiteLink</button>' : "";
+  const assignButton = canManage ? '<button class="button outline small" data-action="new-agent-offer">Add offer to my store</button>' : "";
+  $("pageContent").innerHTML =
+    '<div class="section-heading"><div><h2>Public SiteLink storefront</h2><p>Create a separate customer-facing shop. Your management dashboard remains private.</p></div>' + createButton + '</div>' +
+    '<div class="notice"><strong>Safe order requests:</strong> customers can submit a pending request only. This storefront does not collect payment, verify M-PESA, or trigger bundle delivery.</div>' +
+    tableMarkup(["Store name / slug", "Status", "Actions"], linkRows, "No SiteLink created", "Create a store link for your signed-in account.") +
+    '<div class="section-heading"><div><h2>My published offers</h2><p>Only active offers that you publish here appear in your customer storefront.</p></div>' + assignButton + '</div>' +
+    tableMarkup(["Offer", "Selling price", "Visibility", "Action"], agentRows, "No offers assigned", "Add an active offer and choose the selling price before publishing it.") +
+    '<p class="empty-note">A public store shows no offers until an offer is active and published. Pausing a SiteLink hides its catalogue.</p>';
+}
+
 function renderPage() {
   const map = {
     overview: ["BUSINESS OVERVIEW", "Overview", renderOverview],
@@ -162,7 +185,8 @@ function renderPage() {
     offers: ["CATALOGUE MANAGEMENT", "Offers", renderOffers],
     customers: ["CUSTOMER MANAGEMENT", "Customers", renderCustomers],
     payments: ["PAYMENT CONTROL", "Payments", renderPayments],
-    automation: ["DEVICE & AUTOMATION", "Automation", renderAutomation]
+    automation: ["DEVICE & AUTOMATION", "Automation", renderAutomation],
+    sitelinks: ["CUSTOMER STOREFRONT", "SiteLink", renderSiteLinks]
   };
   const selected = map[state.page] || map.overview;
   $("pageEyebrow").textContent = selected[0];
@@ -200,11 +224,13 @@ async function loadWorkspaceData() {
     rowsFor("payment_notification_candidates", "id,receipt_candidate,amount_minor,sender_phone_candidate,candidate_status,match_status,created_at", id),
     rowsFor("payment_offer_rules", "id,amount_minor,menu_entry_code,is_enabled,menu_flow_verified_at,created_at,offers(name)", id),
     rowsFor("payment_ingress_channels", "id,shortcode,channel_type,is_active,created_at", id),
-    rowsFor("devices", "id,device_label,platform,status,last_seen_at,created_at", id)
+    rowsFor("devices", "id,device_label,platform,status,last_seen_at,created_at", id),
+    rowsFor("site_links", "id,agent_user_id,slug,display_name,is_active,created_at", id),
+    rowsFor("agent_offers", "id,offer_id,agent_user_id,selling_price_kes,is_published,created_at,offers(id,name,category,is_active)", id)
   ]);
   [state.metrics.orders, state.metrics.offers, state.metrics.customers, state.metrics.providers,
     state.orders, state.offers, state.providers, state.customers, state.payments, state.candidates,
-    state.rules, state.channels, state.devices] = results;
+    state.rules, state.channels, state.devices, state.siteLinks, state.agentOffers] = results;
   $("navOrderCount").textContent = String(state.metrics.orders);
   renderPage();
 }
@@ -291,6 +317,23 @@ function ruleModal() {
     html: '<label>Offer<select name="offer_id" required>' + choices + '</select></label><label>Customer payment amount (KES)<input name="amount_kes" type="number" min="1" step="1" required></label><label>Confirmed USSD entry code<input name="menu_entry_code" placeholder="e.g. *xxx#" pattern="\\*[0-9*]+#" required></label><p class="empty-note">Menu steps and verification remain empty. Automatic fulfilment remains disabled until the real menu flow is captured and reviewed.</p>'
   }, "Save inactive rule");
 }
+function siteLinkModal() {
+  const suggested = slugify(state.business.slug + "-" + (state.session?.user?.email || "agent").split("@")[0]);
+  openModal("Create your SiteLink", "Create a public store for your account. It starts paused until you activate it.", {
+    kind: "sitelink",
+    html: '<label>Store display name<input name="display_name" maxlength="120" value="' + escapeHtml(state.business.name) + '"></label><label>Public link slug<input name="slug" maxlength="49" pattern="[a-z0-9][a-z0-9-]{2,48}" value="' + escapeHtml(suggested) + '" required></label>'
+  }, "Create paused store");
+}
+function agentOfferModal() {
+  const available = state.offers.filter(o => o.is_active && !state.agentOffers.some(a => a.agent_user_id === state.session?.user?.id && a.offer_id === o.id));
+  if (!available.length) return flash("Activate an offer first, or all active offers are already assigned.", true);
+  const options = available.map(o => '<option value="' + escapeHtml(o.id) + '">' + escapeHtml(o.name) + " · " + escapeHtml(o.category) + "</option>").join("");
+  openModal("Add offer to my store", "Set your customer selling price. The offer remains hidden until you publish it.", {
+    kind: "agent-offer",
+    html: '<label>Offer<select name="offer_id" required>' + options + '</select></label><label>Selling price (KES)<input name="selling_price_kes" type="number" min="0" step="1" required></label>'
+  }, "Save hidden offer");
+}
+
 async function submitModal(form) {
   const values = Object.fromEntries(new FormData(form).entries());
   const business_id = state.business.id;
@@ -311,6 +354,14 @@ async function submitModal(form) {
     const shortcode = values.shortcode.trim();
     if (!/^[0-9]{4,20}$/.test(shortcode)) throw new Error("Enter a valid Till or PayBill number.");
     result = await supabase.from("payment_ingress_channels").insert({ business_id, shortcode, channel_type: values.channel_type, is_active: false });
+  } else if (form.dataset.modalForm === "sitelink") {
+    const slug = values.slug.trim().toLowerCase();
+    if (!/^[a-z0-9][a-z0-9-]{2,48}$/.test(slug)) throw new Error("Use 3–49 lowercase letters, numbers or hyphens for the link.");
+    result = await supabase.from("site_links").insert({ business_id, agent_user_id: state.session.user.id, slug, display_name: values.display_name.trim() || state.business.name, is_active: false });
+  } else if (form.dataset.modalForm === "agent-offer") {
+    const price = Number(values.selling_price_kes);
+    if (!Number.isSafeInteger(price) || price < 0) throw new Error("Enter a whole-number selling price in KES.");
+    result = await supabase.from("agent_offers").upsert({ business_id, offer_id: values.offer_id, agent_user_id: state.session.user.id, selling_price_kes: price, is_published: false }, { onConflict: "offer_id,agent_user_id" });
   } else if (form.dataset.modalForm === "rule") {
     const amount = Number(values.amount_kes);
     if (!Number.isSafeInteger(amount) || amount < 1) throw new Error("Enter a whole-number KES amount.");
@@ -366,6 +417,37 @@ document.addEventListener("click", async (event) => {
     case "new-customer": customerModal(); break;
     case "new-channel": channelModal(); break;
     case "new-rule": ruleModal(); break;
+    case "new-sitelink": siteLinkModal(); break;
+    case "new-agent-offer": agentOfferModal(); break;
+    case "toggle-offer": {
+      const row = state.offers.find(o => o.id === action.dataset.id);
+      if (row) {
+        const { error } = await supabase.from("offers").update({ is_active: !row.is_active }).eq("id", row.id).eq("business_id", state.business.id);
+        if (error) flash(error.message, true); else { flash("Offer status updated."); await loadWorkspaceData(); }
+      }
+      break;
+    }
+    case "toggle-sitelink": {
+      const row = state.siteLinks.find(x => x.id === action.dataset.id);
+      if (row) {
+        const { error } = await supabase.from("site_links").update({ is_active: !row.is_active }).eq("id", row.id).eq("business_id", state.business.id);
+        if (error) flash(error.message, true); else { flash("SiteLink status updated."); await loadWorkspaceData(); }
+      }
+      break;
+    }
+    case "toggle-agent-offer": {
+      const row = state.agentOffers.find(x => x.id === action.dataset.id);
+      if (row) {
+        const { error } = await supabase.from("agent_offers").update({ is_published: !row.is_published }).eq("id", row.id).eq("business_id", state.business.id);
+        if (error) flash(error.message, true); else { flash("Store offer visibility updated."); await loadWorkspaceData(); }
+      }
+      break;
+    }
+    case "copy-sitelink": {
+      try { await navigator.clipboard.writeText(action.dataset.url); flash("SiteLink copied."); }
+      catch { window.prompt("Copy your SiteLink:", action.dataset.url); }
+      break;
+    }
   }
 });
 $("modalContent").addEventListener("submit", async (event) => {
