@@ -1,6 +1,7 @@
 package com.bingwapulse.connectpulse
 
 import android.os.Bundle
+import android.content.Context
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
@@ -32,6 +33,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -39,6 +42,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.LocalContext
+import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.PeriodicWorkRequestBuilder
+import androidx.work.WorkManager
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.util.concurrent.TimeUnit
 
 private val Background = Color(0xFF050817)
 private val Panel = Color(0xFF101A35)
@@ -73,9 +84,46 @@ class ConnectPulseActivity : ComponentActivity() {
 
 @Composable
 private fun ConnectPulseHome() {
-    var deviceName by remember { mutableStateOf("") }
+    val context = LocalContext.current
+    val store = remember { ConnectPulseSecureStore(context) }
+    val scope = rememberCoroutineScope()
+    var deviceName by remember { mutableStateOf("Shop phone") }
     var pairingCode by remember { mutableStateOf("") }
     var message by remember { mutableStateOf("") }
+    var credentials by remember { mutableStateOf(store.load()) }
+    var connectionStatus by remember { mutableStateOf("NOT PAIRED") }
+    var busy by remember { mutableStateOf(false) }
+
+    fun scheduleHeartbeat() {
+        val request = PeriodicWorkRequestBuilder<ConnectPulseHeartbeatWorker>(15, TimeUnit.MINUTES).build()
+        WorkManager.getInstance(context).enqueueUniquePeriodicWork(
+            "connectpulse-device-heartbeat",
+            ExistingPeriodicWorkPolicy.KEEP,
+            request
+        )
+    }
+
+    LaunchedEffect(credentials?.deviceId) {
+        val saved = credentials
+        if (saved != null) {
+            scheduleHeartbeat()
+            try {
+                val status = withContext(Dispatchers.IO) { ConnectPulseApi.status(saved) }
+                connectionStatus = status.replace("_", " ").uppercase()
+                message = if (status == "pending_pairing") {
+                    "Pairing request sent. Approve this device in BingwaPulse."
+                } else if (status == "online") {
+                    "Device is approved. Secure heartbeat monitoring is scheduled."
+                } else {
+                    "Device status: " + status
+                }
+            } catch (error: Exception) {
+                connectionStatus = "CHECK CONNECTION"
+                message = error.message ?: "Could not reach BingwaPulse."
+            }
+        }
+    }
+
     Surface(modifier = Modifier.fillMaxSize(), color = Background) {
         Column(
             modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 22.dp, vertical = 24.dp),
@@ -85,85 +133,118 @@ private fun ConnectPulseHome() {
                 Text("CONNECTPULSE", color = White, fontWeight = FontWeight.Black, fontSize = 28.sp, letterSpacing = 2.sp)
                 Text("MOVE. CONNECT. CONTROL.", color = Cyan, fontWeight = FontWeight.Bold, fontSize = 11.sp, letterSpacing = 1.8.sp)
                 Text("BingwaPulse companion", color = Muted, fontSize = 13.sp)
-                Row(horizontalArrangement = Arrangement.spacedBy(5.dp), verticalAlignment = Alignment.CenterVertically) {
-                    repeat(3) { index -> Spacer(Modifier.size(width = (22 - index * 4).dp, height = 3.dp).clip(CircleShape).background(if (index == 0) Cyan else ElectricBlue)) }
-                }
             }
 
-            Card(
-                shape = RoundedCornerShape(26.dp),
-                colors = CardDefaults.cardColors(containerColor = Panel),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(Modifier.padding(19.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(9.dp)) {
-                        Surface(color = ElectricBlue.copy(alpha = 0.18f), shape = CircleShape, modifier = Modifier.size(34.dp)) {
-                            Spacer(Modifier.size(1.dp))
-                        }
-                        Text("DEVICE LINK", color = Cyan, fontSize = 11.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 1.5.sp)
-                    }
+            Card(shape = RoundedCornerShape(26.dp), colors = CardDefaults.cardColors(containerColor = Panel), modifier = Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(19.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("DEVICE LINK", color = Cyan, fontSize = 11.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 1.5.sp)
                     Text("Connection status", color = Muted, fontSize = 13.sp)
-                    Text("NOT CONNECTED", color = White, fontWeight = FontWeight.Black, fontSize = 24.sp, letterSpacing = 0.5.sp)
-                    Text("No pairing or data sync is active on this device.", color = Muted, fontSize = 13.sp)
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                        repeat(5) { index ->
-                            Spacer(
-                                Modifier.weight(1f).height(4.dp)
-                                    .clip(CircleShape)
-                                    .background(if (index == 0) ElectricBlue else PanelBright)
-                            )
-                        }
-                    }
+                    Text(connectionStatus, color = if (connectionStatus == "ONLINE") Cyan else White, fontWeight = FontWeight.Black, fontSize = 22.sp)
+                    Text(
+                        if (credentials == null) "No companion credential is stored on this device."
+                        else "Device ID: " + credentials!!.deviceId,
+                        color = Muted,
+                        fontSize = 11.sp
+                    )
                 }
             }
 
             Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
-                Text("Pair your device", color = White, fontWeight = FontWeight.ExtraBold, fontSize = 21.sp)
-                Text("Link this companion to your BingwaPulse workspace when secure pairing is available.", color = Muted, fontSize = 13.sp)
+                Text(if (credentials == null) "Pair this companion" else "Device is registered", color = White, fontWeight = FontWeight.ExtraBold, fontSize = 21.sp)
+                Text(
+                    if (credentials == null) "Generate a one-time code in BingwaPulse, then enter it here."
+                    else "The owner must approve the pairing request in BingwaPulse before heartbeats are accepted.",
+                    color = Muted,
+                    fontSize = 13.sp
+                )
             }
 
-            OutlinedTextField(
-                value = deviceName,
-                onValueChange = { deviceName = it },
-                label = { Text("Device name") },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-                shape = RoundedCornerShape(16.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = Cyan,
-                    unfocusedBorderColor = PanelBright,
-                    focusedLabelColor = Cyan,
-                    cursorColor = Cyan
+            if (credentials == null) {
+                OutlinedTextField(
+                    value = deviceName,
+                    onValueChange = { deviceName = it.take(100) },
+                    label = { Text("Device name") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    shape = RoundedCornerShape(16.dp),
+                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Cyan, unfocusedBorderColor = PanelBright, focusedLabelColor = Cyan, cursorColor = Cyan)
                 )
-            )
-            OutlinedTextField(
-                value = pairingCode,
-                onValueChange = { pairingCode = it.filter(Char::isLetterOrDigit).take(8) },
-                label = { Text("Pairing code") },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-                shape = RoundedCornerShape(16.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = Cyan,
-                    unfocusedBorderColor = PanelBright,
-                    focusedLabelColor = Cyan,
-                    cursorColor = Cyan
+                OutlinedTextField(
+                    value = pairingCode,
+                    onValueChange = { pairingCode = it.filter(Char::isLetterOrDigit).take(10).uppercase() },
+                    label = { Text("10-character pairing code") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    shape = RoundedCornerShape(16.dp),
+                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Cyan, unfocusedBorderColor = PanelBright, focusedLabelColor = Cyan, cursorColor = Cyan)
                 )
-            )
-            Button(
-                onClick = {
-                    message = if (deviceName.isBlank() || pairingCode.length < 6) {
-                        "Enter a device name and a code with at least 6 characters."
-                    } else {
-                        "Pairing service is not connected yet. No device was paired and no data was transferred."
-                    }
-                },
-                modifier = Modifier.fillMaxWidth().height(54.dp),
-                shape = RoundedCornerShape(16.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = ElectricBlue, contentColor = Color.White)
-            ) {
-                Text("VERIFY & CONNECT", fontWeight = FontWeight.ExtraBold, letterSpacing = 1.sp)
+                Button(
+                    onClick = {
+                        if (deviceName.trim().length < 2 || pairingCode.length != 10) {
+                            message = "Enter a device name and the complete 10-character code."
+                        } else {
+                            busy = true
+                            message = "Verifying one-time pairing code…"
+                            scope.launch {
+                                try {
+                                    val result = withContext(Dispatchers.IO) {
+                                        ConnectPulseApi.pair(pairingCode, deviceName)
+                                    }
+                                    store.save(result)
+                                    credentials = result
+                                    pairingCode = ""
+                                    scheduleHeartbeat()
+                                    connectionStatus = "PENDING APPROVAL"
+                                    message = "Pairing request sent. Open BingwaPulse and approve this device."
+                                } catch (error: Exception) {
+                                    message = error.message ?: "Pairing could not be completed."
+                                } finally {
+                                    busy = false
+                                }
+                            }
+                        }
+                    },
+                    enabled = !busy,
+                    modifier = Modifier.fillMaxWidth().height(54.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = ElectricBlue, contentColor = Color.White)
+                ) {
+                    Text(if (busy) "VERIFYING…" else "VERIFY & SEND PAIRING REQUEST", fontWeight = FontWeight.ExtraBold, letterSpacing = 0.6.sp)
+                }
+            } else {
+                Button(
+                    onClick = {
+                        val saved = credentials
+                        if (saved != null) {
+                            busy = true
+                            scope.launch {
+                                try {
+                                    val status = withContext(Dispatchers.IO) { ConnectPulseApi.heartbeat(context, saved) }
+                                    connectionStatus = status.replace("_", " ").uppercase()
+                                    message = when (status) {
+                                        "online" -> "Heartbeat received by BingwaPulse."
+                                        "pending_pairing" -> "Waiting for the owner to approve this device."
+                                        "paused" -> "This device is paused by the business owner."
+                                        "revoked" -> "This device has been revoked. Contact the owner."
+                                        else -> "Device status: " + status
+                                    }
+                                } catch (error: Exception) {
+                                    message = error.message ?: "Heartbeat failed. It will retry later."
+                                } finally {
+                                    busy = false
+                                }
+                            }
+                        }
+                    },
+                    enabled = !busy,
+                    modifier = Modifier.fillMaxWidth().height(54.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = ElectricBlue, contentColor = Color.White)
+                ) {
+                    Text(if (busy) "CHECKING…" else "CHECK APPROVAL & SEND HEARTBEAT", fontWeight = FontWeight.ExtraBold, letterSpacing = 0.4.sp)
+                }
             }
+
             if (message.isNotBlank()) {
                 Card(colors = CardDefaults.cardColors(containerColor = PanelBright), shape = RoundedCornerShape(16.dp)) {
                     Text(message, color = Cyan, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(15.dp))
@@ -172,12 +253,12 @@ private fun ConnectPulseHome() {
 
             Card(colors = CardDefaults.cardColors(containerColor = Panel), shape = RoundedCornerShape(22.dp)) {
                 Column(Modifier.padding(17.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("BUILT FOR MOVEMENT", color = Cyan, fontWeight = FontWeight.ExtraBold, fontSize = 11.sp, letterSpacing = 1.4.sp)
-                    Text("Secure pairing · device status · controlled sync", color = White, fontWeight = FontWeight.Bold)
-                    Text("The companion interface is ready for its pairing service. Secure pairing, remote sync and background services must be implemented before connection can become active.", color = Muted, fontSize = 12.sp)
+                    Text("SECURE DEVICE MONITORING", color = Cyan, fontWeight = FontWeight.ExtraBold, fontSize = 11.sp, letterSpacing = 1.4.sp)
+                    Text("Device-specific secret · encrypted local storage · periodic heartbeat", color = White, fontWeight = FontWeight.Bold)
+                    Text("ConnectPulse reports its own app, battery and network state. This first connection stage does not yet inspect or remotely restart BingwaPulse, and it cannot restart a powered-off phone.", color = Muted, fontSize = 12.sp)
                 }
             }
-            Text("No payments, SMS, USSD or background data transfer are enabled.", color = Muted, fontSize = 11.sp)
+            Text("No payments, SMS or USSD purchases are initiated by ConnectPulse.", color = Muted, fontSize = 11.sp)
         }
     }
 }
