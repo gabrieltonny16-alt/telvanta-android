@@ -10,6 +10,7 @@ import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
 import java.security.KeyStore
+import java.security.MessageDigest
 import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
@@ -93,6 +94,14 @@ class SecureSessionStore(context: Context) {
     }
 }
 
+data class BingwaDevice(
+    val id: String,
+    val label: String,
+    val status: String,
+    val lastSeenAt: String?,
+    val pairedAt: String?
+)
+
 class BingwaSupabaseApi {
     private val baseUrl = BuildConfig.SUPABASE_URL.trimEnd('/')
     private val publishableKey = BuildConfig.SUPABASE_PUBLISHABLE_KEY
@@ -142,6 +151,61 @@ class BingwaSupabaseApi {
         val array = JSONArray(response)
         if (array.length() == 0) throw IOException("The business was not returned by the database.")
         return array.getJSONObject(0).getString("id")
+    }
+
+    fun createDevicePairingChallenge(
+        session: BingwaSession,
+        businessId: String,
+        deviceLabel: String,
+        pairingCode: String
+    ) {
+        require(businessId.isNotBlank() && deviceLabel.trim().length in 2..100)
+        require(pairingCode.matches(Regex("^[A-Z0-9]{10}$")))
+        val codeHash = MessageDigest.getInstance("SHA-256")
+            .digest(pairingCode.toByteArray(Charsets.UTF_8))
+            .joinToString("") { "%02x".format(it) }
+        val body = JSONObject()
+            .put("business_id", businessId)
+            .put("created_by", session.userId)
+            .put("device_label", deviceLabel.trim())
+            .put("code_hash", codeHash)
+            .put("expires_at", java.time.Instant.now().plusSeconds(600).toString())
+        request(
+            "POST", "/rest/v1/device_pairing_challenges",
+            body = body,
+            token = session.accessToken,
+            prefer = "return=minimal"
+        )
+    }
+
+    fun listDevices(session: BingwaSession, businessId: String): List<BingwaDevice> {
+        val query = "/rest/v1/devices?select=id,device_label,status,last_seen_at,paired_at,created_at&business_id=eq.$businessId&order=created_at.desc"
+        val rows = JSONArray(request("GET", query, token = session.accessToken))
+        return buildList {
+            for (i in 0 until rows.length()) {
+                val row = rows.getJSONObject(i)
+                add(BingwaDevice(
+                    id = row.getString("id"),
+                    label = row.optString("device_label", "Android device"),
+                    status = row.optString("status", "unknown"),
+                    lastSeenAt = row.optString("last_seen_at").takeIf { it.isNotBlank() && it != "null" },
+                    pairedAt = row.optString("paired_at").takeIf { it.isNotBlank() && it != "null" }
+                ))
+            }
+        }
+    }
+
+    fun approveDevice(session: BingwaSession, businessId: String, deviceId: String) {
+        require(businessId.isNotBlank() && deviceId.isNotBlank())
+        val body = JSONObject()
+            .put("status", "online")
+            .put("paired_at", java.time.Instant.now().toString())
+        request(
+            "PATCH", "/rest/v1/devices?id=eq.$deviceId&business_id=eq.$businessId",
+            body = body,
+            token = session.accessToken,
+            prefer = "return=minimal"
+        )
     }
 
     /**
