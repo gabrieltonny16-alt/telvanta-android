@@ -176,7 +176,7 @@ private fun BingwaPulseApp(db: LocalDatabase) {
                         "SiteLink" -> SiteLinkScreen(db) { message = it }
                         "Signature Offers", "Signature" -> SignatureOffersScreen(db) { message = it }
                         "Statistics" -> StatisticsScreen(db)
-                        "Wallet" -> FeatureWorkspaceScreen("Wallet")
+                        "Wallet" -> WalletScreen()
                         "Quick Dial" -> FeatureWorkspaceScreen("Quick Dial")
                         "Auto Renewals" -> FeatureWorkspaceScreen("Auto Renewals")
                         "Signature" -> FeatureWorkspaceScreen("Signature")
@@ -1265,5 +1265,85 @@ private fun BingwaDashboard(db: LocalDatabase, onNavigate: (String) -> Unit) {
                 }
             }
         }
+    }
+}
+
+
+@Composable
+private fun WalletScreen() {
+    val context = LocalContext.current
+    val prefs = remember { context.getSharedPreferences("bingwapulse_wallet_pricing", Context.MODE_PRIVATE) }
+    var refresh by remember { mutableIntStateOf(0) }
+    var notice by remember { mutableStateOf("") }
+    val subscriptions = listOf(
+        Triple("Daily", "24 hours · Unlimited USSD access", 17),
+        Triple("3 days", "3 days · Unlimited USSD access", 40),
+        Triple("Weekly", "7 days · Unlimited USSD access", 99),
+        Triple("Monthly", "30 days · Unlimited USSD access", 279)
+    )
+    val tokenPackages = listOf(
+        Triple("Starter", "150 USSD requests", 15),
+        Triple("Basic", "300 USSD requests", 29),
+        Triple("Growth", "600 USSD requests", 45),
+        Triple("Business", "1,500 USSD requests", 109)
+    )
+    @Composable
+    fun priceRow(key: String, title: String, detail: String, defaultPrice: Int) {
+        var value by remember(refresh) { mutableStateOf(prefs.getInt(key, defaultPrice).toString()) }
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF102018)),
+            shape = RoundedCornerShape(18.dp)
+        ) {
+            Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                        Text(title, color = Color.White, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+                        Text(detail, color = Muted, style = MaterialTheme.typography.bodySmall)
+                    }
+                    Text("KES", color = Teal, fontWeight = FontWeight.Bold)
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                    OutlinedTextField(
+                        value = value,
+                        onValueChange = { value = it.filter { ch -> ch.isDigit() }.take(6) },
+                        label = { Text("Admin price") },
+                        singleLine = true,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Button(onClick = {
+                        val amount = value.toIntOrNull()
+                        if (amount == null || amount <= 0) notice = "Enter a valid price for $title."
+                        else {
+                            prefs.edit().putInt(key, amount).apply()
+                            notice = "$title price saved: KES $amount."
+                            refresh++
+                        }
+                    }) { Text("Save") }
+                }
+            }
+        }
+    }
+
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        Text("Wallet", color = Color.White, fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.headlineMedium)
+        Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF0B3A23)), shape = RoundedCornerShape(22.dp)) {
+            Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                Text("YOUR WALLET", color = Teal, fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.labelMedium)
+                Text("Subscription: Not active", color = Color.White, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleLarge)
+                Text("USSD tokens: Not connected", color = Color.White, fontWeight = FontWeight.Bold)
+                Text("Balances will appear after secure account and payment integration. No balance is being assumed.", color = Muted, style = MaterialTheme.typography.bodySmall)
+            }
+        }
+        Text("UNLIMITED SUBSCRIPTIONS", color = Teal, fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.labelLarge)
+        subscriptions.forEachIndexed { i, item -> priceRow("sub_$i", item.first, item.second, item.third) }
+        Text("USSD TOKEN PACKAGES", color = Teal, fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.labelLarge)
+        tokenPackages.forEachIndexed { i, item -> priceRow("tokens_$i", item.first, item.second, item.third) }
+        Text("PAYMENT METHODS", color = Teal, fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.labelLarge)
+        InfoCard("M-PESA", "Payment integration is not active yet. No STK Push or charge will be initiated.")
+        InfoCard("Airtime", "Airtime payment is not active yet. No USSD payment or airtime deduction will be initiated.")
+        InfoCard("Purchase history", "No wallet purchases have been recorded. This section will show verified purchases after payment integration.")
+        InfoCard("Pricing controls", "These prices are saved on this device for now. Server-wide admin pricing and customer checkout require backend integration.")
+        if (notice.isNotBlank()) Text(notice, color = Teal, fontWeight = FontWeight.SemiBold)
     }
 }
