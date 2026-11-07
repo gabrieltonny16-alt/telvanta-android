@@ -177,6 +177,13 @@ private fun BingwaAuthScreen(store: SecureSessionStore, api: BingwaSupabaseApi, 
                 TextButton(onClick = { createAccount = !createAccount; message = if (createAccount) "Create a new BingwaPulse account." else "Sign in to your existing account." }, enabled = !busy) {
                     Text(if (createAccount) "I already have an account" else "Create a new account")
                 }
+                Spacer(Modifier.height(6.dp))
+                TextButton(onClick = {
+                    store.enableLocalWorkspace()
+                    onComplete()
+                }, enabled = !busy, modifier = Modifier.fillMaxWidth()) {
+                    Text("Open local workspace (no account needed)")
+                }
             }
         } else {
             Text("Set up your business", color = Color.White, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
