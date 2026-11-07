@@ -52,13 +52,10 @@ jobs:
           name: connect-pulse-android-debug
           path: Connect-Pulse-debug.apk
           if-no-files-found: error
-      - name: Publish direct APK download links
+      - name: Publish versioned APK release
         if: github.event_name == 'push' && github.ref == 'refs/heads/feature/vecta-branding'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          if gh release view bingwapulse-latest >/dev/null 2>&1; then
-            gh release upload bingwapulse-latest BingwaPulse-debug.apk Connect-Pulse-debug.apk --clobber
-          else
-            gh release create bingwapulse-latest BingwaPulse-debug.apk Connect-Pulse-debug.apk --target "$GITHUB_SHA" --title "BingwaPulse and Connect Pulse - Latest Debug APKs" --notes "Latest verified debug APKs from the feature/vecta-branding branch. These are test builds, not Play Store releases." --prerelease
-          fi
+          TAG="debug-${GITHUB_SHA::12}"
+          gh release create "$TAG" BingwaPulse-debug.apk Connect-Pulse-debug.apk --target "$GITHUB_SHA" --title "BingwaPulse and Connect Pulse - ${GITHUB_SHA::7}" --notes "Verified debug APKs from feature/vecta-branding at commit $GITHUB_SHA. Test builds, not Play Store releases." --prerelease
