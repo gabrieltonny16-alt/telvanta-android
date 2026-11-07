@@ -299,24 +299,152 @@ private fun BingwaPulseApp(db: LocalDatabase) {
 
 @Composable
 private fun ConnectPulseScreen() {
+    val context = LocalContext.current
+    val store = remember { SecureSessionStore(context) }
+    val api = remember { BingwaSupabaseApi() }
+    val scope = rememberCoroutineScope()
+    var session by remember { mutableStateOf(store.load()) }
+    var deviceLabel by remember { mutableStateOf("Shop phone") }
     var pairingCode by remember { mutableStateOf("") }
-    var deviceLabel by remember { mutableStateOf("") }
     var notice by remember { mutableStateOf("") }
-    Text("Connect Pulse", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.ExtraBold, color = Navy)
-    InfoCard("BingwaPulse companion connection", "Use Connect Pulse to pair an authorized phone with BingwaPulse. This screen is ready for the connection workflow; secure pairing and live sync are not yet connected.")
-    Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF082A1A)), modifier = Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(17.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
-            Text("Connection status", color = Muted)
-            Text("NOT CONNECTED", color = Color(0xFFFFC857), fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.titleLarge)
-            Text("No device is paired. This status is not inferred from a demo connection.", color = Muted, style = MaterialTheme.typography.bodySmall)
+    var devices by remember { mutableStateOf<List<BingwaDevice>>(emptyList()) }
+    var busy by remember { mutableStateOf(false) }
+
+    fun refreshDevices() {
+        val current = session
+        if (current == null) {
+            notice = "Sign in to BingwaPulse before managing paired devices."
+            return
+        }
+        scope.launch {
+            busy = true
+            try {
+                val activeSession = current
+                val businessId = activeSession.businessId
+                    ?: withContext(Dispatchers.IO) { api.firstBusinessId(activeSession) }
+                    ?: throw IllegalStateException("This account has no active business workspace.")
+                if (activeSession.businessId == null) {
+                    session = activeSession.copy(businessId = businessId)
+                    store.save(activeSession.copy(businessId = businessId))
+                }
+                devices = withContext(Dispatchers.IO) { api.listDevices(activeSession, businessId) }
+                notice = "Device list refreshed."
+            } catch (error: Exception) {
+                notice = error.message ?: "Could not load paired devices."
+            } finally {
+                busy = false
+            }
         }
     }
-    Text("Pair a device", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = Navy)
-    OutlinedTextField(value = deviceLabel, onValueChange = { deviceLabel = it }, label = { Text("Device name (e.g. Shop phone)") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
-    OutlinedTextField(value = pairingCode, onValueChange = { pairingCode = it.filter { ch -> ch.isLetterOrDigit() }.take(8) }, label = { Text("Pairing code") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
-    Button(onClick = { notice = if (deviceLabel.isBlank() || pairingCode.length < 6) "Enter a device name and a pairing code of at least 6 characters." else "Pairing is not active yet. No device was connected and no data was synced." }, modifier = Modifier.fillMaxWidth()) { Text("Verify and pair device") }
-    InfoCard("Planned connection controls", "Paired devices · last sync time · sync status · revoke device access · reconnect. These controls will become active after secure pairing and the companion service are implemented.")
-    InfoCard("Security", "No payment, SMS, USSD, customer data transfer, or background sync is triggered from this screen.")
+
+    Text("Connect Pulse", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.ExtraBold, color = Navy)
+    InfoCard(
+        "Secure companion pairing",
+        "Generate a one-time code here, enter it in ConnectPulse on the companion phone, then approve the device below. The code expires after 10 minutes and can be used once."
+    )
+    Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF082A1A)), modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(17.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("PAIRING CONTROL", color = Teal, fontWeight = FontWeight.ExtraBold)
+            Text("Only devices approved by a business manager become active.", color = Muted, style = MaterialTheme.typography.bodySmall)
+            OutlinedTextField(
+                value = deviceLabel,
+                onValueChange = { deviceLabel = it.take(100) },
+                label = { Text("Companion device name") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true
+            )
+            Button(
+                enabled = !busy && deviceLabel.trim().length >= 2,
+                onClick = {
+                    val current = session
+                    if (current == null) {
+                        notice = "Sign in to BingwaPulse first."
+                    } else {
+                        busy = true
+                        notice = "Creating a one-time pairing code…"
+                        scope.launch {
+                            try {
+                                val businessId = current.businessId
+                                    ?: withContext(Dispatchers.IO) { api.firstBusinessId(current) }
+                                    ?: throw IllegalStateException("No business workspace is linked to this account.")
+                                val activeSession = current.copy(businessId = businessId)
+                                if (current.businessId == null) {
+                                    session = activeSession
+                                    store.save(activeSession)
+                                }
+                                val code = java.util.UUID.randomUUID().toString()
+                                    .replace("-", "").take(10).uppercase(Locale.ROOT)
+                                withContext(Dispatchers.IO) {
+                                    api.createDevicePairingChallenge(activeSession, businessId, deviceLabel, code)
+                                }
+                                pairingCode = code
+                                notice = "Code created. Enter it in ConnectPulse within 10 minutes, then approve the device below."
+                                devices = withContext(Dispatchers.IO) { api.listDevices(activeSession, businessId) }
+                            } catch (error: Exception) {
+                                notice = error.message ?: "Could not create the pairing code."
+                            } finally {
+                                busy = false
+                            }
+                        }
+                    }
+                },
+                modifier = Modifier.fillMaxWidth()
+            ) { Text(if (busy) "PLEASE WAIT…" else "GENERATE PAIRING CODE") }
+            if (pairingCode.isNotBlank()) {
+                Text("ONE-TIME PAIRING CODE", color = Muted, style = MaterialTheme.typography.labelSmall)
+                Text(pairingCode, color = Color(0xFFB7FF24), fontWeight = FontWeight.Black, style = MaterialTheme.typography.headlineMedium)
+                Text("Share this code only with the ConnectPulse app you are pairing. It expires in 10 minutes.", color = Muted, style = MaterialTheme.typography.bodySmall)
+            }
+        }
+    }
+
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+        Text("Paired and pending devices", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = Navy)
+        TextButton(onClick = { refreshDevices() }, enabled = !busy) { Text("Refresh") }
+    }
+    if (devices.isEmpty()) {
+        InfoCard("No device records loaded", "Refresh to check devices registered to this business. A companion remains pending until a manager approves it.")
+    } else {
+        devices.forEach { device ->
+            Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF082A1A)), modifier = Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(15.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                    Text(device.label, color = Navy, fontWeight = FontWeight.Bold)
+                    Text(device.status.replace("_", " ").uppercase(Locale.ROOT), color = if (device.status == "online") Teal else Color(0xFFFFC857), fontWeight = FontWeight.ExtraBold)
+                    Text("Last seen: " + (device.lastSeenAt ?: "No heartbeat received"), color = Muted, style = MaterialTheme.typography.bodySmall)
+                    if (device.status == "pending_pairing") {
+                        Button(
+                            enabled = !busy,
+                            onClick = {
+                                val current = session
+                                val businessId = current?.businessId
+                                if (current == null || businessId.isNullOrBlank()) {
+                                    notice = "Sign in again before approving this device."
+                                } else {
+                                    scope.launch {
+                                        busy = true
+                                        try {
+                                            withContext(Dispatchers.IO) { api.approveDevice(current, businessId, device.id) }
+                                            devices = withContext(Dispatchers.IO) { api.listDevices(current, businessId) }
+                                            notice = "Device approved. ConnectPulse can now send its heartbeat."
+                                        } catch (error: Exception) {
+                                            notice = error.message ?: "Could not approve this device."
+                                        } finally {
+                                            busy = false
+                                        }
+                                    }
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) { Text("APPROVE DEVICE") }
+                    }
+                }
+            }
+        }
+    }
+    InfoCard(
+        "What pairing enables",
+        "ConnectPulse receives a device-specific secret stored in Android Keystore and sends a heartbeat after approval. A revoked or paused device cannot report as online. This first stage does not remotely restart a powered-off phone or perform USSD purchases."
+    )
     if (notice.isNotBlank()) Text(notice, color = Teal, fontWeight = FontWeight.SemiBold)
 }
 
