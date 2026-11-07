@@ -155,6 +155,9 @@ private fun BingwaPulseApp(db: LocalDatabase) {
         ) }) { padding ->
             LazyColumn(Modifier.fillMaxSize().padding(padding).padding(horizontal=16.dp),verticalArrangement=Arrangement.spacedBy(14.dp),contentPadding=PaddingValues(vertical=16.dp)) {
                 item { Surface(color=Color(0xFF082A1A),shape=MaterialTheme.shapes.large) { Row(Modifier.fillMaxWidth().padding(horizontal=13.dp,vertical=11.dp),verticalAlignment=androidx.compose.ui.Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(9.dp)) { Surface(color=Teal,shape=MaterialTheme.shapes.small) { Text("●",color=Color.White,modifier=Modifier.padding(horizontal=7.dp,vertical=4.dp),style=MaterialTheme.typography.labelSmall) }; Column { Text("OFFLINE-READY WORKSPACE",color=Navy,fontWeight=FontWeight.Bold,style=MaterialTheme.typography.labelMedium); Text("Your records stay on this device",color=Muted,style=MaterialTheme.typography.bodySmall) } } } }
+                if (SecureSessionStore(context).isLocalWorkspace()) {
+                    item { InfoCard("LOCAL PREVIEW MODE", "You are exploring the app locally. Sign in later to connect a real business account. Server sync and device pairing are unavailable in this mode.") }
+                }
                 item {
                     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                     when(selected) {
@@ -309,6 +312,15 @@ private fun ConnectPulseScreen() {
     var notice by remember { mutableStateOf("") }
     var devices by remember { mutableStateOf<List<BingwaDevice>>(emptyList()) }
     var busy by remember { mutableStateOf(false) }
+
+    if (store.isLocalWorkspace()) {
+        Text("Connect Pulse", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.ExtraBold, color = Navy)
+        InfoCard(
+            "Connect Pulse is locked in local preview",
+            "You can inspect the rest of BingwaPulse without signing in. Device pairing, server sync and account-backed controls require a real authenticated business account."
+        )
+        return
+    }
 
     fun refreshDevices() {
         val current = session
