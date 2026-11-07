@@ -36,11 +36,12 @@ The Android app now has an email/password sign-in and sign-up entry point, a fir
 - Atomic worker claim/acknowledgement and lease expiry are not yet implemented.
 - M-PESA notification candidates are not verified against a trusted Safaricom source.
 - No live payment collection, STK Push, provider API or automated bundle fulfilment is enabled.
+- Public SiteLink and ConnectPulse Edge Functions are deployed. Both use server-side credentials; no service-role key is included in either Android or browser clients.
 - The USSD accessibility service still observes screens; it is not an automatic purchasing engine.
 - Management website is implemented in web/ with authenticated workspace, overview, orders, offers, customers, payment review, automation readiness and SiteLink management.
 - Public SiteLink storefront is implemented in web/sitelink/ and uses the deployed sitelink-storefront Edge Function. It exposes only active, published offers and creates idempotent AWAITING_PAYMENT order requests. It does not collect or verify payments or trigger fulfilment.
 - GitHub Pages deployment is configured but the repository Pages site still needs to be enabled in repository Settings before the deployment workflow can publish it.
-- ConnectPulse pairing and recovery remain incomplete.
+- ConnectPulse now has one-time pairing challenges, owner approval, device-specific hashed credentials, Android Keystore storage and a 15-minute periodic heartbeat. The companion reports its own app/battery/network state; cross-app worker diagnostics and safe recovery actions are still incomplete.
 - Android authentication has been added to source but must pass CI and be exercised with a real account before it is considered verified.
 
 ## Safety
