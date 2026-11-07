@@ -613,9 +613,11 @@ private fun SignatureOffersScreen(db: LocalDatabase, onMessage: (String) -> Unit
                     val price = downloadPrice.toDoubleOrNull()
                     if (price == null || price <= 0.0) onMessage("Enter a valid selling price greater than zero.")
                     else try {
-                        db.saveOffer(null, candidate.name, candidate.category, price,
-                            if (candidate.price >= 0) candidate.price.toDouble() else null,
-                            "Signature import · ${candidate.simProfile} SIM", false, false)
+                        db.saveOffer(null, candidate.name, when (candidate.category.uppercase()) { "VOICE" -> "Minutes"; "DATA" -> "Data"; "SMS" -> "SMS"; "COMBO" -> "Combo"; else -> candidate.category },
+                            price, if (candidate.price >= 0) candidate.price.toDouble() else null,
+                            "Signature import · ${candidate.simProfile} SIM", false, false,
+                            ussdCode = candidate.code, duration = candidate.duration, sourceId = candidate.id,
+                            simProfile = candidate.simProfile, tags = candidate.tags)
                         reload++
                         downloadCandidate = null
                         onMessage("${candidate.name} added to My Offers at KES ${money(price)}.")
@@ -748,51 +750,85 @@ private fun PlannedFeatureScreen(title: String, details: String) {
 }
 
 @Composable
-private fun OffersScreen(db: LocalDatabase,onMessage:(String)->Unit) {
-    var editId by remember { mutableStateOf<Long?>(null) }; var name by remember { mutableStateOf("") }; var category by remember { mutableStateOf("Data") }; var price by remember { mutableStateOf("") }; var originalPrice by remember { mutableStateOf("") }; var source by remember { mutableStateOf("Manual") }; var verified by remember { mutableStateOf(false) }; var active by remember { mutableStateOf(false) }; var importText by remember { mutableStateOf("") }; var reload by remember { mutableIntStateOf(0) }
-    Text("Offer catalogue",style=MaterialTheme.typography.headlineMedium,fontWeight=FontWeight.Bold)
-    Text("Create offers or tap Edit to change a saved offer.",color=Muted)
-    OutlinedTextField(name,{name=it},label={Text("Offer name")},modifier=Modifier.fillMaxWidth(),singleLine=true)
-    OutlinedTextField(category,{category=it},label={Text("Category: Data, Minutes, SMS, Combo")},modifier=Modifier.fillMaxWidth(),singleLine=true)
-    OutlinedTextField(price,{price=it},label={Text("Selling price (KES)")},modifier=Modifier.fillMaxWidth(),singleLine=true)
-    OutlinedTextField(originalPrice,{originalPrice=it},label={Text("Original/source price (optional, KES)")},modifier=Modifier.fillMaxWidth(),singleLine=true)
-    OutlinedTextField(source,{source=it},label={Text("Offer source (e.g. Manual, Signature)")},modifier=Modifier.fillMaxWidth(),singleLine=true)
-    Row(Modifier.fillMaxWidth(),verticalAlignment=androidx.compose.ui.Alignment.CenterVertically) { Checkbox(checked=verified,onCheckedChange={verified=it}); Text("Marked verified by operator") }
-    Text("Bulk import offers",fontWeight=FontWeight.Bold)
-    Text("One offer per line: name | category | original price or blank | selling price | source. Imported offers remain unverified.",color=Muted,style=MaterialTheme.typography.bodySmall)
-    OutlinedTextField(importText,{importText=it},label={Text("Paste offer rows")},modifier=Modifier.fillMaxWidth(),minLines=3)
-    OutlinedButton(onClick={
-        val lines=importText.lines().map { it.trim() }.filter { it.isNotBlank() }
-        val parsed=lines.map { line ->
-            val parts=line.split("|").map { it.trim() }
-            val original=parts.getOrNull(2)?.takeIf { it.isNotBlank() }?.toDoubleOrNull()
-            val selling=parts.getOrNull(3)?.toDoubleOrNull()
-            if(parts.size!=5 || parts[0].isBlank() || parts[1].isBlank() || parts[4].isBlank() || (parts[2].isNotBlank()&&original==null) || original?.let { it<0 }==true || selling==null || selling<0) null
-            else ImportedOffer(parts[0],parts[1],original,selling,parts[4])
-        }
-        if(lines.isEmpty() || parsed.any { it==null }) onMessage("Import stopped: check every line has 5 fields separated by | and valid prices.")
-        else try { val count=db.importOffers(parsed.filterNotNull());importText="";reload++;onMessage("Imported $count offers locally. All are marked unverified.") }
-        catch(_:Exception) { onMessage("Import failed; no partial import was saved.") }
-    },modifier=Modifier.fillMaxWidth()){Text("Import offers")}
-    Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp)) {
-        Button(onClick={val amount=price.toDoubleOrNull(); val original=if(originalPrice.isBlank()) null else originalPrice.toDoubleOrNull()
-            if(name.isBlank()||category.isBlank()||amount==null||amount<0||source.isBlank()||(!originalPrice.isBlank()&&(original==null||original<0))) onMessage("Enter valid offer details and prices.")
-            else try {db.saveOffer(editId,name,category,amount,original,source,verified,active);name="";category="Data";price="";originalPrice="";source="Manual";verified=false;active=false;editId=null;reload++;onMessage("Offer saved. Selling prices must be unique.")}
-            catch(e:Exception){onMessage(e.message ?: "Could not save offer. Check details.")}
-        },modifier=Modifier.weight(1f)){Text(if(editId==null)"Save offer" else "Update offer")}
-        OutlinedButton(onClick={editId=null;name="";category="Data";price="";originalPrice="";source="Manual";verified=false;active=false}){Text("Clear")}
+private fun OffersScreen(db: LocalDatabase, onMessage: (String) -> Unit) {
+    var selectedCategory by remember { mutableStateOf("All") }
+    var reload by remember { mutableIntStateOf(0) }
+    var showEditor by remember { mutableStateOf(false) }
+    var editId by remember { mutableStateOf<Long?>(null) }
+    var name by remember { mutableStateOf("") }
+    var category by remember { mutableStateOf("Data") }
+    var duration by remember { mutableStateOf("") }
+    var code by remember { mutableStateOf("") }
+    var price by remember { mutableStateOf("") }
+    var active by remember { mutableStateOf(false) }
+    val categories = listOf("All", "Data", "Minutes", "SMS", "Combo")
+    val offers = remember(reload) { db.offers() }
+    val visible = offers.filter { selectedCategory == "All" || it.category.equals(selectedCategory, true) || (selectedCategory == "Minutes" && it.category.equals("VOICE", true)) }
+    fun clearEditor() { editId = null; name = ""; category = "Data"; duration = ""; code = ""; price = ""; active = false }
+    Text("My Offers", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = Teal)
+    Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        categories.forEach { item -> FilterChip(selected = selectedCategory == item, onClick = { selectedCategory = item }, label = { Text(item) }) }
     }
-    val offers=remember(reload){db.offers()}
-    Text("Saved offers (${offers.size})",fontWeight=FontWeight.Bold)
-    offers.forEach { o -> Card(colors=CardDefaults.cardColors(containerColor=Color(0xFF082A1A)),modifier=Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(12.dp),verticalArrangement=Arrangement.spacedBy(5.dp)) {
-            Text(o.name,fontWeight=FontWeight.Bold);Text("${o.category} · Selling KES ${money(o.price)}",color=Muted)
-            Text("Source: ${o.source} · ${if(o.verified) "Marked verified by operator" else "Unverified"}",color=Muted,style=MaterialTheme.typography.bodySmall)
-            Row(Modifier.fillMaxWidth(), verticalAlignment=androidx.compose.ui.Alignment.CenterVertically) { Checkbox(checked=o.active,onCheckedChange={enabled -> try { db.setOfferActive(o.id,enabled); reload++; onMessage(if(enabled) "Offer activated for SiteLink." else "Offer hidden from SiteLink.") } catch(e:Exception) { onMessage(e.message ?: "Could not update offer status.") } }); Text(if(o.active) "Active on SiteLink" else "Not listed on SiteLink") }
-            Text("Original price: ${o.originalPrice?.let { "KES ${money(it)}" } ?: "Not recorded"}",color=Muted,style=MaterialTheme.typography.bodySmall)
-            Row(Modifier.fillMaxWidth()) { TextButton(onClick={editId=o.id;name=o.name;category=o.category;price=o.price.toString();originalPrice=o.originalPrice?.toString() ?: "";source=o.source;verified=o.verified;active=o.active}){Text("Edit")};TextButton(onClick={db.deleteOffer(o.id);reload++;onMessage("Offer deleted.")}){Text("Delete")} }
+    if (offers.isEmpty()) InfoCard("No offers yet", "Download offers from Signature Offers or tap + to add one manually.")
+    visible.forEach { offer ->
+        Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF101D16)), modifier = Modifier.fillMaxWidth()) {
+            Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 13.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                Text("✥", color = Teal, fontSize = 25.sp, fontWeight = FontWeight.Bold)
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                    Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(offer.name, color = Teal, fontWeight = FontWeight.Bold, maxLines = 1, style = MaterialTheme.typography.titleMedium)
+                        if (offer.verified) Text("✿", color = Color(0xFF65B96E), fontWeight = FontWeight.Bold)
+                    }
+                    val detail = listOf(offer.duration, offer.ussdCode).filter { it.isNotBlank() }.joinToString(" · ")
+                    Text(if (detail.isNotBlank()) detail else offer.category, color = Muted, style = MaterialTheme.typography.bodySmall)
+                }
+                Text("KES \${money(offer.price)}", color = Navy, fontWeight = FontWeight.Bold, maxLines = 1)
+                Switch(checked = offer.active, onCheckedChange = { enabled ->
+                    try { db.setOfferActive(offer.id, enabled); reload++; onMessage(if (enabled) "Offer activated on SiteLink." else "Offer deactivated on SiteLink.") }
+                    catch (e: Exception) { onMessage(e.message ?: "Could not update offer.") }
+                })
+                TextButton(onClick = { db.deleteOffer(offer.id); reload++; onMessage("Offer deleted from My Offers.") }) { Text("▣", color = Color(0xFFFF5B55), fontSize = 20.sp) }
+                TextButton(onClick = {
+                    editId = offer.id; name = offer.name; category = offer.category; duration = offer.duration
+                    code = offer.ussdCode; price = offer.price.toString(); active = offer.active; showEditor = true
+                }) { Text("Edit", color = Teal) }
+            }
         }
-    } }
+    }
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+        Button(onClick = { clearEditor(); showEditor = true }, shape = RoundedCornerShape(18.dp)) { Text("＋", fontSize = 26.sp) }
+    }
+    if (showEditor) AlertDialog(
+        onDismissRequest = { showEditor = false; clearEditor() },
+        title = { Text(if (editId == null) "Add offer" else "Edit offer") },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(name, { name = it }, label = { Text("Offer name") }, singleLine = true)
+                Text("Category")
+                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    listOf("Data", "Minutes", "SMS", "Combo").forEach { item -> FilterChip(selected = category == item, onClick = { category = item }, label = { Text(item) }) }
+                }
+                OutlinedTextField(duration, { duration = it }, label = { Text("Validity / duration") }, singleLine = true)
+                OutlinedTextField(code, { code = it }, label = { Text("USSD code") }, singleLine = true)
+                OutlinedTextField(price, { price = it }, label = { Text("Selling price (KES)") }, singleLine = true)
+                Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                    Switch(checked = active, onCheckedChange = { active = it }); Text("Active on SiteLink")
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = {
+                val amount = price.toDoubleOrNull()
+                if (name.isBlank() || amount == null || amount <= 0.0) onMessage("Enter an offer name and a valid selling price.")
+                else try {
+                    val savedSource = if (editId == null) "Manual" else (offers.firstOrNull { it.id == editId }?.source ?: "Manual")
+                    db.saveOffer(editId, name, category, amount, null, savedSource, false, active, ussdCode = code, duration = duration)
+                    reload++; showEditor = false; clearEditor(); onMessage("Offer saved in My Offers.")
+                } catch (e: Exception) { onMessage(e.message ?: "Could not save offer.") }
+            }) { Text("Save") }
+        },
+        dismissButton = { TextButton(onClick = { showEditor = false; clearEditor() }) { Text("Cancel") } }
+    )
 }
 
 @Composable
