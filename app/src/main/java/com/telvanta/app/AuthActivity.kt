@@ -159,7 +159,7 @@ private fun BingwaAuthScreen(store: SecureSessionStore, api: BingwaSupabaseApi, 
             if (awaitingPhoneOtp) {
                 TextButton(onClick = { awaitingPhoneOtp = false; code = ""; message = "You can change the phone number or try again." }, enabled = !busy) { Text("Change phone number") }
             } else {
-                if (method == AuthMethod.EMAIL && createAccount) {
+                if (method == AuthMethod.EMAIL) {
                     TextButton(onClick = {
                         if (identifier.isBlank()) message = "Enter your email address first."
                         else {
