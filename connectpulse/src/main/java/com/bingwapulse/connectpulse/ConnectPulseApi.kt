@@ -10,7 +10,8 @@ import org.json.JSONObject
 import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
-import java.security.KeyGenParameterSpec
+import android.security.keystore.KeyGenParameterSpec
+import android.security.keystore.KeyProperties
 import java.security.KeyStore
 import java.security.MessageDigest
 import javax.crypto.Cipher
