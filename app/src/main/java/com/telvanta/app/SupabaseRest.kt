@@ -29,9 +29,17 @@ class SecureSessionStore(context: Context) {
     private val prefs = context.getSharedPreferences("bingwapulse_secure_session", Context.MODE_PRIVATE)
     private val alias = "bingwapulse.session.aes"
 
-    fun hasSession(): Boolean = load()?.expiresAtEpochSeconds?.let { it > System.currentTimeMillis() / 1000L + 60L } == true
+    fun isLocalWorkspace(): Boolean = prefs.getBoolean("local_workspace", false)
+
+    fun enableLocalWorkspace() {
+        prefs.edit().putBoolean("local_workspace", true).remove("session").apply()
+    }
+
+    fun hasSession(): Boolean = isLocalWorkspace() ||
+        load()?.expiresAtEpochSeconds?.let { it > System.currentTimeMillis() / 1000L + 60L } == true
 
     fun save(session: BingwaSession) {
+        prefs.edit().putBoolean("local_workspace", false).apply()
         val json = JSONObject()
             .put("access_token", session.accessToken)
             .put("refresh_token", session.refreshToken)
@@ -71,7 +79,7 @@ class SecureSessionStore(context: Context) {
     }
 
     fun clear() {
-        prefs.edit().remove("session").apply()
+        prefs.edit().remove("session").remove("local_workspace").apply()
     }
 
     private fun getOrCreateKey(): SecretKey {
