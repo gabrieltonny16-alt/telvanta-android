@@ -52,20 +52,16 @@ class ConnectPulseSecureStore(context: Context) {
     private fun getOrCreateKey(): SecretKey {
         val keyStore = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
         (keyStore.getKey(alias, null) as? SecretKey)?.let { return it }
-        val generator = KeyGenerator.getInstance(KeyPropertiesCompat.AES, "AndroidKeyStore")
+        val generator = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, "AndroidKeyStore")
         generator.init(
-            KeyGenParameterSpec.Builder(alias, KeyGenParameterSpec.PURPOSE_ENCRYPT or KeyGenParameterSpec.PURPOSE_DECRYPT)
-                .setBlockModes(KeyGenParameterSpec.BLOCK_MODE_GCM)
-                .setEncryptionPaddings(KeyGenParameterSpec.ENCRYPTION_PADDING_NONE)
+            KeyGenParameterSpec.Builder(alias, KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT)
+                .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
+                .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
                 .setKeySize(256)
                 .setRandomizedEncryptionRequired(true)
                 .build()
         )
         return generator.generateKey()
-    }
-
-    private object KeyPropertiesCompat {
-        const val AES = "AES"
     }
 }
 
