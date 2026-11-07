@@ -123,6 +123,43 @@ class BingwaSupabaseApi {
         return parseSession(JSONObject(response))
     }
 
+    fun signUpPhone(phone: String, password: String) {
+        val normalized = normalizePhone(phone)
+        request("POST", "/auth/v1/signup", JSONObject().put("phone", normalized).put("password", password))
+    }
+
+    fun verifyPhoneOtp(phone: String, token: String): BingwaSession {
+        val normalized = normalizePhone(phone)
+        val response = request("POST", "/auth/v1/verify",
+            JSONObject().put("type", "sms").put("phone", normalized).put("token", token))
+        return parseSession(JSONObject(response))
+    }
+
+    fun signInPhone(phone: String, password: String): BingwaSession {
+        val normalized = normalizePhone(phone)
+        val response = request("POST", "/auth/v1/token?grant_type=password",
+            JSONObject().put("phone", normalized).put("password", password))
+        return parseSession(JSONObject(response))
+    }
+
+    fun resendEmailConfirmation(email: String) {
+        request("POST", "/auth/v1/resend", JSONObject().put("type", "signup").put("email", email.trim()))
+    }
+
+    private fun normalizePhone(input: String): String {
+        val compact = input.trim().replace(Regex("[\\s()\\-]"), "")
+        val normalized = when {
+            compact.startsWith("+") -> compact
+            compact.startsWith("0") && compact.length == 10 -> "+254" + compact.drop(1)
+            compact.startsWith("254") -> "+$compact"
+            else -> compact
+        }
+        require(normalized.matches(Regex("^\\+[1-9][0-9]{7,14}$"))) {
+            "Enter a valid phone number with country code, for example +2547XXXXXXXX."
+        }
+        return normalized
+    }
+
     fun refreshSession(session: BingwaSession): BingwaSession {
         val response = request(
             "POST", "/auth/v1/token?grant_type=refresh_token",
