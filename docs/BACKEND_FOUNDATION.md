@@ -37,7 +37,9 @@ The Android app now has an email/password sign-in and sign-up entry point, a fir
 - M-PESA notification candidates are not verified against a trusted Safaricom source.
 - No live payment collection, STK Push, provider API or automated bundle fulfilment is enabled.
 - The USSD accessibility service still observes screens; it is not an automatic purchasing engine.
-- Management website and public SiteLink storefront are not yet implemented.
+- Management website is implemented in web/ with authenticated workspace, overview, orders, offers, customers, payment review, automation readiness and SiteLink management.
+- Public SiteLink storefront is implemented in web/sitelink/ and uses the deployed sitelink-storefront Edge Function. It exposes only active, published offers and creates idempotent AWAITING_PAYMENT order requests. It does not collect or verify payments or trigger fulfilment.
+- GitHub Pages deployment is configured but the repository Pages site still needs to be enabled in repository Settings before the deployment workflow can publish it.
 - ConnectPulse pairing and recovery remain incomplete.
 - Android authentication has been added to source but must pass CI and be exercised with a real account before it is considered verified.
 
