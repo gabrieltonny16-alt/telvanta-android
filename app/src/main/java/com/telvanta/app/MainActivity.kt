@@ -11,6 +11,11 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import android.os.Handler
+import android.os.Looper
+import kotlin.concurrent.thread
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import java.text.SimpleDateFormat
@@ -56,12 +61,7 @@ private fun TelvantaApp(db: LocalDatabase) {
                         "Customers" -> CustomersScreen(db){message=it}
                         "Orders" -> OrdersScreen(db){message=it}
                         "Transactions" -> TransactionsScreen(db){message=it}
-                        else -> {
-                            Text("Settings",style=MaterialTheme.typography.headlineMedium,fontWeight=FontWeight.Bold)
-                            InfoCard("Workspace","Telvanta currently stores records locally on this phone. Multi-agent accounts, encrypted sync and Telvanta Connect pairing are not implemented yet.")
-                            InfoCard("Live integrations","M-PESA collection, SMS, USSD and real bundle fulfilment are disabled. Do not treat manual records as verified payments.")
-                            InfoCard("Data safety","Keep this device secure. Local records are not yet synced or backed up to another device.")
-                        }
+                        else -> SettingsScreen(db)
                     }
                 }
                 if(message.isNotBlank()) item { Text(message,color=Teal,fontWeight=FontWeight.SemiBold) }
@@ -179,3 +179,50 @@ private fun StatCard(label:String,count:Int,modifier:Modifier=Modifier) {
 private fun InfoCard(title:String,body:String) { Card(colors=CardDefaults.cardColors(containerColor=Color.White),modifier=Modifier.fillMaxWidth()) { Column(Modifier.padding(15.dp),verticalArrangement=Arrangement.spacedBy(5.dp)){Text(title,fontWeight=FontWeight.Bold);Text(body,color=Muted)} } }
 private fun money(value:Double)=String.format(Locale.US,"%.2f",value)
 private fun dateText(value:Long)=SimpleDateFormat("dd MMM yyyy, HH:mm",Locale.getDefault()).format(Date(value))
+
+
+@Composable
+private fun SettingsScreen(db: LocalDatabase) {
+    val context = LocalContext.current
+    var apiUrl by remember { mutableStateOf(context.getSharedPreferences("bingwapulse_api", 0).getString("base_url", "https://your-api-host") ?: "https://your-api-host") }
+    var email by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
+    var status by remember { mutableStateOf("Offline records are stored on this phone.") }
+    var busy by remember { mutableStateOf(false) }
+    Text("Connect your workspace",style=MaterialTheme.typography.headlineMedium,fontWeight=FontWeight.Bold)
+    InfoCard("Secure API connection","Enter your deployed BingwaPulse API address. HTTPS is required. Sign in with the same account used in the Web workspace to share records.")
+    OutlinedTextField(apiUrl,{apiUrl=it;context.getSharedPreferences("bingwapulse_api",0).edit().putString("base_url",it).apply()},label={Text("API address (HTTPS)")},modifier=Modifier.fillMaxWidth(),singleLine=true)
+    OutlinedTextField(email,{email=it},label={Text("Account email")},modifier=Modifier.fillMaxWidth(),singleLine=true)
+    OutlinedTextField(password,{password=it},label={Text("Password")},modifier=Modifier.fillMaxWidth(),singleLine=true,visualTransformation=PasswordVisualTransformation())
+    Button(enabled=!busy,onClick={
+        if(email.isBlank()||password.isBlank()||!apiUrl.startsWith("https://")) status="Enter your email, password and an HTTPS API address."
+        else {
+            busy=true;status="Signing in…"
+            thread {
+                try {
+                    BingwaPulseApiClient(context,apiUrl).login(email,password)
+                    Handler(Looper.getMainLooper()).post { busy=false;password="";status="Signed in. Your session is encrypted with Android Keystore." }
+                } catch(e:Exception) {
+                    Handler(Looper.getMainLooper()).post { busy=false;status=e.message ?: "Could not sign in." }
+                }
+            }
+        }
+    },modifier=Modifier.fillMaxWidth()){Text("Sign in to BingwaPulse")}
+    Button(enabled=!busy,onClick={
+        busy=true;status="Synchronizing records…"
+        thread {
+            try {
+                val result=BingwaPulseApiClient(context,apiUrl).sync(db)
+                Handler(Looper.getMainLooper()).post { busy=false;status=result }
+            } catch(e:Exception) {
+                Handler(Looper.getMainLooper()).post { busy=false;status=e.message ?: "Synchronization failed." }
+            }
+        }
+    },modifier=Modifier.fillMaxWidth()){Text("Sync now · ${db.pendingCount()} pending")}
+    OutlinedButton(enabled=!busy,onClick={
+        BingwaPulseApiClient(context,apiUrl).signOut()
+        status="Signed out. Local records remain on this phone."
+    },modifier=Modifier.fillMaxWidth()){Text("Sign out")}
+    Text(status,color=Teal,fontWeight=FontWeight.SemiBold)
+    InfoCard("Payment safety","Syncing records does not collect money, verify M-PESA payments, send SMS or deliver bundles. Transaction notes remain UNVERIFIED.")
+}

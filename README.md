@@ -6,24 +6,26 @@ Native Android workspace for telecom distribution operations. This repository is
 
 ## Current implementation
 - Kotlin + Jetpack Compose.
-- Device-local SQLite storage for offers, customers, orders and transaction notes.
-- Basic create, edit, delete and search workflows.
-- Explicitly unverified payment records; no M-PESA PIN collection.
-- No live payments, STK Push, USSD execution, SMS sending, automatic fulfilment, or remote sync.
+- Device-local SQLite storage for offers, customers, orders and unverified transaction notes.
+- Durable sync outbox with stable operation IDs, server revisions and remote change application.
+- HTTPS-only API login and synchronization client.
+- API bearer session encrypted with Android Keystore.
+- Internet permission is enabled; cleartext HTTP traffic is blocked.
 
 ## Build
 Open this repository in Android Studio, allow Gradle sync, then run the app on an Android device or emulator. GitHub Actions builds a debug APK on pushes and pull requests.
 
+## Connect to the shared API
+Open **Settings**, enter the deployed HTTPS API URL, sign in with the same BingwaPulse account used on Web, then tap **Sync now**. See the [shared API guide](../telvanta-connect/api/README.md) in the Connect repository for endpoint and deployment details.
+
 ## Product components
 - **Android:** daily business operations and offline-first records.
-- **Connect:** authenticated nearby device pairing and controlled synchronization.
-- **Web:** browser-based workspace, initially local/offline until a secured backend exists.
-
-See [the feature register](docs/FULL_FEATURE_REGISTER.md) and [integration contract](docs/INTEGRATION_CONTRACT.md).
+- **Connect:** device trust, pairing and shared API synchronization service.
+- **Web:** browser workspace with account and sync controls.
 
 ## Safety boundaries
 - Never claim payment or delivery without authoritative evidence.
-- Never retry an uncertain fulfilment automatically.
+- Never retry uncertain fulfilment automatically.
 - Never collect or store M-PESA PINs.
-- Test/local mode must not make live purchases or send real messages.
+- Transaction notes remain unverified.
 - Never commit API keys, credentials, customer data, or payment secrets.
