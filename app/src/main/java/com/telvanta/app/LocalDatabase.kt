@@ -14,7 +14,7 @@ data class OrderRow(val id: Long, val customer: String, val offer: String, val p
 data class TransactionRow(val id: Long, val orderId: Long, val amount: Double, val status: String, val reference: String, val createdAt: Long)
 
 /** Offline-first records plus a durable, idempotent synchronization outbox. */
-class LocalDatabase(context: Context) : SQLiteOpenHelper(context, "bingwapulse.db", null, 4) {
+class LocalDatabase(context: Context) : SQLiteOpenHelper(context, "telvanta.db", null, 4) {
     override fun onConfigure(db: SQLiteDatabase) {
         super.onConfigure(db)
         db.setForeignKeyConstraintsEnabled(true)
