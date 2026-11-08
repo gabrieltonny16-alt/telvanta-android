@@ -19,7 +19,7 @@ data class MpesaReceiptCandidate(
 object MpesaReceiptParser {
     private val receiptPattern = Regex("""\b([A-Z0-9]{8,16})\s+confirmed\b""", RegexOption.IGNORE_CASE)
     private val amountPatterns = listOf(
-        Regex("""(?i)\bKSH\.?\s*([\d,]+(?:\.\d{1,2})?)"""),
+        Regex("""(?i)(?:\bKSH\.?|(?<=PM)KSH\.?)\s*([\d,]+(?:\.\d{1,2})?)"""),
         Regex("""(?i)\bKES\s*([\d,]+(?:\.\d{1,2})?)"""),
         Regex("""(?i)\b([\d,]+(?:\.\d{1,2})?)\s*(?:KSH|KES)\b""")
     )
