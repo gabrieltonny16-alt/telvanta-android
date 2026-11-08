@@ -17,22 +17,22 @@ data class MpesaReceiptCandidate(
 )
 
 object MpesaReceiptParser {
-    private val receiptPattern = Regex("""\\b([A-Z0-9]{8,16})\\s+confirmed\\b""", RegexOption.IGNORE_CASE)
+    private val receiptPattern = Regex("""\b([A-Z0-9]{8,16})\s+confirmed\b""", RegexOption.IGNORE_CASE)
     private val amountPatterns = listOf(
-        Regex("""(?i)\\bKSH\\.?\\s*([\\d,]+(?:\\.\\d{1,2})?)"""),
-        Regex("""(?i)\\bKES\\s*([\\d,]+(?:\\.\\d{1,2})?)"""),
-        Regex("""(?i)\\b([\\d,]+(?:\\.\\d{1,2})?)\\s*(?:KSH|KES)\\b""")
+        Regex("""(?i)\bKSH\.?\s*([\d,]+(?:\.\d{1,2})?)"""),
+        Regex("""(?i)\bKES\s*([\d,]+(?:\.\d{1,2})?)"""),
+        Regex("""(?i)\b([\d,]+(?:\.\d{1,2})?)\s*(?:KSH|KES)\b""")
     )
-    private val phonePattern = Regex("""(?<!\\d)(?:\\+?254|0)[17]\\d{8}(?!\\d)""")
+    private val phonePattern = Regex("""(?<!\d)(?:\+?254|0)[17]\d{8}(?!\d)""")
     private val senderPattern = Regex(
-        """(?is)\\bfrom\\s+(?:\\+?254[17]\\d{8}|0[17]\\d{8})\\s+(.+?)(?=\\s+(?:on\\s+\\d{1,2}/\\d{1,2}/\\d{2,4}|new\\s+account\\s+balance|transaction\\s+cost|receiving\\s+payments)|[.]?\\s*$)"""
+        """(?is)\bfrom\s+(?:\+?254[17]\d{8}|0[17]\d{8})\s+(.+?)(?=\s+(?:on\s+\d{1,2}/\d{1,2}/\d{2,4}|new\s+account\s+balance|transaction\s+cost|receiving\s+payments)|[.]?\s*$)"""
     )
 
     fun parse(title: String, body: String): MpesaReceiptCandidate {
         val text = (title + " " + body).trim()
         val normalized = text.uppercase(Locale.ROOT)
         val receipt = receiptPattern.find(text)?.groupValues?.getOrNull(1)?.uppercase(Locale.ROOT)
-            ?: Regex("""\\b([A-Z0-9]{10})\\b""").find(normalized)?.groupValues?.getOrNull(1)
+            ?: Regex("""\b([A-Z0-9]{10})\b""").find(normalized)?.groupValues?.getOrNull(1)
                 ?.takeIf { it.any(Char::isLetter) && it.any(Char::isDigit) }
         val amount = amountPatterns.asSequence()
             .mapNotNull { it.find(text)?.groupValues?.getOrNull(1) }
@@ -49,7 +49,7 @@ object MpesaReceiptParser {
         val senderName = senderPattern.find(text)?.groupValues?.getOrNull(1)
             ?.trim()
             ?.trimEnd('.', ',', ';', ':')
-            ?.replace(Regex("""\\s+"""), " ")
+            ?.replace(Regex("""\s+"""), " ")
             ?.takeIf { name -> name.isNotBlank() && name.any(Char::isLetter) }
         val confirmation = normalized.contains("CONFIRMED") || normalized.contains("RECEIVED") ||
             normalized.contains("YOU HAVE SENT")
