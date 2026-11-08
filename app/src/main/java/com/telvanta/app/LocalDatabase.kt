@@ -10,14 +10,15 @@ data class OfferRow(val id: Long, val name: String, val category: String, val pr
 data class CustomerRow(val id: Long, val name: String, val phone: String, val notes: String)
 data class OrderRow(val id: Long, val customer: String, val offer: String, val price: Double, val status: String, val createdAt: Long)
 data class TransactionRow(val id: Long, val orderId: Long, val amount: Double, val status: String, val reference: String, val createdAt: Long)
+data class TransactionHistoryRow(val id: Long, val customer: String, val offer: String, val amount: Double, val transactionStatus: String, val orderStatus: String, val reference: String, val createdAt: Long, val source: String)
 
 /** Device-local business records only. This class does not initiate payments or fulfil bundles. */
-class LocalDatabase(context: Context) : SQLiteOpenHelper(context, "telvanta.db", null, 5) {
+class LocalDatabase(context: Context) : SQLiteOpenHelper(context, "telvanta.db", null, 6) {
     override fun onConfigure(db: SQLiteDatabase) { db.setForeignKeyConstraintsEnabled(true) }
     override fun onCreate(db: SQLiteDatabase) {
         db.execSQL("CREATE TABLE offers (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, category TEXT NOT NULL, original_price REAL, selling_price REAL NOT NULL, source TEXT NOT NULL DEFAULT 'Manual', verified INTEGER NOT NULL DEFAULT 0, is_active INTEGER NOT NULL DEFAULT 0, ussd_code TEXT NOT NULL DEFAULT '', duration TEXT NOT NULL DEFAULT '', source_id TEXT NOT NULL DEFAULT '', sim_profile TEXT NOT NULL DEFAULT '', tags TEXT NOT NULL DEFAULT '')")
         db.execSQL("CREATE TABLE customers (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, phone TEXT NOT NULL UNIQUE, notes TEXT NOT NULL DEFAULT '')")
-        db.execSQL("CREATE TABLE orders (id INTEGER PRIMARY KEY AUTOINCREMENT, customer_phone TEXT NOT NULL, offer_name TEXT NOT NULL, selling_price REAL NOT NULL, status TEXT NOT NULL DEFAULT 'PENDING', created_at INTEGER NOT NULL)")
+        db.execSQL("CREATE TABLE orders (id INTEGER PRIMARY KEY AUTOINCREMENT, customer_phone TEXT NOT NULL, offer_name TEXT NOT NULL, selling_price REAL NOT NULL, status TEXT NOT NULL DEFAULT 'PENDING', created_at INTEGER NOT NULL, source TEXT NOT NULL DEFAULT 'Manual')")
         db.execSQL("CREATE TABLE transactions (id INTEGER PRIMARY KEY AUTOINCREMENT, order_id INTEGER NOT NULL, amount REAL NOT NULL, status TEXT NOT NULL DEFAULT 'UNVERIFIED', reference TEXT NOT NULL DEFAULT '', created_at INTEGER NOT NULL, FOREIGN KEY(order_id) REFERENCES orders(id))")
         db.execSQL("CREATE UNIQUE INDEX idx_transactions_reference_unique ON transactions(reference) WHERE reference <> ''")
     }
@@ -32,6 +33,7 @@ class LocalDatabase(context: Context) : SQLiteOpenHelper(context, "telvanta.db",
             db.execSQL("ALTER TABLE offers ADD COLUMN sim_profile TEXT NOT NULL DEFAULT ''")
             db.execSQL("ALTER TABLE offers ADD COLUMN tags TEXT NOT NULL DEFAULT ''")
         }
+        if (oldVersion < 6) db.execSQL("ALTER TABLE orders ADD COLUMN source TEXT NOT NULL DEFAULT 'Manual'")
     }
     fun count(table: String): Int {
         require(table in setOf("offers", "customers", "orders", "transactions"))
@@ -88,9 +90,9 @@ class LocalDatabase(context: Context) : SQLiteOpenHelper(context, "telvanta.db",
     fun orders(): List<OrderRow> = readableDatabase.rawQuery("SELECT id,customer_phone,offer_name,selling_price,status,created_at FROM orders ORDER BY id DESC", null).use { c ->
         buildList { while(c.moveToNext()) add(OrderRow(c.getLong(0),c.getString(1),c.getString(2),c.getDouble(3),c.getString(4),c.getLong(5))) }
     }
-    fun createOrder(phone: String, offer: String, price: Double): Long {
+    fun createOrder(phone: String, offer: String, price: Double, source: String = "Manual"): Long {
         require(phone.isNotBlank() && offer.isNotBlank() && price >= 0)
-        val v = ContentValues().apply { put("customer_phone",phone.trim()); put("offer_name",offer); put("selling_price",price); put("status","PENDING"); put("created_at",System.currentTimeMillis()) }
+        val v = ContentValues().apply { put("customer_phone",phone.trim()); put("offer_name",offer); put("selling_price",price); put("status","PENDING"); put("created_at",System.currentTimeMillis()); put("source", source.trim().ifBlank { "Manual" }) }
         return writableDatabase.insertOrThrow("orders",null,v)
     }
     fun updateOrderStatus(id: Long, status: String) {
@@ -100,6 +102,16 @@ class LocalDatabase(context: Context) : SQLiteOpenHelper(context, "telvanta.db",
     }
     fun transactions(): List<TransactionRow> = readableDatabase.rawQuery("SELECT id,order_id,amount,status,reference,created_at FROM transactions ORDER BY id DESC", null).use { c ->
         buildList { while(c.moveToNext()) add(TransactionRow(c.getLong(0),c.getLong(1),c.getDouble(2),c.getString(3),c.getString(4),c.getLong(5))) }
+    }
+    fun transactionHistory(): List<TransactionHistoryRow> = readableDatabase.rawQuery(
+        """SELECT t.id,o.customer_phone,o.offer_name,t.amount,t.status,o.status,t.reference,t.created_at,o.source
+           FROM transactions t INNER JOIN orders o ON o.id=t.order_id
+           ORDER BY t.created_at DESC""", null
+    ).use { c ->
+        buildList { while (c.moveToNext()) add(TransactionHistoryRow(
+            c.getLong(0), c.getString(1), c.getString(2), c.getDouble(3), c.getString(4),
+            c.getString(5), c.getString(6), c.getLong(7), c.getString(8)
+        )) }
     }
     fun recordTransaction(orderId: Long, amount: Double, reference: String) {
         require(amount >= 0 && orderId > 0)
