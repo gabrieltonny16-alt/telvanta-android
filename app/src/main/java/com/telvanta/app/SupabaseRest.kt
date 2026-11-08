@@ -267,6 +267,7 @@ class BingwaSupabaseApi {
         receiptCandidate: String?,
         amountMinor: Long?,
         senderPhoneCandidate: String?,
+        senderNameCandidate: String?,
         notificationHash: String,
         candidateStatus: String,
         postedAtEpochMillis: Long
@@ -283,6 +284,9 @@ class BingwaSupabaseApi {
         if (!receiptCandidate.isNullOrBlank()) body.put("receipt_candidate", receiptCandidate)
         if (amountMinor != null && amountMinor > 0L) body.put("amount_minor", amountMinor)
         if (!senderPhoneCandidate.isNullOrBlank()) body.put("sender_phone_candidate", senderPhoneCandidate)
+        if (!senderNameCandidate.isNullOrBlank()) {
+            body.put("sender_name_candidate", senderNameCandidate.trim().replace(Regex("\\s+"), " ").take(120))
+        }
 
         request(
             "POST", "/rest/v1/payment_notification_candidates",
