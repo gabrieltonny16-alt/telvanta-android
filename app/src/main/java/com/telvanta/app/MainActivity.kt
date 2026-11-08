@@ -782,7 +782,7 @@ private fun OffersScreen(db: LocalDatabase, onMessage: (String) -> Unit) {
                     val detail = listOf(offer.duration, offer.ussdCode).filter { it.isNotBlank() }.joinToString(" · ")
                     Text(if (detail.isNotBlank()) detail else offer.category, color = Muted, style = MaterialTheme.typography.bodySmall)
                 }
-                Text("KES \${money(offer.price)}", color = Navy, fontWeight = FontWeight.Bold, maxLines = 1)
+                Text("KES ${money(offer.price)}", color = Navy, fontWeight = FontWeight.Bold, maxLines = 1)
                 Switch(checked = offer.active, onCheckedChange = { enabled ->
                     try { db.setOfferActive(offer.id, enabled); reload++; onMessage(if (enabled) "Offer activated on SiteLink." else "Offer deactivated on SiteLink.") }
                     catch (e: Exception) { onMessage(e.message ?: "Could not update offer.") }
