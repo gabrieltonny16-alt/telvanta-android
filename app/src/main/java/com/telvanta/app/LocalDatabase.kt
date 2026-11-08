@@ -104,8 +104,8 @@ class LocalDatabase(context: Context) : SQLiteOpenHelper(context, "telvanta.db",
         buildList { while(c.moveToNext()) add(TransactionRow(c.getLong(0),c.getLong(1),c.getDouble(2),c.getString(3),c.getString(4),c.getLong(5))) }
     }
     fun transactionHistory(): List<TransactionHistoryRow> = readableDatabase.rawQuery(
-        """SELECT t.id,o.customer_phone,o.offer_name,t.amount,t.status,o.status,t.reference,t.created_at,o.source
-           FROM transactions t INNER JOIN orders o ON o.id=t.order_id
+        """SELECT t.id,COALESCE(NULLIF(c.name, ''),o.customer_phone),o.offer_name,t.amount,t.status,o.status,t.reference,t.created_at,o.source
+           FROM transactions t INNER JOIN orders o ON o.id=t.order_id LEFT JOIN customers c ON c.phone=o.customer_phone
            ORDER BY t.created_at DESC""", null
     ).use { c ->
         buildList { while (c.moveToNext()) add(TransactionHistoryRow(
