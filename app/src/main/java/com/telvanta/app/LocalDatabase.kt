@@ -32,8 +32,11 @@ class LocalDatabase(context: Context) : SQLiteOpenHelper(context, "telvanta.db",
         if (oldVersion < 3) {
             db.beginTransaction()
             try {
-                db.execSQL("CREATE TABLE transactions_v3 (id INTEGER PRIMARY KEY AUTOINCREMENT, order_id INTEGER NOT NULL, amount REAL NOT NULL, status TEXT NOT NULL DEFAULT 'UNVERIFIED', reference TEXT NOT NULL DEFAULT '', created_at INTEGER NOT NULL, FOREIGN KEY(order_id) REFERENCES orders(id) ON DELETE RESTRICT)")
-                db.execSQL("INSERT INTO transactions_v3(id,order_id,amount,status,reference,created_at) SELECT id,order_id,amount,status,reference,created_at FROM transactions")
+                // Preserve legacy rows with missing orders instead of losing them or blocking upgrade.
+                db.execSQL("CREATE TABLE IF NOT EXISTS transactions_legacy_orphaned (id INTEGER PRIMARY KEY, order_id INTEGER NOT NULL, amount REAL NOT NULL, status TEXT NOT NULL, reference TEXT NOT NULL, created_at INTEGER NOT NULL)")
+                db.execSQL("INSERT OR IGNORE INTO transactions_legacy_orphaned(id,order_id,amount,status,reference,created_at) SELECT t.id,t.order_id,t.amount,t.status,t.reference,t.created_at FROM transactions t WHERE NOT EXISTS (SELECT 1 FROM orders o WHERE o.id=t.order_id)")
+                db.execSQL("CREATE TABLE transactions_v3 (id INTEGER PRIMARY KEY AUTOINCREMENT, order_id INTEGER NOT NULL, amount REAL NOT NULL CHECK(amount >= 0), status TEXT NOT NULL DEFAULT 'UNVERIFIED', reference TEXT NOT NULL DEFAULT '', created_at INTEGER NOT NULL, FOREIGN KEY(order_id) REFERENCES orders(id) ON DELETE RESTRICT)")
+                db.execSQL("INSERT INTO transactions_v3(id,order_id,amount,status,reference,created_at) SELECT t.id,t.order_id,t.amount,t.status,t.reference,t.created_at FROM transactions t WHERE EXISTS (SELECT 1 FROM orders o WHERE o.id=t.order_id)")
                 db.execSQL("DROP TABLE transactions")
                 db.execSQL("ALTER TABLE transactions_v3 RENAME TO transactions")
                 createIndexes(db)
