@@ -205,7 +205,7 @@ class MpesaNotificationListenerService : NotificationListenerService() {
 
     private fun extractAmount(text: String): String? {
         val raw = Regex(
-            """\b(?:KES|KSH)\.?\s*([0-9][0-9,]*(?:\.[0-9]{1,2})?)""",
+            """(?:\bKES|\bKSH|(?<=PM)KSH)\.?\s*([0-9][0-9,]*(?:\.[0-9]{1,2})?)""",
             RegexOption.IGNORE_CASE
         ).find(text)?.groupValues?.getOrNull(1) ?: return null
         return raw.replace(",", "")
