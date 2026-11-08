@@ -126,6 +126,10 @@ class LocalDatabase(context: Context) : SQLiteOpenHelper(context, "telvanta.db",
         val created = System.currentTimeMillis()
         val v=ContentValues().apply { put("order_id",orderId); put("amount",amount); put("status","UNVERIFIED"); put("reference",reference.trim()); put("created_at",created) }
         val id=writableDatabase.insertOrThrow("transactions",null,v)
+        readableDatabase.rawQuery("SELECT customer_phone,offer_name,selling_price,status,created_at FROM orders WHERE id=?",arrayOf(orderId.toString())).use { order ->
+            require(order.moveToFirst()) { "The linked order does not exist" }
+            enqueue("order",orderId,orderPayload(order.getString(0),order.getString(1),order.getDouble(2),order.getString(3),order.getLong(4)))
+        }
         val orderRemoteId=remoteId("order",orderId)
         enqueue("transaction_note",id,JSONObject().put("orderRemoteId",orderRemoteId).put("amountKes",amount).put("reference",reference.trim()).put("status","UNVERIFIED").put("createdAt",created))
     }
