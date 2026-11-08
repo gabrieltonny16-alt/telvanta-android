@@ -165,6 +165,22 @@ class LocalDatabase(context: Context) : SQLiteOpenHelper(context, "telvanta.db",
         throw IllegalStateException("The related order must be queued for sync before its transaction note")
     }
 
+    private fun hasSyncState(type:String,localId:Long):Boolean =
+        readableDatabase.rawQuery("SELECT 1 FROM sync_state WHERE entity_type=? AND local_id=?",arrayOf(type,localId.toString())).use{it.moveToFirst()}
+
+    /** Enqueue pre-sync-version records once, preserving their existing local IDs and data. */
+    fun queueLegacyRecordsForSync() {
+        offers().forEach { if(!hasSyncState("offer",it.id)) enqueue("offer",it.id,JSONObject().put("name",it.name).put("category",it.category).put("priceKes",it.price)) }
+        customers().forEach { if(!hasSyncState("customer",it.id)) enqueue("customer",it.id,JSONObject().put("name",it.name).put("phone",it.phone).put("notes",it.notes)) }
+        orders().forEach { if(!hasSyncState("order",it.id)) enqueue("order",it.id,orderPayload(it.customer,it.offer,it.price,it.status,it.createdAt)) }
+        transactions().forEach { tx ->
+            if(!hasSyncState("transaction_note",tx.id)) {
+                val orderRemoteId=remoteId("order",tx.orderId)
+                enqueue("transaction_note",tx.id,JSONObject().put("orderRemoteId",orderRemoteId).put("amountKes",tx.amount).put("reference",tx.reference).put("status","UNVERIFIED").put("createdAt",tx.createdAt))
+            }
+        }
+    }
+
     fun pendingSyncOperations():JSONArray {
         val array=JSONArray()
         readableDatabase.rawQuery("SELECT operation_id,entity_type,entity_id,action,expected_revision,payload FROM sync_outbox ORDER BY created_at",null).use{c->
