@@ -34,7 +34,7 @@ private fun TelvantaApp(db: LocalDatabase) {
     var message by remember { mutableStateOf("") }
     val tabs = listOf("Dashboard", "Offers", "Orders", "Customers", "Transactions", "Settings")
     MaterialTheme(colorScheme = lightColorScheme(primary=Navy,secondary=Teal,background=Color(0xFFF5F7FB))) {
-        Scaffold(topBar={ TopAppBar(title={Column { Text("Telvanta",fontWeight=FontWeight.Bold); Text("Your Bundles. Your Business. Automated.",style=MaterialTheme.typography.labelSmall,color=Muted) }},colors=TopAppBarDefaults.topAppBarColors(containerColor=Color.White)) }) { padding ->
+        Scaffold(topBar={ TopAppBar(title={Column { Text("BingwaPulse",fontWeight=FontWeight.Bold); Text("Your Bundles. Your Business. Automated.",style=MaterialTheme.typography.labelSmall,color=Muted) }},colors=TopAppBarDefaults.topAppBarColors(containerColor=Color.White)) }) { padding ->
             LazyColumn(Modifier.fillMaxSize().padding(padding).padding(horizontal=16.dp),verticalArrangement=Arrangement.spacedBy(12.dp),contentPadding=PaddingValues(vertical=14.dp)) {
                 item { Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(8.dp)) { tabs.forEach { FilterChip(selected==it,onClick={selected=it;message=""},label={Text(it)}) } } }
                 item { Surface(color=Teal.copy(alpha=.12f),shape=MaterialTheme.shapes.medium) { Text("OFFLINE · DEVICE-LOCAL RECORDS",color=Teal,modifier=Modifier.padding(10.dp),style=MaterialTheme.typography.labelMedium,fontWeight=FontWeight.Bold) } }
@@ -65,7 +65,7 @@ private fun TelvantaApp(db: LocalDatabase) {
                     }
                 }
                 if(message.isNotBlank()) item { Text(message,color=Teal,fontWeight=FontWeight.SemiBold) }
-                item { Text("Telvanta · offline core development · local-only data",color=Muted,style=MaterialTheme.typography.labelSmall) }
+                item { Text("BingwaPulse · offline core development · local-only data",color=Muted,style=MaterialTheme.typography.labelSmall) }
             }
         }
     }

@@ -11,16 +11,53 @@ data class OrderRow(val id: Long, val customer: String, val offer: String, val p
 data class TransactionRow(val id: Long, val orderId: Long, val amount: Double, val status: String, val reference: String, val createdAt: Long)
 
 /** Device-local business records only. This class does not initiate payments or fulfil bundles. */
-class LocalDatabase(context: Context) : SQLiteOpenHelper(context, "telvanta.db", null, 2) {
+class LocalDatabase(context: Context) : SQLiteOpenHelper(context, "telvanta.db", null, 3) {
+    override fun onConfigure(db: SQLiteDatabase) {
+        super.onConfigure(db)
+        db.setForeignKeyConstraintsEnabled(true)
+    }
+
     override fun onCreate(db: SQLiteDatabase) {
         db.execSQL("CREATE TABLE offers (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, category TEXT NOT NULL, original_price REAL, selling_price REAL NOT NULL, source TEXT NOT NULL DEFAULT 'Manual', verified INTEGER NOT NULL DEFAULT 0)")
         db.execSQL("CREATE TABLE customers (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, phone TEXT NOT NULL UNIQUE, notes TEXT NOT NULL DEFAULT '')")
         db.execSQL("CREATE TABLE orders (id INTEGER PRIMARY KEY AUTOINCREMENT, customer_phone TEXT NOT NULL, offer_name TEXT NOT NULL, selling_price REAL NOT NULL, status TEXT NOT NULL DEFAULT 'PENDING', created_at INTEGER NOT NULL)")
-        db.execSQL("CREATE TABLE transactions (id INTEGER PRIMARY KEY AUTOINCREMENT, order_id INTEGER NOT NULL, amount REAL NOT NULL, status TEXT NOT NULL DEFAULT 'UNVERIFIED', reference TEXT NOT NULL DEFAULT '', created_at INTEGER NOT NULL, FOREIGN KEY(order_id) REFERENCES orders(id))")
+        createTransactionsTable(db, "transactions")
+        createIndexes(db)
     }
+
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
-        if (oldVersion < 2) db.execSQL("CREATE TABLE IF NOT EXISTS transactions (id INTEGER PRIMARY KEY AUTOINCREMENT, order_id INTEGER NOT NULL, amount REAL NOT NULL, status TEXT NOT NULL DEFAULT 'UNVERIFIED', reference TEXT NOT NULL DEFAULT '', created_at INTEGER NOT NULL, FOREIGN KEY(order_id) REFERENCES orders(id))")
+        if (oldVersion < 2) {
+            db.execSQL("CREATE TABLE IF NOT EXISTS transactions (id INTEGER PRIMARY KEY AUTOINCREMENT, order_id INTEGER NOT NULL, amount REAL NOT NULL, status TEXT NOT NULL DEFAULT 'UNVERIFIED', reference TEXT NOT NULL DEFAULT '', created_at INTEGER NOT NULL, FOREIGN KEY(order_id) REFERENCES orders(id))")
+        }
+        if (oldVersion < 3) {
+            db.beginTransaction()
+            try {
+                // Preserve legacy rows with missing orders instead of losing them or blocking upgrade.
+                db.execSQL("CREATE TABLE IF NOT EXISTS transactions_legacy_orphaned (id INTEGER PRIMARY KEY, order_id INTEGER NOT NULL, amount REAL NOT NULL, status TEXT NOT NULL, reference TEXT NOT NULL, created_at INTEGER NOT NULL)")
+                db.execSQL("INSERT OR IGNORE INTO transactions_legacy_orphaned(id,order_id,amount,status,reference,created_at) SELECT t.id,t.order_id,t.amount,t.status,t.reference,t.created_at FROM transactions t WHERE NOT EXISTS (SELECT 1 FROM orders o WHERE o.id=t.order_id)")
+                db.execSQL("CREATE TABLE transactions_v3 (id INTEGER PRIMARY KEY AUTOINCREMENT, order_id INTEGER NOT NULL, amount REAL NOT NULL CHECK(amount >= 0), status TEXT NOT NULL DEFAULT 'UNVERIFIED', reference TEXT NOT NULL DEFAULT '', created_at INTEGER NOT NULL, FOREIGN KEY(order_id) REFERENCES orders(id) ON DELETE RESTRICT)")
+                db.execSQL("INSERT INTO transactions_v3(id,order_id,amount,status,reference,created_at) SELECT t.id,t.order_id,t.amount,t.status,t.reference,t.created_at FROM transactions t WHERE EXISTS (SELECT 1 FROM orders o WHERE o.id=t.order_id)")
+                db.execSQL("DROP TABLE transactions")
+                db.execSQL("ALTER TABLE transactions_v3 RENAME TO transactions")
+                createIndexes(db)
+                db.setTransactionSuccessful()
+            } finally {
+                db.endTransaction()
+            }
+        }
     }
+
+    private fun createTransactionsTable(db: SQLiteDatabase, table: String) {
+        require(table == "transactions")
+        db.execSQL("CREATE TABLE transactions (id INTEGER PRIMARY KEY AUTOINCREMENT, order_id INTEGER NOT NULL, amount REAL NOT NULL CHECK(amount >= 0), status TEXT NOT NULL DEFAULT 'UNVERIFIED', reference TEXT NOT NULL DEFAULT '', created_at INTEGER NOT NULL, FOREIGN KEY(order_id) REFERENCES orders(id) ON DELETE RESTRICT)")
+    }
+
+    private fun createIndexes(db: SQLiteDatabase) {
+        db.execSQL("CREATE INDEX IF NOT EXISTS idx_orders_created_at ON orders(created_at DESC)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS idx_orders_customer_phone ON orders(customer_phone)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS idx_transactions_order_id ON transactions(order_id)")
+    }
+
     fun count(table: String): Int {
         require(table in setOf("offers", "customers", "orders", "transactions"))
         readableDatabase.rawQuery("SELECT COUNT(*) FROM $table", null).use { c -> return if (c.moveToFirst()) c.getInt(0) else 0 }
@@ -29,7 +66,7 @@ class LocalDatabase(context: Context) : SQLiteOpenHelper(context, "telvanta.db",
         buildList { while (c.moveToNext()) add(OfferRow(c.getLong(0), c.getString(1), c.getString(2), c.getDouble(3))) }
     }
     fun saveOffer(id: Long?, name: String, category: String, price: Double) {
-        require(name.isNotBlank() && category.isNotBlank() && price >= 0)
+        require(name.isNotBlank() && category.isNotBlank() && price.isFinite() && price >= 0)
         val v = ContentValues().apply { put("name", name.trim()); put("category", category.trim()); put("selling_price", price) }
         if (id == null) { v.put("source", "Manual"); v.put("verified", 0); writableDatabase.insertOrThrow("offers", null, v) }
         else writableDatabase.update("offers", v, "id=?", arrayOf(id.toString()))
@@ -50,8 +87,8 @@ class LocalDatabase(context: Context) : SQLiteOpenHelper(context, "telvanta.db",
         buildList { while(c.moveToNext()) add(OrderRow(c.getLong(0),c.getString(1),c.getString(2),c.getDouble(3),c.getString(4),c.getLong(5))) }
     }
     fun createOrder(phone: String, offer: String, price: Double): Long {
-        require(phone.isNotBlank() && offer.isNotBlank() && price >= 0)
-        val v = ContentValues().apply { put("customer_phone",phone.trim()); put("offer_name",offer); put("selling_price",price); put("status","PENDING"); put("created_at",System.currentTimeMillis()) }
+        require(phone.isNotBlank() && offer.isNotBlank() && price.isFinite() && price >= 0)
+        val v = ContentValues().apply { put("customer_phone",phone.trim()); put("offer_name",offer.trim()); put("selling_price",price); put("status","PENDING"); put("created_at",System.currentTimeMillis()) }
         return writableDatabase.insertOrThrow("orders",null,v)
     }
     fun updateOrderStatus(id: Long, status: String) {
@@ -63,7 +100,7 @@ class LocalDatabase(context: Context) : SQLiteOpenHelper(context, "telvanta.db",
         buildList { while(c.moveToNext()) add(TransactionRow(c.getLong(0),c.getLong(1),c.getDouble(2),c.getString(3),c.getString(4),c.getLong(5))) }
     }
     fun recordTransaction(orderId: Long, amount: Double, reference: String) {
-        require(amount >= 0)
+        require(amount.isFinite() && amount >= 0)
         val v=ContentValues().apply { put("order_id",orderId); put("amount",amount); put("status","UNVERIFIED"); put("reference",reference.trim()); put("created_at",System.currentTimeMillis()) }
         writableDatabase.insertOrThrow("transactions",null,v)
     }
