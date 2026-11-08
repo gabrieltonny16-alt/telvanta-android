@@ -76,12 +76,14 @@ class MpesaNotificationListenerService : NotificationListenerService() {
             (message.contains("confirmed") && (message.contains("ksh") || message.contains("kes")))
         if (!looksLikeMpesa || text.isBlank()) return
 
-        val receipt = extractReceipt(text)
+        val parsed = MpesaReceiptParser.parse(title, text)
+        val receipt = parsed.receiptCode ?: extractReceipt(text)
         val amount = extractAmount(text)
-        val sender = extractSenderPhone(text)
+        val sender = parsed.senderPhone ?: extractSenderPhone(text)
+        val senderName = parsed.senderName
         val completeness = when {
             receipt != null && amount != null && sender != null -> "REVIEW_READY"
-            receipt != null || amount != null || sender != null -> "PARTIAL_CANDIDATE"
+            receipt != null || amount != null || sender != null || senderName != null -> "PARTIAL_CANDIDATE"
             else -> "RAW_NOTIFICATION_ONLY"
         }
 
@@ -92,12 +94,13 @@ class MpesaNotificationListenerService : NotificationListenerService() {
             .putString(KEY_RECEIPT, receipt.orEmpty())
             .putString(KEY_AMOUNT, amount.orEmpty())
             .putString(KEY_SENDER_PHONE, sender.orEmpty())
+            .putString(KEY_SENDER_NAME, senderName.orEmpty())
             .putString(KEY_CANDIDATE_STATUS, completeness)
             .putLong(KEY_TIME, sbn.postTime)
             .putString(KEY_SYNC_STATUS, "QUEUED")
             .apply()
 
-        enqueueRelay(packageName, title, text, receipt, amount, sender, completeness, sbn.postTime)
+        enqueueRelay(packageName, title, text, receipt, amount, sender, senderName, completeness, sbn.postTime)
     }
 
     private fun retryLatestCandidate() {
@@ -113,6 +116,7 @@ class MpesaNotificationListenerService : NotificationListenerService() {
             prefs.getString(KEY_RECEIPT, "").orEmpty().ifBlank { null },
             prefs.getString(KEY_AMOUNT, "").orEmpty().ifBlank { null },
             prefs.getString(KEY_SENDER_PHONE, "").orEmpty().ifBlank { null },
+            prefs.getString(KEY_SENDER_NAME, "").orEmpty().ifBlank { null },
             prefs.getString(KEY_CANDIDATE_STATUS, "RAW_NOTIFICATION_ONLY").orEmpty(),
             prefs.getLong(KEY_TIME, 0L)
         )
@@ -125,6 +129,7 @@ class MpesaNotificationListenerService : NotificationListenerService() {
         receipt: String?,
         amount: String?,
         sender: String?,
+        senderName: String?,
         candidateStatus: String,
         postedAt: Long
     ) {
@@ -153,7 +158,7 @@ class MpesaNotificationListenerService : NotificationListenerService() {
                 }?.takeIf { it > 0L }
                 val fingerprintInput = listOf(
                     businessId, sourcePackage, title, receipt.orEmpty(),
-                    amount.orEmpty(), sender.orEmpty(), rawText, postedAt.toString()
+                    amount.orEmpty(), sender.orEmpty(), senderName.orEmpty(), rawText, postedAt.toString()
                 ).joinToString("\n")
                 val fingerprint = sha256(fingerprintInput)
 
@@ -166,6 +171,7 @@ class MpesaNotificationListenerService : NotificationListenerService() {
                     receiptCandidate = receipt,
                     amountMinor = amountMinor,
                     senderPhoneCandidate = sender,
+                    senderNameCandidate = senderName,
                     notificationHash = fingerprint,
                     candidateStatus = candidateStatus,
                     postedAtEpochMillis = postedAt
@@ -238,6 +244,7 @@ class MpesaNotificationListenerService : NotificationListenerService() {
         const val KEY_RECEIPT = "receipt_candidate"
         const val KEY_AMOUNT = "amount_candidate"
         const val KEY_SENDER_PHONE = "sender_phone_candidate"
+        const val KEY_SENDER_NAME = "sender_name_candidate"
         const val KEY_CANDIDATE_STATUS = "candidate_status"
         const val KEY_TIME = "posted_at"
         const val KEY_SYNC_STATUS = "sync_status"
