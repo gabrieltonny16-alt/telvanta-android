@@ -12,6 +12,9 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import android.os.Handler
+import android.os.Looper
 import kotlin.concurrent.thread
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -181,16 +184,16 @@ private fun dateText(value:Long)=SimpleDateFormat("dd MMM yyyy, HH:mm",Locale.ge
 @Composable
 private fun SettingsScreen(db: LocalDatabase) {
     val context = LocalContext.current
-    var apiUrl by remember { mutableStateOf("https://your-api-host") }
+    var apiUrl by remember { mutableStateOf(context.getSharedPreferences("bingwapulse_api", 0).getString("base_url", "https://your-api-host") ?: "https://your-api-host") }
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var status by remember { mutableStateOf("Offline records are stored on this phone.") }
     var busy by remember { mutableStateOf(false) }
     Text("Connect your workspace",style=MaterialTheme.typography.headlineMedium,fontWeight=FontWeight.Bold)
     InfoCard("Secure API connection","Enter your deployed BingwaPulse API address. HTTPS is required. Sign in with the same account used in the Web workspace to share records.")
-    OutlinedTextField(apiUrl,{apiUrl=it},label={Text("API address (HTTPS)")},modifier=Modifier.fillMaxWidth(),singleLine=true)
+    OutlinedTextField(apiUrl,{apiUrl=it;context.getSharedPreferences("bingwapulse_api",0).edit().putString("base_url",it).apply()},label={Text("API address (HTTPS)")},modifier=Modifier.fillMaxWidth(),singleLine=true)
     OutlinedTextField(email,{email=it},label={Text("Account email")},modifier=Modifier.fillMaxWidth(),singleLine=true)
-    OutlinedTextField(password,{password=it},label={Text("Password")},modifier=Modifier.fillMaxWidth(),singleLine=true)
+    OutlinedTextField(password,{password=it},label={Text("Password")},modifier=Modifier.fillMaxWidth(),singleLine=true,visualTransformation=PasswordVisualTransformation())
     Button(enabled=!busy,onClick={
         if(email.isBlank()||password.isBlank()||!apiUrl.startsWith("https://")) status="Enter your email, password and an HTTPS API address."
         else {
@@ -198,9 +201,9 @@ private fun SettingsScreen(db: LocalDatabase) {
             thread {
                 try {
                     BingwaPulseApiClient(context,apiUrl).login(email,password)
-                    context.mainExecutor.execute { busy=false;password="";status="Signed in. Your session is encrypted with Android Keystore." }
+                    Handler(Looper.getMainLooper()).post { busy=false;password="";status="Signed in. Your session is encrypted with Android Keystore." }
                 } catch(e:Exception) {
-                    context.mainExecutor.execute { busy=false;status=e.message ?: "Could not sign in." }
+                    Handler(Looper.getMainLooper()).post { busy=false;status=e.message ?: "Could not sign in." }
                 }
             }
         }
@@ -210,9 +213,9 @@ private fun SettingsScreen(db: LocalDatabase) {
         thread {
             try {
                 val result=BingwaPulseApiClient(context,apiUrl).sync(db)
-                context.mainExecutor.execute { busy=false;status=result }
+                Handler(Looper.getMainLooper()).post { busy=false;status=result }
             } catch(e:Exception) {
-                context.mainExecutor.execute { busy=false;status=e.message ?: "Synchronization failed." }
+                Handler(Looper.getMainLooper()).post { busy=false;status=e.message ?: "Synchronization failed." }
             }
         }
     },modifier=Modifier.fillMaxWidth()){Text("Sync now · ${db.pendingCount()} pending")}
