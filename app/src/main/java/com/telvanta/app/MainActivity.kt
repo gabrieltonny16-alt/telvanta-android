@@ -76,7 +76,7 @@ private fun BingwaPulseApp(db: LocalDatabase) {
         "MAIN" to listOf("Dashboard", "Wallet", "Offers", "Payment Inbox", "Transaction History"),
         "TOOLS" to listOf("Bulk Messenger", "Quick Dial", "Auto Renewals", "SiteLink", "Auto-Reply"),
         "MANAGEMENT" to listOf("Customers", "Signature", "Statistics", "Connect Pulse"),
-        "SUPPORT" to listOf("Settings", "Updates", "Help & Support", "About BingwaPulse")
+        "SUPPORT" to listOf("Device Activation", "Settings", "Updates", "Help & Support", "About BingwaPulse")
     )
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
@@ -190,7 +190,8 @@ private fun BingwaPulseApp(db: LocalDatabase) {
                         "Signature" -> FeatureWorkspaceScreen("Signature")
                         "Connect Pulse" -> ConnectPulseScreen()
                         "Updates" -> UpdatesScreen()
-                        "Settings" -> PermissionSetupScreen()
+                        "Device Activation" -> PermissionSetupScreen()
+                        "Settings" -> UssdAutomationSettingsScreen()
                         else -> FeatureWorkspaceScreen(selected)
                     }
                     }
