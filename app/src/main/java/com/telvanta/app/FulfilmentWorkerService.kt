@@ -109,12 +109,12 @@ class FulfilmentWorkerService : Service() {
 
                 // Wait for Accessibility to record a final result. Timeout becomes UNKNOWN, never a retry.
                 var waited = 0L
-                while (waited < SESSION_TIMEOUT_MS && prefs.getString(UssdAccessibilityService.KEY_ACTIVE_JOB, null) != null) {
+                while (waited < SESSION_TIMEOUT_MS && jobVault.load() != null) {
                     delay(HEARTBEAT_INTERVAL_MS)
                     waited += HEARTBEAT_INTERVAL_MS
                     api.heartbeatWorkerDevice(session, businessId, deviceId)
                 }
-                if (prefs.getString(UssdAccessibilityService.KEY_ACTIVE_JOB, null) != null) {
+                if (jobVault.load() != null) {
                     finishUnknown(api, session, businessId, deviceId, job, "USSD_TIMEOUT", "No definitive carrier result arrived before timeout.")
                 }
             } catch (error: Exception) {
