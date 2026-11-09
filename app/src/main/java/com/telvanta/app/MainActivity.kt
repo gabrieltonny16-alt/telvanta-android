@@ -1441,6 +1441,40 @@ private fun dateText(value:Long)=SimpleDateFormat("dd MMM yyyy, HH:mm",Locale.ge
 @Composable
 private fun UssdAutomationSettingsScreen() {
     val context = LocalContext.current
+    val secureStore = remember { SecureSessionStore(context) }
+    val api = remember { BingwaSupabaseApi() }
+    val scope = rememberCoroutineScope()
+    var fulfilmentEnabled by remember { mutableStateOf(false) }
+    var fulfilmentPaused by remember { mutableStateOf(true) }
+    var requireManualPin by remember { mutableStateOf(true) }
+    var fulfilmentBusy by remember { mutableStateOf(false) }
+    var fulfilmentNotice by remember { mutableStateOf("") }
+    var workerDevices by remember { mutableStateOf<List<BingwaDevice>>(emptyList()) }
+    var selectedWorkerDevice by remember { mutableStateOf("") }
+    val accountSession = remember { secureStore.load() }
+    LaunchedEffect(accountSession?.userId) {
+        if (accountSession != null && !secureStore.isLocalWorkspace()) {
+            try {
+                var active = accountSession
+                if (active.expiresAtEpochSeconds <= System.currentTimeMillis() / 1000L + 60L) {
+                    active = withContext(Dispatchers.IO) { api.refreshSession(active) }
+                    secureStore.save(active)
+                }
+                val businessId = active.businessId ?: withContext(Dispatchers.IO) { api.firstBusinessId(active) }
+                if (businessId != null) {
+                    val settings = withContext(Dispatchers.IO) { api.getFulfilmentControls(active, businessId) }
+                    fulfilmentEnabled = settings.optBoolean("fulfilment_enabled", false)
+                    fulfilmentPaused = settings.optBoolean("fulfilment_paused", true)
+                    requireManualPin = settings.optBoolean("fulfilment_require_manual_pin", true)
+                    workerDevices = withContext(Dispatchers.IO) { api.listDevices(active, businessId) }
+                        .filter { it.status == "online" && it.assignedUserId == active.userId }
+                    if (selectedWorkerDevice.isBlank()) selectedWorkerDevice = workerDevices.firstOrNull()?.id.orEmpty()
+                }
+            } catch (error: Exception) {
+                fulfilmentNotice = error.message ?: "Could not load fulfilment controls."
+            }
+        }
+    }
     var refresh by remember { mutableIntStateOf(0) }
     var relayNotice by remember { mutableStateOf("") }
     val prefs = remember(refresh) {
@@ -1561,8 +1595,74 @@ private fun UssdAutomationSettingsScreen() {
         "What is not live yet",
         "This build does not yet read M-PESA notifications or SMS, verify payments, submit USSD menu choices, or deliver bundles. Granting Android permissions alone does not activate those features. No payment or bundle action will be triggered by these settings."
     )
-}
 
+    HorizontalDivider(color = Color(0xFF263B70))
+    Text("AUTOMATIC FULFILMENT CONTROL", color = Navy, fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.titleLarge)
+    InfoCard(
+        "Manager-controlled order delivery",
+        "Verified PAID orders can be claimed only by an approved online Android device with a verified offer rule and menu flow. Automation is disabled and paused by default."
+    )
+    if (accountSession == null || secureStore.isLocalWorkspace()) {
+        InfoCard("Business account required", "Sign in to a real business workspace to configure automatic fulfilment.")
+    } else {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text("Enable automatic fulfilment", color = Navy, fontWeight = FontWeight.Bold)
+                Text("Allow eligible paid orders to enter the worker queue.", color = Muted, style = MaterialTheme.typography.bodySmall)
+            }
+            Switch(checked = fulfilmentEnabled, onCheckedChange = { fulfilmentEnabled = it })
+        }
+        Row(Modifier.fillMaxWidth(), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text("Pause fulfilment", color = Navy, fontWeight = FontWeight.Bold)
+                Text("Pause new order claims immediately.", color = Muted, style = MaterialTheme.typography.bodySmall)
+            }
+            Switch(checked = fulfilmentPaused, onCheckedChange = { fulfilmentPaused = it })
+        }
+        Row(Modifier.fillMaxWidth(), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text("Require manual PIN entry", color = Navy, fontWeight = FontWeight.Bold)
+                Text("Keep the SIM PIN out of server storage.", color = Muted, style = MaterialTheme.typography.bodySmall)
+            }
+            Switch(checked = requireManualPin, onCheckedChange = { requireManualPin = it })
+        }
+        Text("Eligible worker devices: ${workerDevices.size}", color = Navy, fontWeight = FontWeight.Bold)
+        workerDevices.forEach { device ->
+            Row(Modifier.fillMaxWidth(), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                RadioButton(selected = selectedWorkerDevice == device.id, onClick = { selectedWorkerDevice = device.id })
+                Column {
+                    Text(device.label, color = Navy, fontWeight = FontWeight.SemiBold)
+                    Text("Online · assigned to this account", color = Muted, style = MaterialTheme.typography.bodySmall)
+                }
+            }
+        }
+        Button(
+            onClick = {
+                val active = accountSession
+                fulfilmentBusy = true
+                scope.launch {
+                    try {
+                        val refreshed = if (active.expiresAtEpochSeconds <= System.currentTimeMillis() / 1000L + 60L)
+                            withContext(Dispatchers.IO) { api.refreshSession(active) } else active
+                        val businessId = refreshed.businessId ?: withContext(Dispatchers.IO) { api.firstBusinessId(refreshed) }
+                            ?: throw IllegalStateException("No business workspace is connected.")
+                        withContext(Dispatchers.IO) {
+                            api.setFulfilmentControls(refreshed, businessId, fulfilmentEnabled, fulfilmentPaused, requireManualPin)
+                        }
+                        fulfilmentNotice = "Fulfilment controls saved. New worker claims follow these settings."
+                    } catch (error: Exception) {
+                        fulfilmentNotice = error.message ?: "Could not save fulfilment controls."
+                    } finally { fulfilmentBusy = false }
+                }
+            },
+            enabled = !fulfilmentBusy,
+            modifier = Modifier.fillMaxWidth()
+        ) { Text(if (fulfilmentBusy) "Saving…" else "Save fulfilment controls") }
+        Text("Worker selection is informational at this stage; the on-device polling and USSD execution service is the next implementation layer.", color = Muted, style = MaterialTheme.typography.bodySmall)
+    }
+    if (fulfilmentNotice.isNotBlank()) Text(fulfilmentNotice, color = Cyan, fontWeight = FontWeight.SemiBold)
+
+}
 
 @Composable
 private fun BingwaDashboard(db: LocalDatabase, onNavigate: (String) -> Unit) {
