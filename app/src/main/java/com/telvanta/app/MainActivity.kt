@@ -1748,8 +1748,14 @@ private fun UssdAutomationSettingsScreen() {
                 val amount = amountKesText.toLongOrNull()
                 val selected = selectedOffer
                 val steps = runCatching { JSONArray(menuStepsJson) }.getOrNull()
-                if (selected == null || amount == null || amount <= 0L || !ussdEntryCode.matches(Regex("^\\\\*[0-9*]+#$")) || steps == null || steps.length() == 0) {
-                    fulfilmentNotice = "Choose an offer and enter a valid amount, USSD code and non-empty JSON menu steps."
+                val rawPinInScript = steps?.let { array ->
+                    (0 until array.length()).any { index ->
+                        val step = array.optJSONObject(index)
+                        step?.optString("action") == "reply" && step.optString("value").matches(Regex("^[0-9]{4,8}$"))
+                    }
+                } == true
+                if (selected == null || amount == null || amount <= 0L || !ussdEntryCode.matches(Regex("^\\\\*[0-9*]+#$")) || steps == null || steps.length() == 0 || rawPinInScript) {
+                    fulfilmentNotice = if (rawPinInScript) "Do not put the SIM PIN in menu steps. Use the manual_pin action; automatic PINs are stored only in the encrypted local vault." else "Choose an offer and enter a valid amount, USSD code and non-empty JSON menu steps."
                 } else {
                     ruleBusy = true
                     scope.launch {
