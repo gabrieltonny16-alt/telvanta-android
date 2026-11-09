@@ -20,6 +20,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -392,8 +393,7 @@ private fun QuickDialScreen(db: LocalDatabase, onMessage: (String) -> Unit) {
                             else -> "▣"
                         }
                         Card(
-                            onClick = { selectedOfferId = offer.id },
-                            modifier = Modifier.weight(1f).heightIn(min = 132.dp),
+                            modifier = Modifier.weight(1f).heightIn(min = 132.dp).clickable { selectedOfferId = offer.id },
                             shape = RoundedCornerShape(20.dp),
                             border = if (chosen) androidx.compose.foundation.BorderStroke(2.dp, Teal) else null,
                             colors = CardDefaults.cardColors(containerColor = if (chosen) Color(0xFF07351D) else Color(0xFF111F18))
