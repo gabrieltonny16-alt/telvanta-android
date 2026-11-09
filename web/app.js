@@ -32,7 +32,7 @@ function slugify(value) {
 function flash(message, error = false) {
   const el = $("toast");
   el.textContent = message;
-  el.style.borderColor = error ? "rgba(255,143,131,.38)" : "rgba(154,240,100,.3)";
+  el.style.borderColor = error ? "rgba(255,143,131,.38)" : "rgba(54,179,235,.34)";
   el.classList.add("visible");
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => el.classList.remove("visible"), 3200);
