@@ -73,18 +73,18 @@ object UssdScreenClassifier {
         val successSignals = matchingSignals(successPatterns, normalized)
         val errorSignals = matchingSignals(errorPatterns, normalized)
 
-        // Confirmation/payment screens take precedence over generic menu detection.
-        if (paymentSignals.isNotEmpty()) {
-            return UssdScreenClassification(UssdScreenType.PAYMENT_METHOD, paymentSignals)
-        }
-        if (confirmationSignals.isNotEmpty()) {
-            return UssdScreenClassification(UssdScreenType.PURCHASE_CONFIRMATION, confirmationSignals)
-        }
+        // Carrier success and errors must win over generic M-PESA/payment words.
         if (successSignals.isNotEmpty()) {
             return UssdScreenClassification(UssdScreenType.SUCCESS_OR_RECEIPT, successSignals)
         }
         if (errorSignals.isNotEmpty()) {
             return UssdScreenClassification(UssdScreenType.ERROR_OR_UNAVAILABLE, errorSignals)
+        }
+        if (confirmationSignals.isNotEmpty()) {
+            return UssdScreenClassification(UssdScreenType.PURCHASE_CONFIRMATION, confirmationSignals)
+        }
+        if (paymentSignals.isNotEmpty()) {
+            return UssdScreenClassification(UssdScreenType.PAYMENT_METHOD, paymentSignals)
         }
         if (menuOptionPattern.containsMatchIn(screenText)) {
             return UssdScreenClassification(UssdScreenType.MENU, listOf("numbered_menu_option"))
