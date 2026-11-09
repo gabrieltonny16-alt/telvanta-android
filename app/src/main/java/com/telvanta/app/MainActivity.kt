@@ -40,15 +40,19 @@ import java.util.Date
 import java.util.Locale
 
 private val Navy = Color(0xFFF4F7FF)
-private val NavyDeep = Color(0xFF050816)
-private val Teal = Color(0xFF16D9FF)
+private val NavyDeep = Color(0xFF05060A)
+private val Teal = Color(0xFF00C9F2)
 private val Muted = Color(0xFF91A4C7)
-private val Canvas = Color(0xFF050713)
+private val Canvas = Color(0xFF05060A)
 
 class MainActivity : ComponentActivity() {
     private lateinit var localDb: LocalDatabase
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        window.statusBarColor = android.graphics.Color.rgb(5, 6, 10)
+        window.navigationBarColor = android.graphics.Color.rgb(5, 6, 10)
+        window.decorView.systemUiVisibility = 0
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) window.isNavigationBarContrastEnforced = false
         if (!SecureSessionStore(this).hasSession()) {
             startActivity(Intent(this, AuthActivity::class.java))
             finish()
@@ -74,14 +78,14 @@ private fun BingwaPulseApp(db: LocalDatabase) {
     )
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
-    MaterialTheme(colorScheme = darkColorScheme(primary=Color(0xFF16D9FF),secondary=Color(0xFF9B7BFF),background=Canvas,surface=Color(0xFF111B38),onPrimary=Color(0xFF07101F),onSecondary=Color(0xFF101A35),onBackground=Navy,onSurface=Navy), shapes=Shapes(small=RoundedCornerShape(12.dp),medium=RoundedCornerShape(18.dp),large=RoundedCornerShape(24.dp),extraLarge=RoundedCornerShape(30.dp))) {
+    MaterialTheme(colorScheme = darkColorScheme(primary=Color(0xFF00C9F2),secondary=Color(0xFF713BFF),background=Canvas,surface=Color(0xFF111B38),onPrimary=Color(0xFF07101F),onSecondary=Color(0xFF101A35),onBackground=Navy,onSurface=Navy), shapes=Shapes(small=RoundedCornerShape(12.dp),medium=RoundedCornerShape(18.dp),large=RoundedCornerShape(24.dp),extraLarge=RoundedCornerShape(30.dp))) {
         ModalNavigationDrawer(
             drawerState = drawerState,
             drawerContent = {
                 ModalDrawerSheet(drawerContainerColor = Color(0xFF0A1025), drawerContentColor = Color.White) {
                     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(vertical = 12.dp)) {
                     Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                        Text("BINGWAPULSE", color = Color(0xFF9B7BFF), fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.titleLarge)
+                        Text("BINGWAPULSE", color = Color(0xFF713BFF), fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.titleLarge)
                         Text("POWER EVERY CONNECTION", color = Muted, style = MaterialTheme.typography.labelSmall)
                         Spacer(Modifier.height(12.dp))
                     }
@@ -102,7 +106,7 @@ private fun BingwaPulseApp(db: LocalDatabase) {
                                 onClick = { selected = tab; message = ""; scope.launch { drawerState.close() } },
                                 colors = NavigationDrawerItemDefaults.colors(
                                     selectedContainerColor = Color(0xFF1C3270),
-                                    selectedTextColor = Color(0xFF9B7BFF),
+                                    selectedTextColor = Color(0xFF713BFF),
                                     unselectedTextColor = Color(0xFFEAF1FF)
                                 ),
                                 modifier = Modifier.padding(horizontal = 10.dp, vertical = 2.dp)
@@ -150,8 +154,8 @@ private fun BingwaPulseApp(db: LocalDatabase) {
                 }
             }
         },topBar={ TopAppBar(
-            navigationIcon = { IconButton(onClick = { scope.launch { drawerState.open() } }) { Text("≡", color = Color(0xFF9B7BFF), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.headlineMedium) } },
-            title={Column(verticalArrangement=Arrangement.spacedBy(2.dp)) { Text("BINGWAPULSE",fontWeight=FontWeight.Black,color=Color.White,letterSpacing=1.3.sp,style=MaterialTheme.typography.titleLarge); Text(selected.uppercase(),style=MaterialTheme.typography.labelSmall,color=Color(0xFF9B7BFF),letterSpacing=1.5.sp) }},
+            navigationIcon = { IconButton(onClick = { scope.launch { drawerState.open() } }) { Text("≡", color = Color(0xFF713BFF), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.headlineMedium) } },
+            title={Column(verticalArrangement=Arrangement.spacedBy(2.dp)) { Text("BINGWAPULSE",fontWeight=FontWeight.Black,color=Color.White,letterSpacing=1.3.sp,style=MaterialTheme.typography.titleLarge); Text(selected.uppercase(),style=MaterialTheme.typography.labelSmall,color=Color(0xFF713BFF),letterSpacing=1.5.sp) }},
             colors=TopAppBarDefaults.topAppBarColors(containerColor=NavyDeep)
         ) }) { padding ->
             LazyColumn(Modifier.fillMaxSize().padding(padding).padding(horizontal=16.dp),verticalArrangement=Arrangement.spacedBy(14.dp),contentPadding=PaddingValues(vertical=16.dp)) {
@@ -303,7 +307,7 @@ private fun ConnectPulseScreen() {
             ) { Text(if (busy) "PLEASE WAIT…" else "GENERATE PAIRING CODE") }
             if (pairingCode.isNotBlank()) {
                 Text("ONE-TIME PAIRING CODE", color = Muted, style = MaterialTheme.typography.labelSmall)
-                Text(pairingCode, color = Color(0xFF9B7BFF), fontWeight = FontWeight.Black, style = MaterialTheme.typography.headlineMedium)
+                Text(pairingCode, color = Color(0xFF713BFF), fontWeight = FontWeight.Black, style = MaterialTheme.typography.headlineMedium)
                 Text("Share this code only with the ConnectPulse app you are pairing. It expires in 10 minutes.", color = Muted, style = MaterialTheme.typography.bodySmall)
             }
         }
@@ -661,7 +665,7 @@ private fun SignatureOffersScreen(db: LocalDatabase, onMessage: (String) -> Unit
                             Text("${offer.category} · ${offer.duration}", color = Teal, style = MaterialTheme.typography.labelSmall)
                             Text(when(offer.simProfile) { "normal" -> "NORMAL SIM"; "notification" -> "NOTIFICATION SIM"; else -> "ANY SIM" }, color = Muted, style = MaterialTheme.typography.labelSmall)
                         }
-                        Text(if (offer.price >= 0) "KES ${offer.price}" else "Price unknown", color = Color(0xFF9B7BFF), fontWeight = FontWeight.ExtraBold)
+                        Text(if (offer.price >= 0) "KES ${offer.price}" else "Price unknown", color = Color(0xFF713BFF), fontWeight = FontWeight.ExtraBold)
                     }
                     Text("Dial: " + if (offer.code.isBlank()) "Not captured" else offer.code, color = Navy)
                     if (offer.tags.isNotBlank()) Text("Tags: ${offer.tags}", color = Muted, style = MaterialTheme.typography.bodySmall)
@@ -1419,7 +1423,7 @@ private fun DashboardMetric(label: String, count: Int, accent: Color, modifier: 
 private fun QuickAction(symbol:String,label:String,modifier:Modifier=Modifier,onClick:()->Unit) {
     Card(onClick=onClick,modifier=modifier,shape=RoundedCornerShape(18.dp),colors=CardDefaults.cardColors(containerColor=Color(0xFF111B38)),elevation=CardDefaults.cardElevation(defaultElevation=2.dp)) {
         Column(Modifier.fillMaxWidth().padding(vertical=16.dp,horizontal=13.dp),verticalArrangement=Arrangement.spacedBy(9.dp)) {
-            Surface(color=Color(0xFF1C3270),shape=RoundedCornerShape(12.dp)) { Text(symbol,color=Color(0xFF16D9FF),fontWeight=FontWeight.ExtraBold,style=MaterialTheme.typography.titleLarge,modifier=Modifier.padding(horizontal=12.dp,vertical=6.dp)) }
+            Surface(color=Color(0xFF1C3270),shape=RoundedCornerShape(12.dp)) { Text(symbol,color=Color(0xFF00C9F2),fontWeight=FontWeight.ExtraBold,style=MaterialTheme.typography.titleLarge,modifier=Modifier.padding(horizontal=12.dp,vertical=6.dp)) }
             Text(label,color=Navy,fontWeight=FontWeight.Bold,style=MaterialTheme.typography.titleSmall)
         }
     }
