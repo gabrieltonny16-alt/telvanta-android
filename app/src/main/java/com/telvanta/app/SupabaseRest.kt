@@ -107,7 +107,8 @@ data class BingwaDevice(
     val label: String,
     val status: String,
     val lastSeenAt: String?,
-    val pairedAt: String?
+    val pairedAt: String?,
+    val assignedUserId: String? = null
 )
 
 data class MpesaNotificationReviewCandidate(
@@ -238,7 +239,7 @@ class BingwaSupabaseApi {
     }
 
     fun listDevices(session: BingwaSession, businessId: String): List<BingwaDevice> {
-        val query = "/rest/v1/devices?select=id,device_label,status,last_seen_at,paired_at,created_at&business_id=eq.$businessId&order=created_at.desc"
+        val query = "/rest/v1/devices?select=id,device_label,status,last_seen_at,paired_at,assigned_user_id,created_at&business_id=eq.$businessId&order=created_at.desc"
         val rows = JSONArray(request("GET", query, token = session.accessToken))
         return buildList {
             for (i in 0 until rows.length()) {
@@ -248,7 +249,8 @@ class BingwaSupabaseApi {
                     label = row.optString("device_label", "Android device"),
                     status = row.optString("status", "unknown"),
                     lastSeenAt = row.optString("last_seen_at").takeIf { it.isNotBlank() && it != "null" },
-                    pairedAt = row.optString("paired_at").takeIf { it.isNotBlank() && it != "null" }
+                    pairedAt = row.optString("paired_at").takeIf { it.isNotBlank() && it != "null" },
+                    assignedUserId = row.optString("assigned_user_id").takeIf { it.isNotBlank() && it != "null" }
                 ))
             }
         }
@@ -374,6 +376,71 @@ class BingwaSupabaseApi {
             token = session.accessToken,
             prefer = "resolution=ignore-duplicates,return=minimal"
         )
+    }
+
+
+    fun getFulfilmentControls(session: BingwaSession, businessId: String): JSONObject {
+        val rows = JSONArray(request(
+            "GET",
+            "/rest/v1/businesses?select=fulfilment_enabled,fulfilment_paused,fulfilment_require_manual_pin&id=eq.$businessId&limit=1",
+            token = session.accessToken
+        ))
+        if (rows.length() == 0) throw IOException("Business fulfilment settings were not found.")
+        return rows.getJSONObject(0)
+    }
+
+    fun setFulfilmentControls(
+        session: BingwaSession,
+        businessId: String,
+        enabled: Boolean,
+        paused: Boolean,
+        requireManualPin: Boolean
+    ) {
+        val body = JSONObject()
+            .put("p_business_id", businessId)
+            .put("p_enabled", enabled)
+            .put("p_paused", paused)
+            .put("p_require_manual_pin", requireManualPin)
+        request("POST", "/rest/v1/rpc/set_business_fulfilment_controls", body, session.accessToken)
+    }
+
+    fun claimNextFulfilmentOrder(
+        session: BingwaSession,
+        businessId: String,
+        deviceId: String
+    ): JSONObject? {
+        val body = JSONObject().put("p_business_id", businessId).put("p_device_id", deviceId)
+        val response = request("POST", "/rest/v1/rpc/claim_next_fulfilment_order", body, session.accessToken)
+        if (response.isBlank() || response == "null") return null
+        return JSONObject(response)
+    }
+
+    fun recordFulfilmentAttemptResult(
+        session: BingwaSession,
+        businessId: String,
+        orderId: String,
+        deviceId: String,
+        attemptNo: Int,
+        state: String,
+        menuStep: Int = 0,
+        screenText: String? = null,
+        providerReference: String? = null,
+        errorCode: String? = null,
+        errorDetail: String? = null
+    ) {
+        require(state in setOf("USSD_SENT", "DELIVERED", "FAILED", "UNKNOWN"))
+        val body = JSONObject()
+            .put("p_business_id", businessId)
+            .put("p_order_id", orderId)
+            .put("p_device_id", deviceId)
+            .put("p_attempt_no", attemptNo)
+            .put("p_state", state)
+            .put("p_menu_step", menuStep)
+        if (screenText != null) body.put("p_screen_text", screenText.take(2500))
+        if (providerReference != null) body.put("p_provider_reference", providerReference)
+        if (errorCode != null) body.put("p_error_code", errorCode)
+        if (errorDetail != null) body.put("p_error_detail", errorDetail)
+        request("POST", "/rest/v1/rpc/record_fulfilment_attempt_result", body, session.accessToken)
     }
 
     private fun parseSession(json: JSONObject, existingBusinessId: String? = null): BingwaSession {
