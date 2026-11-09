@@ -1,6 +1,8 @@
 package com.telvanta.app
 
 import android.app.Notification
+import android.app.NotificationChannel
+import android.app.NotificationManager
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -31,6 +33,7 @@ class MpesaNotificationListenerService : NotificationListenerService() {
 
     override fun onListenerConnected() {
         super.onListenerConnected()
+        ensureActivityChannel()
         if (!retryReceiverRegistered) {
             val filter = IntentFilter(ACTION_RETRY_RELAY)
             if (Build.VERSION.SDK_INT >= 33) {
@@ -101,6 +104,36 @@ class MpesaNotificationListenerService : NotificationListenerService() {
             .apply()
 
         enqueueRelay(packageName, title, text, receipt, amount, sender, senderName, completeness, sbn.postTime)
+        postCapturedPaymentAlert(receipt, amount, completeness)
+    }
+
+
+    private fun ensureActivityChannel() {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+            val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            manager.createNotificationChannel(
+                NotificationChannel("bingwapulse_live_activity", "BingwaPulse live activity", NotificationManager.IMPORTANCE_DEFAULT)
+                    .apply { description = "Payment alerts and order activity" }
+            )
+        }
+    }
+
+    private fun postCapturedPaymentAlert(receipt: String?, amount: String?, status: String) {
+        ensureActivityChannel()
+        val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        val detail = buildString {
+            append("Payment notification captured · ")
+            append(status.replace('_', ' ').lowercase())
+            if (!amount.isNullOrBlank()) append(" · KES ").append(amount)
+            if (!receipt.isNullOrBlank()) append(" · ").append(receipt)
+        }
+        val notification = Notification.Builder(this, "bingwapulse_live_activity")
+            .setSmallIcon(android.R.drawable.stat_notify_sync)
+            .setContentTitle("BingwaPulse · Payment alert received")
+            .setContentText(detail.take(180))
+            .setAutoCancel(true)
+            .build()
+        manager.notify((System.currentTimeMillis() % Int.MAX_VALUE).toInt(), notification)
     }
 
     private fun retryLatestCandidate() {
