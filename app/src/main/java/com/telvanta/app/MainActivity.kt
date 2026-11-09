@@ -13,6 +13,7 @@ import android.os.Build
 import java.net.HttpURLConnection
 import java.net.URL
 import org.json.JSONObject
+import org.json.JSONArray
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import androidx.activity.ComponentActivity
@@ -1451,6 +1452,19 @@ private fun UssdAutomationSettingsScreen() {
     var fulfilmentNotice by remember { mutableStateOf("") }
     var workerDevices by remember { mutableStateOf<List<BingwaDevice>>(emptyList()) }
     var selectedWorkerDevice by remember { mutableStateOf("") }
+    var fulfilmentOffers by remember { mutableStateOf<List<FulfilmentOffer>>(emptyList()) }
+    var fulfilmentRules by remember { mutableStateOf<List<FulfilmentRuleSummary>>(emptyList()) }
+    var selectedOfferId by remember { mutableStateOf("") }
+    var offerMenuExpanded by remember { mutableStateOf(false) }
+    var amountKesText by remember { mutableStateOf("") }
+    var ussdEntryCode by remember { mutableStateOf("") }
+    var menuStepsJson by remember { mutableStateOf("""[
+  {"match_text":"Buy bundle","action":"reply","value":"1"},
+  {"match_text":"Enter recipient phone","action":"reply","value":"{recipient_phone}"},
+  {"match_text":"Enter PIN","action":"manual_pin"}
+]""") }
+    var confirmMenuVerified by remember { mutableStateOf(false) }
+    var ruleBusy by remember { mutableStateOf(false) }
     val accountSession = remember { secureStore.load() }
 
     fun startFulfilmentWorker() {
@@ -1491,7 +1505,10 @@ private fun UssdAutomationSettingsScreen() {
                     requireManualPin = settings.optBoolean("fulfilment_require_manual_pin", true)
                     workerDevices = withContext(Dispatchers.IO) { api.listDevices(active, businessId) }
                         .filter { it.status == "online" && it.assignedUserId == active.userId }
+                    fulfilmentOffers = withContext(Dispatchers.IO) { api.listFulfilmentOffers(active, businessId) }
+                    fulfilmentRules = withContext(Dispatchers.IO) { api.listFulfilmentRules(active, businessId) }
                     if (selectedWorkerDevice.isBlank()) selectedWorkerDevice = workerDevices.firstOrNull()?.id.orEmpty()
+                    if (selectedOfferId.isBlank()) selectedOfferId = fulfilmentOffers.firstOrNull()?.id.orEmpty()
                 }
             } catch (error: Exception) {
                 fulfilmentNotice = error.message ?: "Could not load fulfilment controls."
@@ -1648,6 +1665,89 @@ private fun UssdAutomationSettingsScreen() {
                 Text("Keep the SIM PIN out of server storage.", color = Muted, style = MaterialTheme.typography.bodySmall)
             }
             Switch(checked = requireManualPin, onCheckedChange = { requireManualPin = it })
+        }
+
+        HorizontalDivider(color = Color(0xFF263B70))
+        Text("OFFER-TO-USSD MENU RULES", color = Navy, fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.titleMedium)
+        InfoCard(
+            "Configure the actual provider menu here",
+            "Choose an active offer, enter the exact amount paid by the customer, the provider USSD code, and the screen-by-screen actions. The worker follows only these configured screen matches; it does not guess menu numbers."
+        )
+        val selectedOffer = fulfilmentOffers.firstOrNull { it.id == selectedOfferId }
+        Box {
+            OutlinedButton(onClick = { offerMenuExpanded = true }, modifier = Modifier.fillMaxWidth()) {
+                Text(selectedOffer?.let { "${it.name} · ${it.category}" } ?: "Choose an active offer")
+            }
+            DropdownMenu(expanded = offerMenuExpanded, onDismissRequest = { offerMenuExpanded = false }) {
+                fulfilmentOffers.forEach { offer ->
+                    DropdownMenuItem(
+                        text = { Text("${offer.name} · ${offer.category}") },
+                        onClick = { selectedOfferId = offer.id; offerMenuExpanded = false }
+                    )
+                }
+            }
+        }
+        OutlinedTextField(
+            value = amountKesText, onValueChange = { amountKesText = it.filter(Char::isDigit).take(7) },
+            label = { Text("Exact customer payment amount (KES)") }, singleLine = true, modifier = Modifier.fillMaxWidth()
+        )
+        OutlinedTextField(
+            value = ussdEntryCode, onValueChange = { ussdEntryCode = it.filter { ch -> ch.isDigit() || ch == '*' || ch == '#' }.take(32) },
+            label = { Text("Provider / agent USSD code") }, placeholder = { Text("*xxx#") },
+            singleLine = true, modifier = Modifier.fillMaxWidth()
+        )
+        OutlinedTextField(
+            value = menuStepsJson, onValueChange = { menuStepsJson = it },
+            label = { Text("Menu steps (JSON array)") }, minLines = 5, maxLines = 10,
+            modifier = Modifier.fillMaxWidth()
+        )
+        Text(
+            "Each step uses match_text plus action: reply, tap_text or manual_pin. Use {recipient_phone} for the customer's delivery number. The PIN itself is never saved in this menu script.",
+            color = Muted, style = MaterialTheme.typography.bodySmall
+        )
+        Row(Modifier.fillMaxWidth(), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+            Checkbox(checked = confirmMenuVerified, onCheckedChange = { confirmMenuVerified = it })
+            Text("I tested this exact menu flow on the target SIM and verified every step.", color = Navy, style = MaterialTheme.typography.bodySmall)
+        }
+        Button(
+            onClick = {
+                val amount = amountKesText.toLongOrNull()
+                val selected = selectedOffer
+                val steps = runCatching { JSONArray(menuStepsJson) }.getOrNull()
+                if (selected == null || amount == null || amount <= 0L || !ussdEntryCode.matches(Regex("^\\\\*[0-9*]+#$")) || steps == null || steps.length() == 0) {
+                    fulfilmentNotice = "Choose an offer and enter a valid amount, USSD code and non-empty JSON menu steps."
+                } else {
+                    ruleBusy = true
+                    scope.launch {
+                        try {
+                            var active = accountSession ?: throw IllegalStateException("Sign in to a business account.")
+                            if (active.expiresAtEpochSeconds <= System.currentTimeMillis() / 1000L + 60L) {
+                                active = withContext(Dispatchers.IO) { api.refreshSession(active) }
+                                secureStore.save(active)
+                            }
+                            val businessId = active.businessId ?: withContext(Dispatchers.IO) { api.firstBusinessId(active) }
+                                ?: throw IllegalStateException("No business workspace is connected.")
+                            withContext(Dispatchers.IO) {
+                                api.saveFulfilmentRule(active, businessId, amount, selected.id, ussdEntryCode.trim(), steps, confirmMenuVerified)
+                            }
+                            fulfilmentRules = withContext(Dispatchers.IO) { api.listFulfilmentRules(active, businessId) }
+                            fulfilmentNotice = if (confirmMenuVerified) "Menu rule saved and enabled after your verification." else "Menu rule saved disabled. Verify the exact provider flow before enabling it."
+                        } catch (error: Exception) {
+                            fulfilmentNotice = error.message ?: "Could not save the offer menu rule."
+                        } finally { ruleBusy = false }
+                    }
+                }
+            },
+            enabled = !ruleBusy && fulfilmentOffers.isNotEmpty(),
+            modifier = Modifier.fillMaxWidth()
+        ) { Text(if (ruleBusy) "Saving menu rule…" else "Save offer menu rule") }
+        Text("Saved menu rules: ${fulfilmentRules.size}", color = Navy, fontWeight = FontWeight.Bold)
+        fulfilmentRules.forEach { rule ->
+            val offerName = fulfilmentOffers.firstOrNull { it.id == rule.offerId }?.name ?: "Offer"
+            InfoCard(
+                "KES ${rule.amountMinor / 100} · $offerName",
+                "${rule.menuEntryCode} · ${if (rule.isEnabled && rule.verifiedAt != null) "VERIFIED / ENABLED" else "DISABLED / NOT VERIFIED"}"
+            )
         }
         Text("Eligible worker devices: ${workerDevices.size}", color = Navy, fontWeight = FontWeight.Bold)
         workerDevices.forEach { device ->
