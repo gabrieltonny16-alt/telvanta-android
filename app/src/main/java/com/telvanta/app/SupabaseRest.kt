@@ -111,6 +111,23 @@ data class BingwaDevice(
     val assignedUserId: String? = null
 )
 
+data class FulfilmentOffer(
+    val id: String,
+    val name: String,
+    val category: String,
+    val providerId: String,
+    val isActive: Boolean
+)
+
+data class FulfilmentRuleSummary(
+    val id: String,
+    val amountMinor: Long,
+    val offerId: String,
+    val menuEntryCode: String,
+    val isEnabled: Boolean,
+    val verifiedAt: String?
+)
+
 data class MpesaNotificationReviewCandidate(
     val id: String,
     val receiptCode: String?,
@@ -378,6 +395,72 @@ class BingwaSupabaseApi {
         )
     }
 
+
+
+    fun listFulfilmentOffers(session: BingwaSession, businessId: String): List<FulfilmentOffer> {
+        val query = "/rest/v1/offers?select=id,name,category,provider_id,is_active&business_id=eq.$businessId&is_active=eq.true&order=name.asc"
+        val rows = JSONArray(request("GET", query, token = session.accessToken))
+        return buildList {
+            for (i in 0 until rows.length()) {
+                val row = rows.getJSONObject(i)
+                add(FulfilmentOffer(
+                    id = row.getString("id"),
+                    name = row.optString("name"),
+                    category = row.optString("category"),
+                    providerId = row.optString("provider_id"),
+                    isActive = row.optBoolean("is_active", false)
+                ))
+            }
+        }
+    }
+
+    fun listFulfilmentRules(session: BingwaSession, businessId: String): List<FulfilmentRuleSummary> {
+        val query = "/rest/v1/payment_offer_rules?select=id,amount_minor,offer_id,menu_entry_code,is_enabled,menu_flow_verified_at&business_id=eq.$businessId&order=amount_minor.asc"
+        val rows = JSONArray(request("GET", query, token = session.accessToken))
+        return buildList {
+            for (i in 0 until rows.length()) {
+                val row = rows.getJSONObject(i)
+                add(FulfilmentRuleSummary(
+                    id = row.getString("id"),
+                    amountMinor = row.optLong("amount_minor"),
+                    offerId = row.optString("offer_id"),
+                    menuEntryCode = row.optString("menu_entry_code"),
+                    isEnabled = row.optBoolean("is_enabled", false),
+                    verifiedAt = row.optString("menu_flow_verified_at").takeIf { it.isNotBlank() && it != "null" }
+                ))
+            }
+        }
+    }
+
+    fun saveFulfilmentRule(
+        session: BingwaSession,
+        businessId: String,
+        amountKes: Long,
+        offerId: String,
+        ussdCode: String,
+        menuSteps: org.json.JSONArray,
+        enableAfterManagerVerification: Boolean
+    ) {
+        require(amountKes > 0L && offerId.isNotBlank())
+        require(ussdCode.matches(Regex("^\\\\*[0-9*]+#$")))
+        require(menuSteps.length() > 0)
+        val now = java.time.Instant.now().toString()
+        val body = JSONObject()
+            .put("business_id", businessId)
+            .put("amount_minor", amountKes * 100L)
+            .put("offer_id", offerId)
+            .put("menu_entry_code", ussdCode)
+            .put("menu_steps", menuSteps)
+            .put("is_enabled", enableAfterManagerVerification)
+            .put("menu_flow_verified_at", if (enableAfterManagerVerification) now else JSONObject.NULL)
+        request(
+            "POST",
+            "/rest/v1/payment_offer_rules?on_conflict=business_id,amount_minor",
+            body,
+            session.accessToken,
+            "resolution=merge-duplicates,return=minimal"
+        )
+    }
 
     fun getFulfilmentControls(session: BingwaSession, businessId: String): JSONObject {
         val rows = JSONArray(request(
