@@ -3,8 +3,8 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <application
         android:allowBackup="true"
-        android:icon="@mipmap/ic_launcher"
-        android:roundIcon="@mipmap/ic_launcher_round"
+        android:icon="@drawable/launcher_legacy_icon"
+        android:roundIcon="@drawable/launcher_legacy_icon"
         android:label="BingwaPulse"
         android:supportsRtl="true"
         android:theme="@android:style/Theme.Material.Light.NoActionBar">
