@@ -397,7 +397,7 @@ private fun QuickDialScreen(db: LocalDatabase, onMessage: (String) -> Unit) {
                             modifier = Modifier.weight(1f).heightIn(min = 132.dp).clickable { selectedOfferId = offer.id },
                             shape = RoundedCornerShape(20.dp),
                             border = if (chosen) androidx.compose.foundation.BorderStroke(2.dp, Teal) else null,
-                            colors = CardDefaults.cardColors(containerColor = if (chosen) Color(0xFF07351D) else Color(0xFF17213D))
+                            colors = CardDefaults.cardColors(containerColor = if (chosen) Color(0xFF14234A) else Color(0xFF17213D))
                         ) {
                             Column(
                                 Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 13.dp),
