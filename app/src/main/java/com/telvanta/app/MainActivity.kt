@@ -1629,7 +1629,7 @@ private fun UssdAutomationSettingsScreen() {
     HorizontalDivider(color = Color(0xFF263B70))
     InfoCard(
         "USSD accessibility service",
-        if (enabled) "ENABLED. The current service observes supported visible USSD screens only."
+        if (enabled) "ENABLED. The service reads visible USSD menus and performs only the screen-matched actions configured for the selected offer in the Admin Fulfilment controls."
         else "NOT ENABLED. Android requires you to turn it on manually in Accessibility settings."
     )
     Button(
@@ -1642,7 +1642,7 @@ private fun UssdAutomationSettingsScreen() {
     if (updatedAt > 0L) InfoCard("Last update", dateText(updatedAt))
     InfoCard(
         "What is not live yet",
-        "This build does not yet read M-PESA notifications or SMS, verify payments, submit USSD menu choices, or deliver bundles. Granting Android permissions alone does not activate those features. No payment or bundle action will be triggered by these settings."
+        "Payment notifications are parsed as unverified evidence. A manager must verify the Till transaction before an order becomes PAID. The foreground worker then claims only eligible orders with an enabled, verified offer menu rule. Accessibility follows configured screen matches; unknown screens are not guessed, and uncertain outcomes require manager reconciliation. No live order is processed until fulfilment is enabled and unpaused."
     )
 
     HorizontalDivider(color = Color(0xFF263B70))
