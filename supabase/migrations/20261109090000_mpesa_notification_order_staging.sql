@@ -129,7 +129,7 @@ begin
   )
   on conflict (business_id, phone_e164)
   do update set
-    display_name = coalesce(public.customers.display_name, excluded.display_name),
+    display_name = coalesce(customers.display_name, excluded.display_name),
     updated_at = now()
   returning id into v_customer_id;
 
