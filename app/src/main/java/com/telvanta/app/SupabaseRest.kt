@@ -117,6 +117,7 @@ data class MpesaNotificationReviewCandidate(
     val senderPhone: String?,
     val senderName: String?,
     val candidateStatus: String,
+    val matchStatus: String,
     val stagingStatus: String,
     val stagingReason: String?,
     val postedAt: String?,
@@ -271,7 +272,7 @@ class BingwaSupabaseApi {
         businessId: String
     ): List<MpesaNotificationReviewCandidate> {
         require(businessId.isNotBlank())
-        val query = "/rest/v1/payment_notification_candidates?select=id,receipt_candidate,amount_minor,sender_phone_candidate,sender_name_candidate,candidate_status,staging_status,staging_reason,notification_posted_at,staged_order_id&business_id=eq.$businessId&order=notification_posted_at.desc&limit=100"
+        val query = "/rest/v1/payment_notification_candidates?select=id,receipt_candidate,amount_minor,sender_phone_candidate,sender_name_candidate,candidate_status,match_status,staging_status,staging_reason,notification_posted_at,staged_order_id&business_id=eq.$businessId&order=notification_posted_at.desc&limit=100"
         val rows = JSONArray(request("GET", query, token = session.accessToken))
         return buildList {
             for (i in 0 until rows.length()) {
@@ -285,6 +286,7 @@ class BingwaSupabaseApi {
                     senderPhone = optional("sender_phone_candidate"),
                     senderName = optional("sender_name_candidate"),
                     candidateStatus = row.optString("candidate_status", "UNKNOWN"),
+                    matchStatus = row.optString("match_status", "pending"),
                     stagingStatus = row.optString("staging_status", "not_staged"),
                     stagingReason = optional("staging_reason"),
                     postedAt = optional("notification_posted_at"),
@@ -292,6 +294,23 @@ class BingwaSupabaseApi {
                 ))
             }
         }
+    }
+
+    fun retryMpesaNotificationCandidate(
+        session: BingwaSession,
+        businessId: String,
+        candidateId: String
+    ) {
+        require(businessId.isNotBlank() && candidateId.isNotBlank())
+        val body = JSONObject()
+            .put("p_business_id", businessId)
+            .put("p_candidate_id", candidateId)
+        request(
+            "POST", "/rest/v1/rpc/retry_mpesa_notification_candidate",
+            body = body,
+            token = session.accessToken,
+            prefer = "return=minimal"
+        )
     }
 
     fun reviewMpesaNotificationCandidate(
