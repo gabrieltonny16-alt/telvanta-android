@@ -255,6 +255,49 @@ class BingwaSupabaseApi {
         )
     }
 
+
+    fun registerCurrentWorkerDevice(
+        session: BingwaSession,
+        businessId: String,
+        deviceLabel: String
+    ): BingwaDevice {
+        require(businessId.isNotBlank() && deviceLabel.trim().length in 2..100)
+        val now = java.time.Instant.now().toString()
+        val body = JSONObject()
+            .put("business_id", businessId)
+            .put("assigned_user_id", session.userId)
+            .put("device_label", deviceLabel.trim())
+            .put("platform", "android")
+            .put("status", "online")
+            .put("paired_at", now)
+            .put("last_seen_at", now)
+        val response = JSONArray(request(
+            "POST", "/rest/v1/devices", body,
+            session.accessToken, "return=representation"
+        ))
+        if (response.length() == 0) throw IOException("The worker device was not registered.")
+        val row = response.getJSONObject(0)
+        return BingwaDevice(
+            id = row.getString("id"),
+            label = row.optString("device_label", deviceLabel),
+            status = row.optString("status", "online"),
+            lastSeenAt = row.optString("last_seen_at").takeIf { it.isNotBlank() && it != "null" },
+            pairedAt = row.optString("paired_at").takeIf { it.isNotBlank() && it != "null" },
+            assignedUserId = row.optString("assigned_user_id").takeIf { it.isNotBlank() && it != "null" }
+        )
+    }
+
+    fun heartbeatWorkerDevice(session: BingwaSession, businessId: String, deviceId: String) {
+        val body = JSONObject().put("last_seen_at", java.time.Instant.now().toString())
+        request(
+            "PATCH",
+            "/rest/v1/devices?id=eq.$deviceId&business_id=eq.$businessId&assigned_user_id=eq.${session.userId}&status=eq.online",
+            body,
+            session.accessToken,
+            "return=minimal"
+        )
+    }
+
     fun listDevices(session: BingwaSession, businessId: String): List<BingwaDevice> {
         val query = "/rest/v1/devices?select=id,device_label,status,last_seen_at,paired_at,assigned_user_id,created_at&business_id=eq.$businessId&order=created_at.desc"
         val rows = JSONArray(request("GET", query, token = session.accessToken))
