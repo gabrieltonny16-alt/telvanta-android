@@ -1826,6 +1826,9 @@ private fun UssdAutomationSettingsScreen() {
                             withContext(Dispatchers.IO) { api.refreshSession(active) } else active
                         val businessId = refreshed.businessId ?: withContext(Dispatchers.IO) { api.firstBusinessId(refreshed) }
                             ?: throw IllegalStateException("No business workspace is connected.")
+                        if (!requireManualPin && !pinStore.hasPin()) {
+                            throw IllegalStateException("Save the encrypted local USSD PIN before disabling manual PIN entry.")
+                        }
                         withContext(Dispatchers.IO) {
                             api.setFulfilmentControls(refreshed, businessId, fulfilmentEnabled, fulfilmentPaused, requireManualPin)
                         }
