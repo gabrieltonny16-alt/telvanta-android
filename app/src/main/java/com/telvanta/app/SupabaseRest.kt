@@ -119,6 +119,15 @@ data class FulfilmentOffer(
     val isActive: Boolean
 )
 
+data class FulfilmentOrderSummary(
+    val id: String,
+    val recipientPhone: String,
+    val amountKes: Long,
+    val status: String,
+    val offerId: String,
+    val createdAt: String?
+)
+
 data class FulfilmentRuleSummary(
     val id: String,
     val amountMinor: Long,
@@ -503,6 +512,39 @@ class BingwaSupabaseApi {
             session.accessToken,
             "resolution=merge-duplicates,return=minimal"
         )
+    }
+
+
+    fun listFulfilmentOrders(session: BingwaSession, businessId: String): List<FulfilmentOrderSummary> {
+        val query = "/rest/v1/orders?select=id,recipient_phone,customer_price_kes,status,offer_id,created_at&business_id=eq.$businessId&order=created_at.desc&limit=25"
+        val rows = JSONArray(request("GET", query, token = session.accessToken))
+        return buildList {
+            for (i in 0 until rows.length()) {
+                val row = rows.getJSONObject(i)
+                add(FulfilmentOrderSummary(
+                    id = row.getString("id"),
+                    recipientPhone = row.optString("recipient_phone"),
+                    amountKes = row.optLong("customer_price_kes"),
+                    status = row.optString("status"),
+                    offerId = row.optString("offer_id"),
+                    createdAt = row.optString("created_at").takeIf { it.isNotBlank() && it != "null" }
+                ))
+            }
+        }
+    }
+
+    fun retryFulfilmentOrderAfterReconciliation(
+        session: BingwaSession,
+        businessId: String,
+        orderId: String,
+        managerReason: String
+    ) {
+        require(managerReason.trim().length >= 10) { "Enter a reconciliation note of at least 10 characters." }
+        val body = JSONObject()
+            .put("p_business_id", businessId)
+            .put("p_order_id", orderId)
+            .put("p_manager_reason", managerReason.trim().take(500))
+        request("POST", "/rest/v1/rpc/retry_fulfilment_order_after_reconciliation", body, session.accessToken)
     }
 
     fun getFulfilmentControls(session: BingwaSession, businessId: String): JSONObject {
