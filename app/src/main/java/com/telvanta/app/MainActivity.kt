@@ -1004,6 +1004,36 @@ private fun PaymentInboxScreen() {
         }
     }
 
+    fun retryCandidate(candidate: MpesaNotificationReviewCandidate) {
+        val current = session ?: run {
+            notice = "Your session has expired. Sign in again."
+            return
+        }
+        scope.launch {
+            busy = true
+            try {
+                var activeSession = current
+                if (activeSession.expiresAtEpochSeconds <= System.currentTimeMillis() / 1000L + 60L) {
+                    activeSession = withContext(Dispatchers.IO) { api.refreshSession(activeSession) }
+                    store.save(activeSession)
+                    session = activeSession
+                }
+                val businessId = activeSession.businessId
+                    ?: withContext(Dispatchers.IO) { api.firstBusinessId(activeSession) }
+                    ?: throw IllegalStateException("This account has no active business workspace.")
+                withContext(Dispatchers.IO) {
+                    api.retryMpesaNotificationCandidate(activeSession, businessId, candidate.id)
+                }
+                notice = "Retry requested. The server will re-check the Till and offer configuration."
+                refreshCandidates()
+            } catch (error: Exception) {
+                notice = error.message ?: "The candidate could not be retried."
+            } finally {
+                busy = false
+            }
+        }
+    }
+
     fun submitReview(candidate: MpesaNotificationReviewCandidate, decision: String) {
         val current = session ?: run {
             notice = "Your session has expired. Sign in again."
@@ -1070,9 +1100,14 @@ private fun PaymentInboxScreen() {
                 Text("Receipt: ${candidate.receiptCode ?: "Not identified"}", color = Navy, fontWeight = FontWeight.SemiBold)
                 Text("Payer: ${candidate.senderPhone ?: "Not identified"}", color = Muted)
                 if (!candidate.senderName.isNullOrBlank()) Text("Name: ${candidate.senderName}", color = Muted)
-                Text("Parser: ${candidate.candidateStatus.replace('_', ' ')} · Match: pending / review", color = Muted, style = MaterialTheme.typography.labelSmall)
+                Text("Parser: ${candidate.candidateStatus.replace('_', ' ')} · Match: ${candidate.matchStatus.uppercase()}", color = Muted, style = MaterialTheme.typography.labelSmall)
                 if (!candidate.stagingReason.isNullOrBlank()) Text(candidate.stagingReason, color = Muted, style = MaterialTheme.typography.bodySmall)
                 if (!candidate.stagedOrderId.isNullOrBlank()) Text("Order: ${candidate.stagedOrderId}", color = Muted, style = MaterialTheme.typography.labelSmall)
+                if (candidate.stagingStatus == "blocked") {
+                    OutlinedButton(onClick = { retryCandidate(candidate) }, enabled = !busy, modifier = Modifier.fillMaxWidth()) {
+                        Text("Retry after fixing configuration")
+                    }
+                }
                 if (candidate.stagingStatus == "staged_for_review") {
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Button(onClick = { pendingVerification = candidate }, enabled = !busy, modifier = Modifier.weight(1f)) {
