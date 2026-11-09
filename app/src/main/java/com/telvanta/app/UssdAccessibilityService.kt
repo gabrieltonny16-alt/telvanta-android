@@ -159,7 +159,8 @@ class UssdAccessibilityService : AccessibilityService() {
                 api.recordFulfilmentAttemptResult(session, job.getString("business_id"), job.getString("order_id"),
                     job.getString("device_id"), job.getInt("attempt_no"), state, prefs.getInt(KEY_ACTIVE_STEP, 0),
                     screenText, errorCode = errorCode, errorDetail = errorDetail)
-                prefs.edit().remove(KEY_ACTIVE_JOB).remove(KEY_ACTIVE_STEP).remove(KEY_JOB_STARTED_AT).apply()
+                SecureFulfilmentJobStore(this).clear()
+                prefs.edit().remove(KEY_ACTIVE_STEP).remove(KEY_JOB_STARTED_AT).apply()
                 recordState(state, screenText)
             } catch (error: Exception) {
                 recordState("RESULT_NOT_SYNCED", error.message ?: "Could not save carrier result. Manager reconciliation is required.")
@@ -176,9 +177,17 @@ class UssdAccessibilityService : AccessibilityService() {
         for (index in 0 until node.childCount) { result.append(readVisibleText(node.getChild(index), depth + 1)); if (result.length >= 2500) break }
         return result.toString().take(2500)
     }
+    private fun redactSensitiveText(value: String): String {
+        val labelled = value.replace(
+            Regex("(?i)(pin|passcode|password)(\\\\s*[:=\\\\-]?\\\\s*)[0-9]{4,8}"),
+            "$1$2[REDACTED]"
+        )
+        return labelled.replace(Regex("\\\\b[0-9]{4,8}\\\\b"), "[REDACTED]")
+    }
+
     private fun recordState(state: String, detail: String) {
         getSharedPreferences(PREFS, MODE_PRIVATE).edit().putString(KEY_STATE, state)
-            .putString(KEY_DETAIL, detail.take(2500)).putLong(KEY_UPDATED_AT, System.currentTimeMillis()).apply()
+            .putString(KEY_DETAIL, redactSensitiveText(detail).take(2500)).putLong(KEY_UPDATED_AT, System.currentTimeMillis()).apply()
     }
     override fun onDestroy() { automationExecutor.shutdown(); super.onDestroy() }
 
@@ -187,7 +196,6 @@ class UssdAccessibilityService : AccessibilityService() {
         const val KEY_STATE = "state"
         const val KEY_DETAIL = "detail"
         const val KEY_UPDATED_AT = "updated_at"
-        const val KEY_ACTIVE_JOB = "active_fulfilment_job"
         const val KEY_ACTIVE_STEP = "active_fulfilment_step"
         const val KEY_JOB_STARTED_AT = "active_fulfilment_started_at"
     }

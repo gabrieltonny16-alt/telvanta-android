@@ -59,6 +59,7 @@ class FulfilmentWorkerService : Service() {
         val store = SecureSessionStore(this)
         val api = BingwaSupabaseApi()
         val prefs = getSharedPreferences(UssdAccessibilityService.PREFS, MODE_PRIVATE)
+        val jobVault = SecureFulfilmentJobStore(this)
         while (scope.isActive) {
             try {
                 val saved = store.load() ?: throw IllegalStateException("Sign in again to run the fulfilment worker.")
@@ -67,7 +68,7 @@ class FulfilmentWorkerService : Service() {
                     api.refreshSession(saved).also(store::save)
                 } else saved
                 api.heartbeatWorkerDevice(session, businessId, deviceId)
-                if (prefs.getString(UssdAccessibilityService.KEY_ACTIVE_JOB, null) != null) {
+                if (jobVault.load() != null) {
                     delay(POLL_INTERVAL_MS)
                     continue
                 }
@@ -76,8 +77,8 @@ class FulfilmentWorkerService : Service() {
                     delay(POLL_INTERVAL_MS)
                     continue
                 }
+                jobVault.save(job.toString())
                 prefs.edit()
-                    .putString(UssdAccessibilityService.KEY_ACTIVE_JOB, job.toString())
                     .putInt(UssdAccessibilityService.KEY_ACTIVE_STEP, 0)
                     .putLong(UssdAccessibilityService.KEY_JOB_STARTED_AT, System.currentTimeMillis())
                     .apply()
@@ -139,8 +140,8 @@ class FulfilmentWorkerService : Service() {
                 errorCode = code, errorDetail = detail
             )
         }
+        SecureFulfilmentJobStore(this).clear()
         getSharedPreferences(UssdAccessibilityService.PREFS, MODE_PRIVATE).edit()
-            .remove(UssdAccessibilityService.KEY_ACTIVE_JOB)
             .remove(UssdAccessibilityService.KEY_ACTIVE_STEP)
             .remove(UssdAccessibilityService.KEY_JOB_STARTED_AT)
             .apply()
