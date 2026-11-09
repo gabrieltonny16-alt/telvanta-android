@@ -51,7 +51,7 @@ class UssdAccessibilityService : AccessibilityService() {
 
     private fun executeConfiguredStep(screenText: String, root: AccessibilityNodeInfo?) {
         val prefs = getSharedPreferences(PREFS, MODE_PRIVATE)
-        val job = runCatching { prefs.getString(KEY_ACTIVE_JOB, null)?.let(::JSONObject) }.getOrNull() ?: return
+        val job = runCatching { SecureFulfilmentJobStore(this).load()?.let(::JSONObject) }.getOrNull() ?: return
         val steps = job.optJSONArray("menu_steps") ?: return
         val stepIndex = prefs.getInt(KEY_ACTIVE_STEP, 0)
         val classification = UssdScreenClassifier.classify(screenText)
@@ -179,10 +179,10 @@ class UssdAccessibilityService : AccessibilityService() {
     }
     private fun redactSensitiveText(value: String): String {
         val labelled = value.replace(
-            Regex("(?i)(pin|passcode|password)(\\\\s*[:=\\\\-]?\\\\s*)[0-9]{4,8}"),
+            Regex("(?i)(pin|passcode|password)(\\s*[:=\\-]?\\s*)[0-9]{4,8}"),
             "$1$2[REDACTED]"
         )
-        return labelled.replace(Regex("\\\\b[0-9]{4,8}\\\\b"), "[REDACTED]")
+        return labelled.replace(Regex("\\b[0-9]{4,8}\\b"), "[REDACTED]")
     }
 
     private fun recordState(state: String, detail: String) {
