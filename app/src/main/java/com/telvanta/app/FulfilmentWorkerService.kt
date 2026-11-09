@@ -61,15 +61,16 @@ class FulfilmentWorkerService : Service() {
         val prefs = getSharedPreferences(UssdAccessibilityService.PREFS, MODE_PRIVATE)
         while (scope.isActive) {
             try {
-                if (prefs.getString(UssdAccessibilityService.KEY_ACTIVE_JOB, null) != null) {
-                    delay(POLL_INTERVAL_MS)
-                    continue
-                }
                 val saved = store.load() ?: throw IllegalStateException("Sign in again to run the fulfilment worker.")
                 if (store.isLocalWorkspace()) throw IllegalStateException("Local preview cannot run fulfilment.")
                 val session = if (saved.expiresAtEpochSeconds <= System.currentTimeMillis() / 1000L + 90L) {
                     api.refreshSession(saved).also(store::save)
                 } else saved
+                api.heartbeatWorkerDevice(session, businessId, deviceId)
+                if (prefs.getString(UssdAccessibilityService.KEY_ACTIVE_JOB, null) != null) {
+                    delay(POLL_INTERVAL_MS)
+                    continue
+                }
                 val job = api.claimNextFulfilmentOrder(session, businessId, deviceId)
                 if (job == null) {
                     delay(POLL_INTERVAL_MS)
@@ -108,8 +109,9 @@ class FulfilmentWorkerService : Service() {
                 // Wait for Accessibility to record a final result. Timeout becomes UNKNOWN, never a retry.
                 var waited = 0L
                 while (waited < SESSION_TIMEOUT_MS && prefs.getString(UssdAccessibilityService.KEY_ACTIVE_JOB, null) != null) {
-                    delay(1000L)
-                    waited += 1000L
+                    delay(HEARTBEAT_INTERVAL_MS)
+                    waited += HEARTBEAT_INTERVAL_MS
+                    api.heartbeatWorkerDevice(session, businessId, deviceId)
                 }
                 if (prefs.getString(UssdAccessibilityService.KEY_ACTIVE_JOB, null) != null) {
                     finishUnknown(api, session, businessId, deviceId, job, "USSD_TIMEOUT", "No definitive carrier result arrived before timeout.")
@@ -176,6 +178,7 @@ class FulfilmentWorkerService : Service() {
         private const val NOTIFICATION_ID = 7301
         private const val POLL_INTERVAL_MS = 8000L
         private const val SESSION_TIMEOUT_MS = 120000L
+        private const val HEARTBEAT_INTERVAL_MS = 20000L
         private const val ERROR_BACKOFF_MS = 15000L
     }
 }

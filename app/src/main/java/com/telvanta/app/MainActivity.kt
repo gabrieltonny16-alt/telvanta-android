@@ -1789,6 +1789,33 @@ private fun UssdAutomationSettingsScreen() {
                 "${rule.menuEntryCode} · ${if (rule.isEnabled && rule.verifiedAt != null) "VERIFIED / ENABLED" else "DISABLED / NOT VERIFIED"}"
             )
         }
+
+        OutlinedButton(
+            onClick = {
+                val active = accountSession
+                fulfilmentBusy = true
+                scope.launch {
+                    try {
+                        var refreshed = active ?: throw IllegalStateException("Sign in to register this phone.")
+                        if (refreshed.expiresAtEpochSeconds <= System.currentTimeMillis() / 1000L + 60L) {
+                            refreshed = withContext(Dispatchers.IO) { api.refreshSession(refreshed) }
+                            secureStore.save(refreshed)
+                        }
+                        val businessId = refreshed.businessId ?: withContext(Dispatchers.IO) { api.firstBusinessId(refreshed) }
+                            ?: throw IllegalStateException("No business workspace is connected.")
+                        val label = listOf(Build.MANUFACTURER, Build.MODEL).filter { it.isNotBlank() }.joinToString(" ").take(100)
+                        val device = withContext(Dispatchers.IO) { api.registerCurrentWorkerDevice(refreshed, businessId, label.ifBlank { "BingwaPulse host phone" }) }
+                        workerDevices = (workerDevices.filterNot { it.id == device.id } + device)
+                        selectedWorkerDevice = device.id
+                        fulfilmentNotice = "This phone is registered as an approved worker device."
+                    } catch (error: Exception) {
+                        fulfilmentNotice = error.message ?: "Could not register this phone as a worker."
+                    } finally { fulfilmentBusy = false }
+                }
+            },
+            enabled = !fulfilmentBusy,
+            modifier = Modifier.fillMaxWidth()
+        ) { Text("Register this phone as a worker") }
         Text("Eligible worker devices: ${workerDevices.size}", color = Navy, fontWeight = FontWeight.Bold)
         workerDevices.forEach { device ->
             Row(Modifier.fillMaxWidth(), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
