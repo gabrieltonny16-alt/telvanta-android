@@ -41,7 +41,7 @@ import java.util.Locale
 
 private val Navy = Color(0xFFF4F7FF)
 private val NavyDeep = Color(0xFF05060A)
-private val Teal = Color(0xFF00C9F2)
+private val Cyan = Color(0xFF00C9F2)
 private val Muted = Color(0xFF91A4C7)
 private val Canvas = Color(0xFF05060A)
 
@@ -133,7 +133,7 @@ private fun BingwaPulseApp(db: LocalDatabase) {
             }
         ) {
         Scaffold(containerColor=Canvas,bottomBar={
-            NavigationBar(containerColor = Color(0xFF090E22), contentColor = Teal) {
+            NavigationBar(containerColor = Color(0xFF090E22), contentColor = Cyan) {
                 val bottomItems = listOf("Dashboard", "Transaction History", "Wallet", "Account & Session")
                 val bottomLabels = listOf("Home", "Transactions", "Wallet", "Profile")
                 val bottomIcons = listOf("▦", "↔", "▣", "●")
@@ -144,8 +144,8 @@ private fun BingwaPulseApp(db: LocalDatabase) {
                         icon = { Text(bottomIcons[index], fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleLarge) },
                         label = { Text(bottomLabels[index], maxLines = 1, style = MaterialTheme.typography.labelSmall) },
                         colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = Teal,
-                            selectedTextColor = Teal,
+                            selectedIconColor = Cyan,
+                            selectedTextColor = Cyan,
                             indicatorColor = Color(0xFF223B79),
                             unselectedIconColor = Muted,
                             unselectedTextColor = Muted
@@ -159,7 +159,7 @@ private fun BingwaPulseApp(db: LocalDatabase) {
             colors=TopAppBarDefaults.topAppBarColors(containerColor=NavyDeep)
         ) }) { padding ->
             LazyColumn(Modifier.fillMaxSize().padding(padding).padding(horizontal=16.dp),verticalArrangement=Arrangement.spacedBy(14.dp),contentPadding=PaddingValues(vertical=16.dp)) {
-                item { Surface(color=Color(0xFF111B38),shape=MaterialTheme.shapes.large) { Row(Modifier.fillMaxWidth().padding(horizontal=13.dp,vertical=11.dp),verticalAlignment=androidx.compose.ui.Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(9.dp)) { Surface(color=Teal,shape=MaterialTheme.shapes.small) { Text("●",color=Color.White,modifier=Modifier.padding(horizontal=7.dp,vertical=4.dp),style=MaterialTheme.typography.labelSmall) }; Column { Text("OFFLINE-READY WORKSPACE",color=Navy,fontWeight=FontWeight.Bold,style=MaterialTheme.typography.labelMedium); Text("Your records stay on this device",color=Muted,style=MaterialTheme.typography.bodySmall) } } } }
+                item { Surface(color=Color(0xFF111B38),shape=MaterialTheme.shapes.large) { Row(Modifier.fillMaxWidth().padding(horizontal=13.dp,vertical=11.dp),verticalAlignment=androidx.compose.ui.Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(9.dp)) { Surface(color=Cyan,shape=MaterialTheme.shapes.small) { Text("●",color=Color.White,modifier=Modifier.padding(horizontal=7.dp,vertical=4.dp),style=MaterialTheme.typography.labelSmall) }; Column { Text("OFFLINE-READY WORKSPACE",color=Navy,fontWeight=FontWeight.Bold,style=MaterialTheme.typography.labelMedium); Text("Your records stay on this device",color=Muted,style=MaterialTheme.typography.bodySmall) } } } }
                 if (SecureSessionStore(context).isLocalWorkspace()) {
                     item { InfoCard("LOCAL PREVIEW MODE", "You are exploring the app locally. Sign in later to connect a real business account. Server sync and device pairing are unavailable in this mode.") }
                 }
@@ -193,7 +193,7 @@ private fun BingwaPulseApp(db: LocalDatabase) {
                     }
                     }
                 }
-                if(message.isNotBlank()) item { Text(message,color=Teal,fontWeight=FontWeight.SemiBold) }
+                if(message.isNotBlank()) item { Text(message,color=Cyan,fontWeight=FontWeight.SemiBold) }
                 item { Text("BingwaPulse · offline core · local-only data",color=Muted,style=MaterialTheme.typography.labelSmall) }
             }
         }
@@ -259,7 +259,7 @@ private fun ConnectPulseScreen() {
     )
     Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF111B38)), modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(17.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("PAIRING CONTROL", color = Teal, fontWeight = FontWeight.ExtraBold)
+            Text("PAIRING CONTROL", color = Cyan, fontWeight = FontWeight.ExtraBold)
             Text("Only devices approved by a business manager become active.", color = Muted, style = MaterialTheme.typography.bodySmall)
             OutlinedTextField(
                 value = deviceLabel,
@@ -324,7 +324,7 @@ private fun ConnectPulseScreen() {
             Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF111B38)), modifier = Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(15.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
                     Text(device.label, color = Navy, fontWeight = FontWeight.Bold)
-                    Text(device.status.replace("_", " ").uppercase(Locale.ROOT), color = if (device.status == "online") Teal else Color(0xFFFFC857), fontWeight = FontWeight.ExtraBold)
+                    Text(device.status.replace("_", " ").uppercase(Locale.ROOT), color = if (device.status == "online") Cyan else Color(0xFFFFC857), fontWeight = FontWeight.ExtraBold)
                     Text("Last seen: " + (device.lastSeenAt ?: "No heartbeat received"), color = Muted, style = MaterialTheme.typography.bodySmall)
                     if (device.status == "pending_pairing") {
                         Button(
@@ -360,7 +360,7 @@ private fun ConnectPulseScreen() {
         "What pairing enables",
         "ConnectPulse receives a device-specific secret stored in Android Keystore and sends a heartbeat after approval. A revoked or paused device cannot report as online. This first stage does not remotely restart a powered-off phone or perform USSD purchases."
     )
-    if (notice.isNotBlank()) Text(notice, color = Teal, fontWeight = FontWeight.SemiBold)
+    if (notice.isNotBlank()) Text(notice, color = Cyan, fontWeight = FontWeight.SemiBold)
 }
 
 
@@ -400,7 +400,7 @@ private fun QuickDialScreen(db: LocalDatabase, onMessage: (String) -> Unit) {
                         Card(
                             modifier = Modifier.weight(1f).heightIn(min = 132.dp).clickable { selectedOfferId = offer.id },
                             shape = RoundedCornerShape(20.dp),
-                            border = if (chosen) androidx.compose.foundation.BorderStroke(2.dp, Teal) else null,
+                            border = if (chosen) androidx.compose.foundation.BorderStroke(2.dp, Cyan) else null,
                             colors = CardDefaults.cardColors(containerColor = if (chosen) Color(0xFF14234A) else Color(0xFF17213D))
                         ) {
                             Column(
@@ -408,9 +408,9 @@ private fun QuickDialScreen(db: LocalDatabase, onMessage: (String) -> Unit) {
                                 horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally,
                                 verticalArrangement = Arrangement.spacedBy(7.dp)
                             ) {
-                                Text(symbol, color = Teal, fontSize = 26.sp, fontWeight = FontWeight.Bold)
+                                Text(symbol, color = Cyan, fontSize = 26.sp, fontWeight = FontWeight.Bold)
                                 Text(offer.name, color = Navy, fontWeight = FontWeight.Medium, style = MaterialTheme.typography.bodySmall, maxLines = 3)
-                                Text("KES ${money(offer.price)}", color = Teal, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
+                                Text("KES ${money(offer.price)}", color = Cyan, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
                             }
                         }
                     }
@@ -587,7 +587,7 @@ private fun SiteLinkScreen(db: LocalDatabase, onMessage: (String) -> Unit) {
                 Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
                     Text(offer.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Navy)
                     Text(offer.category, color = Muted)
-                    Text("KES ${money(offer.price)}", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.ExtraBold, color = Teal)
+                    Text("KES ${money(offer.price)}", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.ExtraBold, color = Cyan)
                     if (!offer.verified) Text("Offer details not independently verified", color = Muted, style = MaterialTheme.typography.bodySmall)
                 }
             }
@@ -662,7 +662,7 @@ private fun SignatureOffersScreen(db: LocalDatabase, onMessage: (String) -> Unit
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = androidx.compose.ui.Alignment.Top) {
                         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                             Text(offer.name, fontWeight = FontWeight.Bold, color = Navy)
-                            Text("${offer.category} · ${offer.duration}", color = Teal, style = MaterialTheme.typography.labelSmall)
+                            Text("${offer.category} · ${offer.duration}", color = Cyan, style = MaterialTheme.typography.labelSmall)
                             Text(when(offer.simProfile) { "normal" -> "NORMAL SIM"; "notification" -> "NOTIFICATION SIM"; else -> "ANY SIM" }, color = Muted, style = MaterialTheme.typography.labelSmall)
                         }
                         Text(if (offer.price >= 0) "KES ${offer.price}" else "Price unknown", color = Color(0xFF713BFF), fontWeight = FontWeight.ExtraBold)
@@ -862,7 +862,7 @@ private fun OffersScreen(db: LocalDatabase, onMessage: (String) -> Unit) {
     val offers = remember(reload) { db.offers() }
     val visible = offers.filter { selectedCategory == "All" || it.category.equals(selectedCategory, true) || (selectedCategory == "Minutes" && it.category.equals("VOICE", true)) }
     fun clearEditor() { editId = null; name = ""; category = "Data"; duration = ""; code = ""; price = ""; active = false }
-    Text("My Offers", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = Teal)
+    Text("My Offers", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = Cyan)
     Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         categories.forEach { item -> FilterChip(selected = selectedCategory == item, onClick = { selectedCategory = item }, label = { Text(item) }) }
     }
@@ -870,10 +870,10 @@ private fun OffersScreen(db: LocalDatabase, onMessage: (String) -> Unit) {
     visible.forEach { offer ->
         Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF151D35)), modifier = Modifier.fillMaxWidth()) {
             Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 13.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                Text("✥", color = Teal, fontSize = 25.sp, fontWeight = FontWeight.Bold)
+                Text("✥", color = Cyan, fontSize = 25.sp, fontWeight = FontWeight.Bold)
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                     Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text(offer.name, color = Teal, fontWeight = FontWeight.Bold, maxLines = 1, style = MaterialTheme.typography.titleMedium)
+                        Text(offer.name, color = Cyan, fontWeight = FontWeight.Bold, maxLines = 1, style = MaterialTheme.typography.titleMedium)
                         if (offer.verified) Text("✿", color = Color(0xFF4C9FFB), fontWeight = FontWeight.Bold)
                     }
                     val detail = listOf(offer.duration, offer.ussdCode).filter { it.isNotBlank() }.joinToString(" · ")
@@ -888,7 +888,7 @@ private fun OffersScreen(db: LocalDatabase, onMessage: (String) -> Unit) {
                 TextButton(onClick = {
                     editId = offer.id; name = offer.name; category = offer.category; duration = offer.duration
                     code = offer.ussdCode; price = offer.price.toString(); active = offer.active; showEditor = true
-                }) { Text("Edit", color = Teal) }
+                }) { Text("Edit", color = Cyan) }
             }
         }
     }
@@ -1088,9 +1088,9 @@ private fun PaymentInboxScreen() {
         Button(onClick = { refreshCandidates() }, enabled = !busy, modifier = Modifier.weight(1f)) {
             Text(if (busy) "Loading…" else "Refresh inbox")
         }
-        if (busy) CircularProgressIndicator(modifier = Modifier.size(22.dp), color = Teal, strokeWidth = 2.dp)
+        if (busy) CircularProgressIndicator(modifier = Modifier.size(22.dp), color = Cyan, strokeWidth = 2.dp)
     }
-    if (notice.isNotBlank()) Text(notice, color = Teal, fontWeight = FontWeight.SemiBold)
+    if (notice.isNotBlank()) Text(notice, color = Cyan, fontWeight = FontWeight.SemiBold)
     if (candidates.isEmpty() && !busy) {
         InfoCard("Nothing to review yet", "New matching M-PESA notifications will appear here after the agent phone has Notification Access and successfully syncs to this business.")
     }
@@ -1123,7 +1123,7 @@ private fun PaymentInboxScreen() {
                     }
                 }
                 if (candidate.stagingStatus == "verified") {
-                    Text("Verified by a manager · order marked PAID. Bundle fulfilment is tracked separately.", color = Teal, style = MaterialTheme.typography.bodySmall)
+                    Text("Verified by a manager · order marked PAID. Bundle fulfilment is tracked separately.", color = Cyan, style = MaterialTheme.typography.bodySmall)
                 }
             }
         }
@@ -1253,10 +1253,10 @@ private fun TransactionsScreen(db: LocalDatabase, onMessage: (String) -> Unit) {
         OutlinedTextField(
             value = search, onValueChange = { search = it }, modifier = Modifier.weight(1f),
             singleLine = true, label = { Text("Search customer, phone or offer") },
-            leadingIcon = { Text("⌕", color = Teal, fontSize = 22.sp) }
+            leadingIcon = { Text("⌕", color = Cyan, fontSize = 22.sp) }
         )
-        IconButton(onClick = { reload++ }) { Text("↻", color = Teal, fontSize = 25.sp) }
-        IconButton(onClick = { exportLauncher.launch("bingwapulse-transactions.csv") }) { Text("⇩", color = Teal, fontSize = 25.sp) }
+        IconButton(onClick = { reload++ }) { Text("↻", color = Cyan, fontSize = 25.sp) }
+        IconButton(onClick = { exportLauncher.launch("bingwapulse-transactions.csv") }) { Text("⇩", color = Cyan, fontSize = 25.sp) }
     }
     Text("TRANSACTION FILTERS", color = Muted, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall)
     Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -1304,7 +1304,7 @@ private fun TransactionsScreen(db: LocalDatabase, onMessage: (String) -> Unit) {
                     )
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Text(row.customer, color = Color.White, fontWeight = FontWeight.Bold, maxLines = 1)
-                        Text(row.offer, color = Teal, fontWeight = FontWeight.SemiBold, maxLines = 1)
+                        Text(row.offer, color = Cyan, fontWeight = FontWeight.SemiBold, maxLines = 1)
                         Text(label + " · " + row.source, color = statusColor, style = MaterialTheme.typography.labelSmall)
                     }
                     Column(horizontalAlignment = androidx.compose.ui.Alignment.End, verticalArrangement = Arrangement.spacedBy(5.dp)) {
@@ -1350,7 +1350,7 @@ private fun BulkMessengerScreen(db: LocalDatabase) {
         }
     }, modifier = Modifier.fillMaxWidth()) { Text("Save campaign draft") }
     OutlinedButton(onClick = { campaignName = ""; message = ""; notice = "Draft fields cleared. Previously saved draft remains until overwritten." }, modifier = Modifier.fillMaxWidth()) { Text("Clear fields") }
-    if (notice.isNotBlank()) Text(notice, color = Teal, fontWeight = FontWeight.SemiBold)
+    if (notice.isNotBlank()) Text(notice, color = Cyan, fontWeight = FontWeight.SemiBold)
     InfoCard("Sending safety", "Before live sending is enabled, the app needs verified channel setup, consent-aware recipients, duplicate prevention, rate limits, delivery/error reporting, and a stop control. This screen currently sends nothing.")
 }
 
@@ -1527,7 +1527,7 @@ private fun UssdAutomationSettingsScreen() {
         modifier = Modifier.fillMaxWidth()
     ) { Text("Retry latest M-PESA relay") }
     if (relayNotice.isNotBlank()) {
-        Text(relayNotice, color = Teal, fontWeight = FontWeight.SemiBold)
+        Text(relayNotice, color = Cyan, fontWeight = FontWeight.SemiBold)
     }
 
     InfoCard(
@@ -1592,7 +1592,7 @@ private fun BingwaDashboard(db: LocalDatabase, onNavigate: (String) -> Unit) {
                 Text(date, color = Muted, style = MaterialTheme.typography.bodyLarge)
                 Spacer(Modifier.height(2.dp))
                 Text("Subscription", color = Muted, style = MaterialTheme.typography.bodyLarge)
-                Text("Tokens: —", color = Teal, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleLarge)
+                Text("Tokens: —", color = Cyan, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleLarge)
                 Text("Token balance is not connected to a subscription service yet.", color = Muted, style = MaterialTheme.typography.labelSmall)
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     DashboardMetric("Successful", successful, Color(0xFF36BFEF), Modifier.weight(1f))
@@ -1615,7 +1615,7 @@ private fun BingwaDashboard(db: LocalDatabase, onNavigate: (String) -> Unit) {
                 horizontalArrangement = Arrangement.spacedBy(14.dp)
             ) {
                 Surface(color = Color(0xFF1B2D5C), shape = RoundedCornerShape(50)) {
-                    Text("▣", color = Teal, modifier = Modifier.padding(14.dp), style = MaterialTheme.typography.headlineSmall)
+                    Text("▣", color = Cyan, modifier = Modifier.padding(14.dp), style = MaterialTheme.typography.headlineSmall)
                 }
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text("Airtime Balance", color = Muted, style = MaterialTheme.typography.bodyLarge)
@@ -1624,7 +1624,7 @@ private fun BingwaDashboard(db: LocalDatabase, onNavigate: (String) -> Unit) {
                     Text("Provider airtime balance is not connected.", color = Muted, style = MaterialTheme.typography.labelSmall)
                 }
                 IconButton(onClick = { refreshKey++ }) {
-                    Text("↻", color = Teal, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.headlineLarge)
+                    Text("↻", color = Cyan, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.headlineLarge)
                 }
             }
         }
@@ -1634,8 +1634,8 @@ private fun BingwaDashboard(db: LocalDatabase, onNavigate: (String) -> Unit) {
                 val active = tab == item
                 TextButton(onClick = { tab = item }, modifier = Modifier.weight(1f)) {
                     Column(horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally) {
-                        Text(item, color = if (active) Teal else Muted, fontWeight = if (active) FontWeight.Bold else FontWeight.Normal, maxLines = 1, style = MaterialTheme.typography.labelLarge)
-                        if (active) HorizontalDivider(color = Teal, thickness = 2.dp)
+                        Text(item, color = if (active) Cyan else Muted, fontWeight = if (active) FontWeight.Bold else FontWeight.Normal, maxLines = 1, style = MaterialTheme.typography.labelLarge)
+                        if (active) HorizontalDivider(color = Cyan, thickness = 2.dp)
                     }
                 }
             }
@@ -1663,7 +1663,7 @@ private fun BingwaDashboard(db: LocalDatabase, onNavigate: (String) -> Unit) {
                 ) {
                     Column(Modifier.padding(17.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         Text("This week's commission", color = Color.White, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleLarge)
-                        Text("KES —", color = Teal, fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.headlineMedium)
+                        Text("KES —", color = Cyan, fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.headlineMedium)
                         Text("Commission records are not available yet.", color = Muted, style = MaterialTheme.typography.bodyMedium)
                     }
                 }
@@ -1674,7 +1674,7 @@ private fun BingwaDashboard(db: LocalDatabase, onNavigate: (String) -> Unit) {
                 ) {
                     Column(Modifier.padding(17.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text("Worker status", color = Color.White, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleLarge)
-                        Text("Processing · $processing", color = if (processing > 0) Teal else Muted, fontWeight = FontWeight.SemiBold)
+                        Text("Processing · $processing", color = if (processing > 0) Cyan else Muted, fontWeight = FontWeight.SemiBold)
                         Text("Automated delivery worker and pause/stop controls are not implemented in this build. No bundle purchases are triggered here.", color = Muted, style = MaterialTheme.typography.bodySmall)
                     }
                 }
@@ -1686,7 +1686,7 @@ private fun BingwaDashboard(db: LocalDatabase, onNavigate: (String) -> Unit) {
                     Column(Modifier.padding(17.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text("Business snapshot", color = Color.White, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleLarge)
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            DashboardMetric("Orders", orders.size, Teal, Modifier.weight(1f))
+                            DashboardMetric("Orders", orders.size, Cyan, Modifier.weight(1f))
                             DashboardMetric("Customers", customers, Color(0xFF41D9FF), Modifier.weight(1f))
                             DashboardMetric("Offers", offers, Color(0xFF8CCBFF), Modifier.weight(1f))
                         }
@@ -1704,7 +1704,7 @@ private fun BingwaDashboard(db: LocalDatabase, onNavigate: (String) -> Unit) {
                             recentTransactions.forEach { tx ->
                                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                                     Text(tx.reference.ifBlank { "Order #${tx.orderId}" }, color = Color.White, modifier = Modifier.weight(1f))
-                                    Text("KES ${money(tx.amount)}", color = Teal, fontWeight = FontWeight.SemiBold)
+                                    Text("KES ${money(tx.amount)}", color = Cyan, fontWeight = FontWeight.SemiBold)
                                 }
                                 Text("${tx.status} · ${dateText(tx.createdAt)}", color = Muted, style = MaterialTheme.typography.labelSmall)
                             }
@@ -1737,13 +1737,13 @@ private fun WalletScreen() {
             shape = RoundedCornerShape(22.dp)
         ) {
             Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
-                Text("YOUR WALLET", color = Teal, fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.labelMedium)
+                Text("YOUR WALLET", color = Cyan, fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.labelMedium)
                 Text("Subscription: Not active", color = Color.White, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleLarge)
                 Text("Choose a plan below to continue.", color = Muted, style = MaterialTheme.typography.bodySmall)
             }
         }
 
-        Text("CHOOSE SUBSCRIPTION", color = Teal, fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.labelLarge)
+        Text("CHOOSE SUBSCRIPTION", color = Cyan, fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.labelLarge)
         subscriptions.forEach { plan ->
             val isSelected = selectedPlan == plan.first
             Card(
@@ -1759,7 +1759,7 @@ private fun WalletScreen() {
                             Text(plan.first, color = Color.White, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleLarge)
                             Text(plan.second, color = Muted, style = MaterialTheme.typography.bodySmall)
                         }
-                        Text("KES ${plan.third}", color = Teal, fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.titleLarge)
+                        Text("KES ${plan.third}", color = Cyan, fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.titleLarge)
                     }
                     Button(
                         onClick = {
@@ -1776,7 +1776,7 @@ private fun WalletScreen() {
         }
 
         if (selectedPlan != null) {
-            Text("PAY FOR ${selectedPlan!!.uppercase()} · KES $selectedPrice", color = Teal, fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.labelLarge)
+            Text("PAY FOR ${selectedPlan!!.uppercase()} · KES $selectedPrice", color = Cyan, fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.labelLarge)
             Button(
                 onClick = { notice = "Airtime checkout is not connected yet. No airtime has been deducted." },
                 modifier = Modifier.fillMaxWidth()
@@ -1788,7 +1788,7 @@ private fun WalletScreen() {
         }
 
         if (notice.isNotBlank()) {
-            Text(notice, color = Teal, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyMedium)
+            Text(notice, color = Cyan, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyMedium)
         }
     }
 }
