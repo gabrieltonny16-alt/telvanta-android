@@ -24,8 +24,8 @@ class AuthActivity : ComponentActivity() {
         val store = SecureSessionStore(this)
         val api = BingwaSupabaseApi()
         setContent {
-            MaterialTheme {
-                Surface(color = Color(0xFF010905), modifier = Modifier.fillMaxSize()) {
+            MaterialTheme(colorScheme = darkColorScheme(primary = Color(0xFF16D9FF), secondary = Color(0xFF9B7BFF), background = Color(0xFF050713), surface = Color(0xFF111B38), onPrimary = Color(0xFF050713), onBackground = Color(0xFFF4F7FF), onSurface = Color(0xFFF4F7FF)) {
+                Surface(color = Color(0xFF050713), modifier = Modifier.fillMaxSize()) {
                     BingwaAuthScreen(store, api) {
                         startActivity(Intent(this, MainActivity::class.java).apply {
                             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
@@ -79,8 +79,8 @@ private fun BingwaAuthScreen(store: SecureSessionStore, api: BingwaSupabaseApi, 
     }
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp), verticalArrangement = Arrangement.Center) {
-        Text("BINGWAPULSE", color = Color(0xFFB7FF24), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.ExtraBold)
-        Text("YOUR BUSINESS. ONE CONNECTED PLATFORM.", color = Color(0xFF91AD9D), style = MaterialTheme.typography.labelSmall)
+        Text("BINGWAPULSE", color = Color(0xFF9B7BFF), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.ExtraBold)
+        Text("YOUR BUSINESS. ONE CONNECTED PLATFORM.", color = Color(0xFF91A4C7), style = MaterialTheme.typography.labelSmall)
         Spacer(Modifier.height(28.dp))
 
         if (session == null) {
@@ -210,6 +210,6 @@ private fun BingwaAuthScreen(store: SecureSessionStore, api: BingwaSupabaseApi, 
             }
         }
         Spacer(Modifier.height(18.dp))
-        Text(message, color = Color(0xFFB7D4C4), style = MaterialTheme.typography.bodyMedium)
+        Text(message, color = Color(0xFFB9C9EA), style = MaterialTheme.typography.bodyMedium)
     }
 }
