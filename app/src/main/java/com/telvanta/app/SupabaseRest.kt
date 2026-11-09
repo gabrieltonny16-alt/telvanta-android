@@ -110,6 +110,19 @@ data class BingwaDevice(
     val pairedAt: String?
 )
 
+data class MpesaNotificationReviewCandidate(
+    val id: String,
+    val receiptCode: String?,
+    val amountMinor: Long?,
+    val senderPhone: String?,
+    val senderName: String?,
+    val candidateStatus: String,
+    val stagingStatus: String,
+    val stagingReason: String?,
+    val postedAt: String?,
+    val stagedOrderId: String?
+)
+
 class BingwaSupabaseApi {
     private val baseUrl = BuildConfig.SUPABASE_URL.trimEnd('/')
     private val publishableKey = BuildConfig.SUPABASE_PUBLISHABLE_KEY
@@ -250,6 +263,54 @@ class BingwaSupabaseApi {
             body = body,
             token = session.accessToken,
             prefer = "return=minimal"
+        )
+    }
+
+    fun listMpesaNotificationCandidates(
+        session: BingwaSession,
+        businessId: String
+    ): List<MpesaNotificationReviewCandidate> {
+        require(businessId.isNotBlank())
+        val query = "/rest/v1/payment_notification_candidates?select=id,receipt_candidate,amount_minor,sender_phone_candidate,sender_name_candidate,candidate_status,staging_status,staging_reason,notification_posted_at,staged_order_id&business_id=eq.$businessId&order=notification_posted_at.desc&limit=100"
+        val rows = JSONArray(request("GET", query, token = session.accessToken))
+        return buildList {
+            for (i in 0 until rows.length()) {
+                val row = rows.getJSONObject(i)
+                fun optional(key: String): String? =
+                    row.optString(key).takeIf { it.isNotBlank() && it != "null" }
+                add(MpesaNotificationReviewCandidate(
+                    id = row.getString("id"),
+                    receiptCode = optional("receipt_candidate"),
+                    amountMinor = if (row.isNull("amount_minor")) null else row.optLong("amount_minor"),
+                    senderPhone = optional("sender_phone_candidate"),
+                    senderName = optional("sender_name_candidate"),
+                    candidateStatus = row.optString("candidate_status", "UNKNOWN"),
+                    stagingStatus = row.optString("staging_status", "not_staged"),
+                    stagingReason = optional("staging_reason"),
+                    postedAt = optional("notification_posted_at"),
+                    stagedOrderId = optional("staged_order_id")
+                ))
+            }
+        }
+    }
+
+    fun reviewMpesaNotificationCandidate(
+        session: BingwaSession,
+        businessId: String,
+        candidateId: String,
+        decision: String
+    ) {
+        require(businessId.isNotBlank() && candidateId.isNotBlank())
+        require(decision in setOf("verify", "reject"))
+        val body = JSONObject()
+            .put("p_business_id", businessId)
+            .put("p_candidate_id", candidateId)
+            .put("p_decision", decision)
+        request(
+            "POST", "/rest/v1/rpc/review_mpesa_notification_candidate",
+            body = body,
+            token = session.accessToken,
+            prefer = "return=representation"
         )
     }
 
