@@ -28,7 +28,7 @@ class AuthActivity : ComponentActivity() {
         val store = SecureSessionStore(this)
         val api = BingwaSupabaseApi()
         setContent {
-            MaterialTheme(colorScheme = darkColorScheme(primary = Color(0xFF00C9F2), secondary = Color(0xFF713BFF), background = Color(0xFF05060A), surface = Color(0xFF111B38), onPrimary = Color(0xFF05060A), onBackground = Color(0xFFF4F7FF), onSurface = Color(0xFFF4F7FF)) {
+            MaterialTheme(colorScheme = darkColorScheme(primary = Color(0xFF00C9F2), secondary = Color(0xFF713BFF), background = Color(0xFF05060A), surface = Color(0xFF111B38), onPrimary = Color(0xFF05060A), onBackground = Color(0xFFF4F7FF), onSurface = Color(0xFFF4F7FF))) {
                 Surface(color = Color(0xFF05060A), modifier = Modifier.fillMaxSize()) {
                     BingwaAuthScreen(store, api) {
                         startActivity(Intent(this, MainActivity::class.java).apply {
