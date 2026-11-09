@@ -76,7 +76,18 @@ class UssdAccessibilityService : AccessibilityService() {
         val completed = when (action) {
             "reply" -> enterReply(root, value)
             "tap_text" -> tapVisibleText(root, value)
-            "manual_pin" -> { promptManualPin(); true }
+            "manual_pin" -> {
+                if (job.optBoolean("require_manual_pin", true)) {
+                    promptManualPin()
+                    true
+                } else {
+                    val localPin = SecurePinStore(this).load()
+                    if (localPin.isNullOrBlank()) {
+                        finishJob(job, "UNKNOWN", screenText, "PIN_NOT_CONFIGURED", "Automatic PIN mode is selected but no encrypted local PIN is saved on this device.")
+                        true
+                    } else enterReply(root, localPin)
+                }
+            }
             else -> { recordState("CONFIGURATION_ERROR", "Unsupported configured action at step ${stepIndex + 1}: $action"); false }
         }
         if (completed) {

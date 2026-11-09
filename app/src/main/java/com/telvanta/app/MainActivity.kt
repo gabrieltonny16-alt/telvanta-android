@@ -14,6 +14,7 @@ import java.net.HttpURLConnection
 import java.net.URL
 import org.json.JSONObject
 import org.json.JSONArray
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import androidx.activity.ComponentActivity
@@ -1448,6 +1449,9 @@ private fun UssdAutomationSettingsScreen() {
     var fulfilmentEnabled by remember { mutableStateOf(false) }
     var fulfilmentPaused by remember { mutableStateOf(true) }
     var requireManualPin by remember { mutableStateOf(true) }
+    val pinStore = remember { SecurePinStore(context) }
+    var localPinText by remember { mutableStateOf("") }
+    var localPinSaved by remember { mutableStateOf(pinStore.hasPin()) }
     var fulfilmentBusy by remember { mutableStateOf(false) }
     var fulfilmentNotice by remember { mutableStateOf("") }
     var workerDevices by remember { mutableStateOf<List<BingwaDevice>>(emptyList()) }
@@ -1662,9 +1666,39 @@ private fun UssdAutomationSettingsScreen() {
         Row(Modifier.fillMaxWidth(), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text("Require manual PIN entry", color = Navy, fontWeight = FontWeight.Bold)
-                Text("Keep the SIM PIN out of server storage.", color = Muted, style = MaterialTheme.typography.bodySmall)
+                Text("When off, the worker uses the encrypted PIN stored only on this Android device.", color = Muted, style = MaterialTheme.typography.bodySmall)
             }
             Switch(checked = requireManualPin, onCheckedChange = { requireManualPin = it })
+        }
+        if (!requireManualPin) {
+            OutlinedTextField(
+                value = localPinText,
+                onValueChange = { localPinText = it.filter(Char::isDigit).take(8) },
+                label = { Text("Safaricom USSD PIN (4–8 digits)") },
+                visualTransformation = PasswordVisualTransformation(),
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth()
+            )
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(
+                    onClick = {
+                        try {
+                            pinStore.save(localPinText)
+                            localPinText = ""
+                            localPinSaved = true
+                            fulfilmentNotice = "PIN encrypted and saved on this device only. It was not uploaded."
+                        } catch (error: Exception) {
+                            fulfilmentNotice = error.message ?: "Could not save the local PIN."
+                        }
+                    },
+                    enabled = localPinText.length in 4..8,
+                    modifier = Modifier.weight(1f)
+                ) { Text("Save encrypted PIN") }
+                OutlinedButton(onClick = { pinStore.clear(); localPinSaved = false; localPinText = "" }) {
+                    Text("Clear PIN")
+                }
+            }
+            Text(if (localPinSaved) "An encrypted local PIN is saved on this device." else "No local PIN saved. Automatic PIN mode cannot complete PIN-protected offers yet.", color = Muted, style = MaterialTheme.typography.bodySmall)
         }
 
         HorizontalDivider(color = Color(0xFF263B70))
