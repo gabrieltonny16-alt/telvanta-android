@@ -190,7 +190,7 @@ private fun BingwaPulseApp(db: LocalDatabase) {
                         "Signature" -> FeatureWorkspaceScreen("Signature")
                         "Connect Pulse" -> ConnectPulseScreen()
                         "Updates" -> UpdatesScreen()
-                        "Settings" -> UssdAutomationSettingsScreen()
+                        "Settings" -> PermissionSetupScreen()
                         else -> FeatureWorkspaceScreen(selected)
                     }
                     }
