@@ -1452,6 +1452,29 @@ private fun UssdAutomationSettingsScreen() {
     var workerDevices by remember { mutableStateOf<List<BingwaDevice>>(emptyList()) }
     var selectedWorkerDevice by remember { mutableStateOf("") }
     val accountSession = remember { secureStore.load() }
+
+    fun startFulfilmentWorker() {
+        val active = accountSession ?: run { fulfilmentNotice = "Sign in to start the worker."; return }
+        if (selectedWorkerDevice.isBlank()) { fulfilmentNotice = "Select an approved online worker device first."; return }
+        scope.launch {
+            try {
+                val refreshed = if (active.expiresAtEpochSeconds <= System.currentTimeMillis() / 1000L + 60L)
+                    withContext(Dispatchers.IO) { api.refreshSession(active) } else active
+                val businessId = refreshed.businessId ?: withContext(Dispatchers.IO) { api.firstBusinessId(refreshed) }
+                    ?: throw IllegalStateException("No business workspace is connected.")
+                val intent = Intent(context, FulfilmentWorkerService::class.java)
+                    .putExtra(FulfilmentWorkerService.EXTRA_BUSINESS_ID, businessId)
+                    .putExtra(FulfilmentWorkerService.EXTRA_DEVICE_ID, selectedWorkerDevice)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) context.startForegroundService(intent) else context.startService(intent)
+                fulfilmentNotice = "Worker started. It will only claim eligible paid orders while fulfilment is enabled and unpaused."
+            } catch (error: Exception) {
+                fulfilmentNotice = error.message ?: "Could not start the worker."
+            }
+        }
+    }
+    val callPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) startFulfilmentWorker() else fulfilmentNotice = "Phone permission is required for automatic USSD dialling."
+    }
     LaunchedEffect(accountSession?.userId) {
         if (accountSession != null && !secureStore.isLocalWorkspace()) {
             try {
@@ -1636,6 +1659,29 @@ private fun UssdAutomationSettingsScreen() {
                 }
             }
         }
+
+        val callPermissionGranted = androidx.core.content.ContextCompat.checkSelfPermission(
+            context, android.Manifest.permission.CALL_PHONE
+        ) == PackageManager.PERMISSION_GRANTED
+        Button(
+            onClick = {
+                if (!callPermissionGranted) callPermissionLauncher.launch(android.Manifest.permission.CALL_PHONE)
+                else startFulfilmentWorker()
+            },
+            enabled = selectedWorkerDevice.isNotBlank() && !fulfilmentBusy,
+            modifier = Modifier.fillMaxWidth()
+        ) { Text("Start automatic fulfilment worker") }
+        OutlinedButton(
+            onClick = {
+                context.stopService(Intent(context, FulfilmentWorkerService::class.java))
+                fulfilmentNotice = "Worker stop requested. Any in-progress USSD result must be reconciled if interrupted."
+            },
+            modifier = Modifier.fillMaxWidth()
+        ) { Text("Stop worker") }
+        Text(
+            if (callPermissionGranted) "Phone permission is available." else "Phone permission has not been granted.",
+            color = Muted, style = MaterialTheme.typography.bodySmall
+        )
         Button(
             onClick = {
                 val active = accountSession
@@ -1658,7 +1704,7 @@ private fun UssdAutomationSettingsScreen() {
             enabled = !fulfilmentBusy,
             modifier = Modifier.fillMaxWidth()
         ) { Text(if (fulfilmentBusy) "Saving…" else "Save fulfilment controls") }
-        Text("Worker selection is informational at this stage; the on-device polling and USSD execution service is the next implementation layer.", color = Muted, style = MaterialTheme.typography.bodySmall)
+        Text("The worker polls the server while running. It will not retry uncertain transactions automatically. A manager must reconcile UNKNOWN results before any retry.", color = Muted, style = MaterialTheme.typography.bodySmall)
     }
     if (fulfilmentNotice.isNotBlank()) Text(fulfilmentNotice, color = Cyan, fontWeight = FontWeight.SemiBold)
 
