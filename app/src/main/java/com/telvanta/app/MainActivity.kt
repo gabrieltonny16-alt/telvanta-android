@@ -67,7 +67,7 @@ private fun BingwaPulseApp(db: LocalDatabase) {
     var selected by remember { mutableStateOf("Dashboard") }
     var message by remember { mutableStateOf("") }
     val navGroups = listOf(
-        "MAIN" to listOf("Dashboard", "Wallet", "Offers", "Transaction History"),
+        "MAIN" to listOf("Dashboard", "Wallet", "Offers", "Payment Inbox", "Transaction History"),
         "TOOLS" to listOf("Bulk Messenger", "Quick Dial", "Auto Renewals", "SiteLink", "Auto-Reply"),
         "MANAGEMENT" to listOf("Customers", "Signature", "Statistics", "Connect Pulse"),
         "SUPPORT" to listOf("Settings", "Updates", "Help & Support", "About BingwaPulse")
@@ -166,6 +166,7 @@ private fun BingwaPulseApp(db: LocalDatabase) {
                         "Offers" -> OffersScreen(db){message=it}
                         "Customers" -> CustomersScreen(db){message=it}
                         "Orders" -> OrdersScreen(db){message=it}
+                        "Payment Inbox" -> PaymentInboxScreen()
                         "Transactions", "Transaction History" -> TransactionsScreen(db){message=it}
                         "Bulk Messenger" -> BulkMessengerScreen(db)
                         "Auto-Reply" -> AutoReplyScreen()
@@ -946,6 +947,168 @@ private fun CustomersScreen(db:LocalDatabase,onMessage:(String)->Unit) {
             Row(Modifier.fillMaxWidth()) { TextButton(onClick={editId=c.id;name=c.name;phone=c.phone;notes=c.notes}){Text("Edit")};TextButton(onClick={db.deleteCustomer(c.id);reload++;onMessage("Customer deleted.")}){Text("Delete")} }
         }
     } }
+}
+
+@Composable
+private fun PaymentInboxScreen() {
+    val context = LocalContext.current
+    val store = remember { SecureSessionStore(context) }
+    val api = remember { BingwaSupabaseApi() }
+    val scope = rememberCoroutineScope()
+    var session by remember { mutableStateOf(store.load()) }
+    var candidates by remember { mutableStateOf<List<MpesaNotificationReviewCandidate>>(emptyList()) }
+    var notice by remember { mutableStateOf("") }
+    var busy by remember { mutableStateOf(false) }
+    var pendingVerification by remember { mutableStateOf<MpesaNotificationReviewCandidate?>(null) }
+
+    fun refreshCandidates() {
+        if (store.isLocalWorkspace()) {
+            notice = "Sign in to a real business workspace to review payment candidates."
+            return
+        }
+        val current = session
+        if (current == null) {
+            notice = "Sign in to BingwaPulse before reviewing M-PESA payments."
+            return
+        }
+        scope.launch {
+            busy = true
+            try {
+                var activeSession = current
+                if (activeSession.expiresAtEpochSeconds <= System.currentTimeMillis() / 1000L + 60L) {
+                    activeSession = withContext(Dispatchers.IO) { api.refreshSession(activeSession) }
+                    store.save(activeSession)
+                    session = activeSession
+                }
+                val businessId = activeSession.businessId
+                    ?: withContext(Dispatchers.IO) { api.firstBusinessId(activeSession) }
+                    ?: throw IllegalStateException("This account has no active business workspace.")
+                if (activeSession.businessId == null) {
+                    activeSession = activeSession.copy(businessId = businessId)
+                    store.save(activeSession)
+                    session = activeSession
+                }
+                candidates = withContext(Dispatchers.IO) {
+                    api.listMpesaNotificationCandidates(activeSession, businessId)
+                }
+                notice = if (candidates.isEmpty()) {
+                    "No M-PESA notification candidates have reached this business inbox yet."
+                } else {
+                    "Loaded ${candidates.size} payment candidate(s)."
+                }
+            } catch (error: Exception) {
+                notice = error.message ?: "Could not load the payment inbox."
+            } finally {
+                busy = false
+            }
+        }
+    }
+
+    fun submitReview(candidate: MpesaNotificationReviewCandidate, decision: String) {
+        val current = session ?: run {
+            notice = "Your session has expired. Sign in again."
+            return
+        }
+        scope.launch {
+            busy = true
+            try {
+                var activeSession = current
+                if (activeSession.expiresAtEpochSeconds <= System.currentTimeMillis() / 1000L + 60L) {
+                    activeSession = withContext(Dispatchers.IO) { api.refreshSession(activeSession) }
+                    store.save(activeSession)
+                    session = activeSession
+                }
+                val businessId = activeSession.businessId
+                    ?: withContext(Dispatchers.IO) { api.firstBusinessId(activeSession) }
+                    ?: throw IllegalStateException("This account has no active business workspace.")
+                withContext(Dispatchers.IO) {
+                    api.reviewMpesaNotificationCandidate(activeSession, businessId, candidate.id, decision)
+                }
+                notice = if (decision == "verify") {
+                    "Payment verified. Its order is now PAID and awaits the separate fulfilment worker."
+                } else {
+                    "Payment candidate rejected and sent to reconciliation."
+                }
+                pendingVerification = null
+                refreshCandidates()
+            } catch (error: Exception) {
+                notice = error.message ?: "The payment review could not be saved."
+            } finally {
+                busy = false
+            }
+        }
+    }
+
+    LaunchedEffect(Unit) { refreshCandidates() }
+
+    Text("M-PESA Payment Inbox", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.ExtraBold, color = Navy)
+    InfoCard(
+        "Payment evidence and order staging",
+        "BingwaPulse reads M-PESA notifications and stages exact offer matches for review. Before verifying, compare the receipt and amount with the actual Till transaction record. Notification text alone is not payment verification."
+    )
+    if (store.isLocalWorkspace()) {
+        InfoCard("Account connection required", "Payment review is unavailable in local preview mode. Sign in and connect a business workspace to load its candidates.")
+        return
+    }
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+        Button(onClick = { refreshCandidates() }, enabled = !busy, modifier = Modifier.weight(1f)) {
+            Text(if (busy) "Loading…" else "Refresh inbox")
+        }
+        if (busy) CircularProgressIndicator(modifier = Modifier.size(22.dp), color = Teal, strokeWidth = 2.dp)
+    }
+    if (notice.isNotBlank()) Text(notice, color = Teal, fontWeight = FontWeight.SemiBold)
+    if (candidates.isEmpty() && !busy) {
+        InfoCard("Nothing to review yet", "New matching M-PESA notifications will appear here after the agent phone has Notification Access and successfully syncs to this business.")
+    }
+    candidates.forEach { candidate ->
+        Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF082A1A)), modifier = Modifier.fillMaxWidth()) {
+            Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                    Text("KES ${candidate.amountMinor?.div(100) ?: "—"}", color = Navy, fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.titleLarge)
+                    Text(candidate.stagingStatus.replace('_', ' ').uppercase(), color = if (candidate.stagingStatus == "staged_for_review") Color(0xFFFFD166) else Muted, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall)
+                }
+                Text("Receipt: ${candidate.receiptCode ?: "Not identified"}", color = Navy, fontWeight = FontWeight.SemiBold)
+                Text("Payer: ${candidate.senderPhone ?: "Not identified"}", color = Muted)
+                if (!candidate.senderName.isNullOrBlank()) Text("Name: ${candidate.senderName}", color = Muted)
+                Text("Parser: ${candidate.candidateStatus.replace('_', ' ')} · Match: pending / review", color = Muted, style = MaterialTheme.typography.labelSmall)
+                if (!candidate.stagingReason.isNullOrBlank()) Text(candidate.stagingReason, color = Muted, style = MaterialTheme.typography.bodySmall)
+                if (!candidate.stagedOrderId.isNullOrBlank()) Text("Order: ${candidate.stagedOrderId}", color = Muted, style = MaterialTheme.typography.labelSmall)
+                if (candidate.stagingStatus == "staged_for_review") {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(onClick = { pendingVerification = candidate }, enabled = !busy, modifier = Modifier.weight(1f)) {
+                            Text("Verify against Till")
+                        }
+                        OutlinedButton(onClick = { submitReview(candidate, "reject") }, enabled = !busy) {
+                            Text("Reject")
+                        }
+                    }
+                }
+                if (candidate.stagingStatus == "verified") {
+                    Text("Verified by a manager · order marked PAID. Bundle fulfilment is tracked separately.", color = Teal, style = MaterialTheme.typography.bodySmall)
+                }
+            }
+        }
+    }
+
+    pendingVerification?.let { candidate ->
+        AlertDialog(
+            onDismissRequest = { if (!busy) pendingVerification = null },
+            title = { Text("Verify this M-PESA payment?") },
+            text = {
+                Text("Only continue after checking the transaction in the actual Lipa na M-PESA Till record. Confirm receipt ${candidate.receiptCode ?: "—"} for KES ${candidate.amountMinor?.div(100) ?: "—"} and payer ${candidate.senderPhone ?: "—"}. This marks the linked order PAID; it does not itself start a bundle purchase.")
+            },
+            confirmButton = {
+                TextButton(onClick = { submitReview(candidate, "verify") }, enabled = !busy) {
+                    Text("I checked the Till record")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingVerification = null }, enabled = !busy) {
+                    Text("Not yet")
+                }
+            }
+        )
+    }
 }
 
 @Composable
