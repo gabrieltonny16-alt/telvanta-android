@@ -1458,6 +1458,10 @@ private fun UssdAutomationSettingsScreen() {
     var selectedWorkerDevice by remember { mutableStateOf("") }
     var fulfilmentOffers by remember { mutableStateOf<List<FulfilmentOffer>>(emptyList()) }
     var fulfilmentRules by remember { mutableStateOf<List<FulfilmentRuleSummary>>(emptyList()) }
+    var fulfilmentOrders by remember { mutableStateOf<List<FulfilmentOrderSummary>>(emptyList()) }
+    var pendingRetryOrder by remember { mutableStateOf<FulfilmentOrderSummary?>(null) }
+    var retryReason by remember { mutableStateOf("") }
+    var retryBusy by remember { mutableStateOf(false) }
     var selectedOfferId by remember { mutableStateOf("") }
     var offerMenuExpanded by remember { mutableStateOf(false) }
     var amountKesText by remember { mutableStateOf("") }
@@ -1511,6 +1515,7 @@ private fun UssdAutomationSettingsScreen() {
                         .filter { it.status == "online" && it.assignedUserId == active.userId }
                     fulfilmentOffers = withContext(Dispatchers.IO) { api.listFulfilmentOffers(active, businessId) }
                     fulfilmentRules = withContext(Dispatchers.IO) { api.listFulfilmentRules(active, businessId) }
+                    fulfilmentOrders = withContext(Dispatchers.IO) { api.listFulfilmentOrders(active, businessId) }
                     if (selectedWorkerDevice.isBlank()) selectedWorkerDevice = workerDevices.firstOrNull()?.id.orEmpty()
                     if (selectedOfferId.isBlank()) selectedOfferId = fulfilmentOffers.firstOrNull()?.id.orEmpty()
                 }
@@ -1781,6 +1786,49 @@ private fun UssdAutomationSettingsScreen() {
             enabled = !ruleBusy && fulfilmentOffers.isNotEmpty(),
             modifier = Modifier.fillMaxWidth()
         ) { Text(if (ruleBusy) "Saving menu rule…" else "Save offer menu rule") }
+
+        HorizontalDivider(color = Color(0xFF263B70))
+        Text("FULFILMENT ACTIVITY & RECOVERY", color = Navy, fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.titleMedium)
+        InfoCard(
+            "No blind retries",
+            "DELIVERED is recorded only when the USSD screen shows a recognised carrier success. FAILED and UNKNOWN orders require a manager to check the provider account before retrying."
+        )
+        OutlinedButton(
+            onClick = {
+                scope.launch {
+                    try {
+                        val active = accountSession ?: throw IllegalStateException("Sign in to view order activity.")
+                        val businessId = active.businessId ?: withContext(Dispatchers.IO) { api.firstBusinessId(active) }
+                            ?: throw IllegalStateException("No business workspace is connected.")
+                        fulfilmentOrders = withContext(Dispatchers.IO) { api.listFulfilmentOrders(active, businessId) }
+                    } catch (error: Exception) {
+                        fulfilmentNotice = error.message ?: "Could not refresh fulfilment activity."
+                    }
+                }
+            },
+            modifier = Modifier.fillMaxWidth()
+        ) { Text("Refresh fulfilment activity") }
+        if (fulfilmentOrders.isEmpty()) {
+            Text("No server-side orders found for this business yet.", color = Muted, style = MaterialTheme.typography.bodySmall)
+        }
+        fulfilmentOrders.forEach { order ->
+            val offerName = fulfilmentOffers.firstOrNull { it.id == order.offerId }?.name ?: "Bundle offer"
+            Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF111B38)), modifier = Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(13.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text("KES ${order.amountKes}", color = Navy, fontWeight = FontWeight.ExtraBold)
+                        Text(order.status.replace('_', ' '), color = if (order.status == "DELIVERED") Cyan else Muted, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall)
+                    }
+                    Text(offerName, color = Navy, fontWeight = FontWeight.SemiBold)
+                    Text("Recipient: ${order.recipientPhone}", color = Muted, style = MaterialTheme.typography.bodySmall)
+                    if (order.status in setOf("FAILED", "UNKNOWN")) {
+                        OutlinedButton(onClick = { pendingRetryOrder = order; retryReason = "" }, modifier = Modifier.fillMaxWidth()) {
+                            Text("Reconcile before retry")
+                        }
+                    }
+                }
+            }
+        }
         Text("Saved menu rules: ${fulfilmentRules.size}", color = Navy, fontWeight = FontWeight.Bold)
         fulfilmentRules.forEach { rule ->
             val offerName = fulfilmentOffers.firstOrNull { it.id == rule.offerId }?.name ?: "Offer"
@@ -1875,6 +1923,50 @@ private fun UssdAutomationSettingsScreen() {
             modifier = Modifier.fillMaxWidth()
         ) { Text(if (fulfilmentBusy) "Saving…" else "Save fulfilment controls") }
         Text("The worker polls the server while running. It will not retry uncertain transactions automatically. A manager must reconcile UNKNOWN results before any retry.", color = Muted, style = MaterialTheme.typography.bodySmall)
+    }
+
+    pendingRetryOrder?.let { order ->
+        AlertDialog(
+            onDismissRequest = { if (!retryBusy) pendingRetryOrder = null },
+            title = { Text("Reconcile order before retry") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Check the Safaricom/provider transaction history first. Only retry if you have confirmed the bundle was NOT delivered. This action puts the verified order back into the PAID queue and records your reason.")
+                    OutlinedTextField(
+                        value = retryReason,
+                        onValueChange = { retryReason = it.take(500) },
+                        label = { Text("Reconciliation reason (minimum 10 characters)") },
+                        minLines = 3,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = !retryBusy && retryReason.trim().length >= 10,
+                    onClick = {
+                        val active = accountSession
+                        if (active == null) { fulfilmentNotice = "Sign in again."; return@TextButton }
+                        retryBusy = true
+                        scope.launch {
+                            try {
+                                val businessId = active.businessId ?: withContext(Dispatchers.IO) { api.firstBusinessId(active) }
+                                    ?: throw IllegalStateException("No business workspace is connected.")
+                                withContext(Dispatchers.IO) {
+                                    api.retryFulfilmentOrderAfterReconciliation(active, businessId, order.id, retryReason)
+                                }
+                                fulfilmentOrders = withContext(Dispatchers.IO) { api.listFulfilmentOrders(active, businessId) }
+                                fulfilmentNotice = "Order returned to PAID queue after manager reconciliation."
+                                pendingRetryOrder = null
+                            } catch (error: Exception) {
+                                fulfilmentNotice = error.message ?: "Order could not be reconciled."
+                            } finally { retryBusy = false }
+                        }
+                    }
+                ) { Text(if (retryBusy) "Saving…" else "I checked — retry order") }
+            },
+            dismissButton = { TextButton(onClick = { pendingRetryOrder = null }, enabled = !retryBusy) { Text("Cancel") } }
+        )
     }
     if (fulfilmentNotice.isNotBlank()) Text(fulfilmentNotice, color = Cyan, fontWeight = FontWeight.SemiBold)
 
