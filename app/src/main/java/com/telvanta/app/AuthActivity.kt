@@ -21,11 +21,15 @@ import kotlinx.coroutines.withContext
 class AuthActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        window.statusBarColor = android.graphics.Color.rgb(5, 6, 10)
+        window.navigationBarColor = android.graphics.Color.rgb(5, 6, 10)
+        window.decorView.systemUiVisibility = 0
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) window.isNavigationBarContrastEnforced = false
         val store = SecureSessionStore(this)
         val api = BingwaSupabaseApi()
         setContent {
-            MaterialTheme(colorScheme = darkColorScheme(primary = Color(0xFF16D9FF), secondary = Color(0xFF9B7BFF), background = Color(0xFF050713), surface = Color(0xFF111B38), onPrimary = Color(0xFF050713), onBackground = Color(0xFFF4F7FF), onSurface = Color(0xFFF4F7FF)) {
-                Surface(color = Color(0xFF050713), modifier = Modifier.fillMaxSize()) {
+            MaterialTheme(colorScheme = darkColorScheme(primary = Color(0xFF00C9F2), secondary = Color(0xFF713BFF), background = Color(0xFF05060A), surface = Color(0xFF111B38), onPrimary = Color(0xFF05060A), onBackground = Color(0xFFF4F7FF), onSurface = Color(0xFFF4F7FF)) {
+                Surface(color = Color(0xFF05060A), modifier = Modifier.fillMaxSize()) {
                     BingwaAuthScreen(store, api) {
                         startActivity(Intent(this, MainActivity::class.java).apply {
                             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
@@ -79,7 +83,7 @@ private fun BingwaAuthScreen(store: SecureSessionStore, api: BingwaSupabaseApi, 
     }
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp), verticalArrangement = Arrangement.Center) {
-        Text("BINGWAPULSE", color = Color(0xFF9B7BFF), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.ExtraBold)
+        Text("BINGWAPULSE", color = Color(0xFF713BFF), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.ExtraBold)
         Text("YOUR BUSINESS. ONE CONNECTED PLATFORM.", color = Color(0xFF91A4C7), style = MaterialTheme.typography.labelSmall)
         Spacer(Modifier.height(28.dp))
 
