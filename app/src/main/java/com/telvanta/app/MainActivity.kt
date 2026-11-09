@@ -177,7 +177,7 @@ private fun BingwaPulseApp(db: LocalDatabase) {
                         "Signature Offers", "Signature" -> SignatureOffersScreen(db) { message = it }
                         "Statistics" -> StatisticsScreen(db)
                         "Wallet" -> WalletScreen()
-                        "Quick Dial" -> FeatureWorkspaceScreen("Quick Dial")
+                        "Quick Dial" -> QuickDialScreen(db) { message = it }
                         "Auto Renewals" -> FeatureWorkspaceScreen("Auto Renewals")
                         "Signature" -> FeatureWorkspaceScreen("Signature")
                         "Connect Pulse" -> ConnectPulseScreen()
@@ -355,6 +355,98 @@ private fun ConnectPulseScreen() {
         "ConnectPulse receives a device-specific secret stored in Android Keystore and sends a heartbeat after approval. A revoked or paused device cannot report as online. This first stage does not remotely restart a powered-off phone or perform USSD purchases."
     )
     if (notice.isNotBlank()) Text(notice, color = Teal, fontWeight = FontWeight.SemiBold)
+}
+
+
+@Composable
+private fun QuickDialScreen(db: LocalDatabase, onMessage: (String) -> Unit) {
+    var customerPhone by remember { mutableStateOf("") }
+    var selectedOfferId by remember { mutableStateOf<Long?>(null) }
+    var refresh by remember { mutableIntStateOf(0) }
+    val context = LocalContext.current
+    val offers = remember(refresh) { db.offers() }
+    val selectedOffer = offers.firstOrNull { it.id == selectedOfferId }
+    val dialableOffers = offers.filter { it.ussdCode.isNotBlank() }
+    val rows = dialableOffers.chunked(3)
+
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        OutlinedTextField(
+            value = customerPhone,
+            onValueChange = { customerPhone = it.filter { ch -> ch.isDigit() || ch == '+' }.take(16) },
+            label = { Text("Customer Phone") },
+            placeholder = { Text("Enter customer number (optional)") },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true
+        )
+        if (dialableOffers.isEmpty()) {
+            InfoCard("No dialable offers yet", "Quick Dial reads saved offers from My Offers. Add an offer with a USSD code in Offers, then return here. Offers without a saved USSD code cannot be dialled.")
+        } else {
+            rows.forEach { rowOffers ->
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(9.dp)) {
+                    rowOffers.forEach { offer ->
+                        val chosen = selectedOfferId == offer.id
+                        val symbol = when (offer.category.uppercase(Locale.ROOT)) {
+                            "SMS" -> "▤"
+                            "MINUTES", "VOICE" -> "☎"
+                            "DATA" -> "⌁"
+                            else -> "▣"
+                        }
+                        Card(
+                            onClick = { selectedOfferId = offer.id },
+                            modifier = Modifier.weight(1f).heightIn(min = 132.dp),
+                            shape = RoundedCornerShape(20.dp),
+                            border = if (chosen) androidx.compose.foundation.BorderStroke(2.dp, Teal) else null,
+                            colors = CardDefaults.cardColors(containerColor = if (chosen) Color(0xFF07351D) else Color(0xFF111F18))
+                        ) {
+                            Column(
+                                Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 13.dp),
+                                horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(7.dp)
+                            ) {
+                                Text(symbol, color = Teal, fontSize = 26.sp, fontWeight = FontWeight.Bold)
+                                Text(offer.name, color = Navy, fontWeight = FontWeight.Medium, style = MaterialTheme.typography.bodySmall, maxLines = 3)
+                                Text("KES ${money(offer.price)}", color = Teal, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
+                            }
+                        }
+                    }
+                    repeat(3 - rowOffers.size) { Spacer(Modifier.weight(1f)) }
+                }
+            }
+        }
+        Button(
+            onClick = {
+                val offer = selectedOffer
+                if (offer == null) {
+                    onMessage("Select an offer before opening the dialler.")
+                } else {
+                    val code = offer.ussdCode.trim()
+                    val inner = if (code.length >= 2) code.substring(1, code.length - 1) else ""
+                    val valid = code.length in 3..30 && code.startsWith("*") && code.endsWith("#") &&
+                        inner.all { it.isDigit() || it == '*' || it == '#' }
+                    if (!valid) {
+                        onMessage("This offer's saved USSD code is invalid. Edit it in Offers before dialling.")
+                    } else {
+                        try {
+                            context.startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:" + Uri.encode(code))))
+                            onMessage("Opened the phone dialler for ${offer.name}. Review the code, choose the SIM and press Call yourself. The customer phone field is not inserted into the code automatically.")
+                        } catch (_: Exception) {
+                            onMessage("No compatible phone dialler was found.")
+                        }
+                    }
+                }
+            },
+            enabled = selectedOffer != null,
+            modifier = Modifier.fillMaxWidth().height(58.dp),
+            shape = RoundedCornerShape(18.dp)
+        ) {
+            Text("☎   Dial", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleLarge)
+        }
+        Text(
+            "Offers are loaded from My Offers on this device. Quick Dial does not automatically call, submit USSD menu choices or purchase bundles.",
+            color = Muted,
+            style = MaterialTheme.typography.bodySmall
+        )
+    }
 }
 
 @Composable
