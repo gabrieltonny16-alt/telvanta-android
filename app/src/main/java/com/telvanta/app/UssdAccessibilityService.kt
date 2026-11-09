@@ -97,9 +97,9 @@ class UssdAccessibilityService : AccessibilityService() {
 
     private fun tapVisibleText(root: AccessibilityNodeInfo?, value: String): Boolean {
         if (root == null || value.isBlank()) return false
-        var target = findTextNode(root, value) ?: return false
-        while (!target.isClickable && target.parent != null) target = target.parent
-        return target.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+        var target: AccessibilityNodeInfo? = findTextNode(root, value) ?: return false
+        while (target != null && !target.isClickable) target = target.parent
+        return target?.performAction(AccessibilityNodeInfo.ACTION_CLICK) == true
     }
 
     private fun findEditable(node: AccessibilityNodeInfo?): AccessibilityNodeInfo? {
@@ -129,9 +129,12 @@ class UssdAccessibilityService : AccessibilityService() {
         runCatching {
             val vibrator = getSystemService(Vibrator::class.java)
             if (Build.VERSION.SDK_INT >= 26) vibrator?.vibrate(VibrationEffect.createOneShot(350, VibrationEffect.DEFAULT_AMPLITUDE))
-            else @Suppress("DEPRECATION") vibrator?.vibrate(350)
+            else vibrateLegacy(vibrator)
         }
     }
+
+    @Suppress("DEPRECATION")
+    private fun vibrateLegacy(vibrator: Vibrator?) { vibrator?.vibrate(350L) }
 
     private fun finishJob(job: JSONObject, state: String, screenText: String, errorCode: String?, errorDetail: String?) {
         val prefs = getSharedPreferences(PREFS, MODE_PRIVATE)
