@@ -77,16 +77,10 @@ class UssdAccessibilityService : AccessibilityService() {
             "reply" -> enterReply(root, value)
             "tap_text" -> tapVisibleText(root, value)
             "manual_pin" -> {
-                if (job.optBoolean("require_manual_pin", true)) {
-                    promptManualPin()
-                    true
-                } else {
-                    val localPin = SecurePinStore(this).load()
-                    if (localPin.isNullOrBlank()) {
-                        finishJob(job, "UNKNOWN", screenText, "PIN_NOT_CONFIGURED", "Automatic PIN mode is selected but no encrypted local PIN is saved on this device.")
-                        true
-                    } else enterReply(root, localPin)
-                }
+                // PIN entry is always a human-only step. Never retrieve, store, or
+                // transmit a PIN from app storage or accessibility text.
+                promptManualPin()
+                true
             }
             else -> { recordState("CONFIGURATION_ERROR", "Unsupported configured action at step ${stepIndex + 1}: $action"); false }
         }
@@ -158,7 +152,7 @@ class UssdAccessibilityService : AccessibilityService() {
                     api.refreshSession(saved).also { SecureSessionStore(this).save(it) } else saved
                 api.recordFulfilmentAttemptResult(session, job.getString("business_id"), job.getString("order_id"),
                     job.getString("device_id"), job.getInt("attempt_no"), state, prefs.getInt(KEY_ACTIVE_STEP, 0),
-                    screenText, errorCode = errorCode, errorDetail = errorDetail)
+                    redactSensitiveText(screenText), errorCode = errorCode, errorDetail = errorDetail)
                 SecureFulfilmentJobStore(this).clear()
                 prefs.edit().remove(KEY_ACTIVE_STEP).remove(KEY_JOB_STARTED_AT).apply()
                 recordState(state, screenText)
