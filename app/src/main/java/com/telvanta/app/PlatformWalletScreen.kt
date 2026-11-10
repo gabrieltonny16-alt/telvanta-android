@@ -111,17 +111,77 @@ internal fun WalletScreen() {
     var paymentNotice by remember { mutableStateOf("") }
     var paymentBusy by remember { mutableStateOf(false) }
     var pendingPlan by remember { mutableStateOf<PlatformSubscriptionPlan?>(null) }
+    val processAirtimePayment: (PlatformSubscriptionPlan) -> Unit = { plan ->
+        paymentBusy = true
+        paymentNotice = "Preparing your subscription request..."
+        scope.launch {
+            try {
+                val current = session ?: throw IllegalStateException("Sign in before purchasing a subscription.")
+                val businessId = current.businessId
+                    ?: withContext(Dispatchers.IO) { api.firstBusinessId(current) }
+                    ?: throw IllegalStateException("No business workspace is linked to this account.")
+                val activeSession = if (current.businessId == businessId) current else current.copy(businessId = businessId)
+                if (activeSession !== current) {
+                    session = activeSession
+                    store.save(activeSession)
+                }
+                val attemptId = withContext(Dispatchers.IO) {
+                    api.createSambazaSubscriptionIntent(activeSession, businessId, plan.code)
+                }
+                paymentNotice = "Processing airtime payment..."
+                requestAirtimeSubscription(context, plan.priceKes) { result ->
+                    scope.launch {
+                        try {
+                            when (result) {
+                                is AirtimeSubscriptionResult.Response -> {
+                                    val confirmation = parseSambazaConfirmation(result.message)
+                                    val matches = confirmation != null &&
+                                        confirmation.recipient == SAMBAZA_RECEIVER &&
+                                        kotlin.math.abs(confirmation.amountKes - plan.priceKes.toDouble()) < 0.01
+                                    if (!matches) {
+                                        withContext(Dispatchers.IO) {
+                                            api.cancelSambazaSubscriptionIntent(activeSession, businessId, attemptId)
+                                        }
+                                        paymentNotice = describeAirtimeResult(result, plan.priceKes)
+                                    } else {
+                                        withContext(Dispatchers.IO) {
+                                            api.recordSambazaSenderResponse(
+                                                activeSession, businessId, attemptId, result.message
+                                            )
+                                        }
+                                        paymentNotice = "Airtime transfer detected. Waiting for the receiving phone to confirm delivery. Your subscription activates only after that confirmation is verified."
+                                    }
+                                }
+                                is AirtimeSubscriptionResult.Failed -> {
+                                    withContext(Dispatchers.IO) {
+                                        api.cancelSambazaSubscriptionIntent(activeSession, businessId, attemptId)
+                                    }
+                                    paymentNotice = describeAirtimeResult(result, plan.priceKes)
+                                }
+                                is AirtimeSubscriptionResult.Error -> {
+                                    paymentNotice = "The transfer outcome is unconfirmed. Check the receiving account before trying again. " + result.message
+                                }
+                            }
+                        } catch (error: Exception) {
+                            paymentNotice = error.message ?: "The transfer result could not be saved. Check the receiving account before retrying."
+                        } finally {
+                            paymentBusy = false
+                        }
+                    }
+                }
+            } catch (error: Exception) {
+                paymentBusy = false
+                paymentNotice = error.message ?: "Could not prepare the subscription request."
+            }
+        }
+    }
     val callPermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
         val plan = pendingPlan
         pendingPlan = null
         if (granted && plan != null) {
-            paymentBusy = true
-            requestAirtimeSubscription(context, plan.priceKes) { result ->
-                paymentBusy = false
-                paymentNotice = describeAirtimeResult(result, plan.priceKes)
-            }
+            processAirtimePayment(plan)
         } else if (!granted) {
             paymentNotice = "Allow phone access so BingwaPulse can process the airtime payment."
         }
@@ -135,11 +195,7 @@ internal fun WalletScreen() {
             callPermissionLauncher.launch(Manifest.permission.CALL_PHONE)
         } else {
             pendingPlan = null
-            paymentBusy = true
-            requestAirtimeSubscription(context, plan.priceKes) { result ->
-                paymentBusy = false
-                paymentNotice = describeAirtimeResult(result, plan.priceKes)
-            }
+            processAirtimePayment(plan)
         }
     }
     val localPreview = remember { store.isLocalWorkspace() }
