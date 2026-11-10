@@ -19,7 +19,6 @@ import java.net.HttpURLConnection
 import java.net.URL
 import org.json.JSONObject
 import org.json.JSONArray
-import androidx.compose.ui.text.input.PasswordVisualTransformation
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import androidx.activity.ComponentActivity
@@ -1457,9 +1456,6 @@ private fun UssdAutomationSettingsScreen() {
     var fulfilmentEnabled by remember { mutableStateOf(false) }
     var fulfilmentPaused by remember { mutableStateOf(true) }
     var requireManualPin by remember { mutableStateOf(true) }
-    val pinStore = remember { SecurePinStore(context) }
-    var localPinText by remember { mutableStateOf("") }
-    var localPinSaved by remember { mutableStateOf(pinStore.hasPin()) }
     var fulfilmentBusy by remember { mutableStateOf(false) }
     var fulfilmentNotice by remember { mutableStateOf("") }
     var workerDevices by remember { mutableStateOf<List<BingwaDevice>>(emptyList()) }
@@ -1475,9 +1471,9 @@ private fun UssdAutomationSettingsScreen() {
     var amountKesText by remember { mutableStateOf("") }
     var ussdEntryCode by remember { mutableStateOf("") }
     var menuStepsJson by remember { mutableStateOf("""[
-  {"match_text":"Buy bundle","action":"reply","value":"1"},
-  {"match_text":"Enter recipient phone","action":"reply","value":"{recipient_phone}"},
-  {"match_text":"Enter PIN","action":"manual_pin"}
+  {"match_text":"[EXACT OFFER NAME] [EXACT VALIDITY]","action":"tap_text","value":"[EXACT OFFER NAME] [EXACT VALIDITY]"},
+  {"match_text":"Buy with Airtime","action":"tap_text","value":"Buy with Airtime"},
+  {"match_text":"Enter recipient phone","action":"reply","value":"{recipient_phone}"}
 ]""") }
     var confirmMenuVerified by remember { mutableStateOf(false) }
     var ruleBusy by remember { mutableStateOf(false) }
@@ -1676,59 +1672,26 @@ private fun UssdAutomationSettingsScreen() {
             }
             Switch(checked = fulfilmentPaused, onCheckedChange = { fulfilmentPaused = it })
         }
-        Row(Modifier.fillMaxWidth(), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text("Require manual PIN entry", color = Navy, fontWeight = FontWeight.Bold)
-                Text("When off, the worker uses the encrypted PIN stored only on this Android device.", color = Muted, style = MaterialTheme.typography.bodySmall)
-            }
-            Switch(checked = requireManualPin, onCheckedChange = { requireManualPin = it })
-        }
-        if (!requireManualPin) {
-            OutlinedTextField(
-                value = localPinText,
-                onValueChange = { localPinText = it.filter(Char::isDigit).take(8) },
-                label = { Text("Safaricom USSD PIN (4–8 digits)") },
-                visualTransformation = PasswordVisualTransformation(),
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth()
-            )
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(
-                    onClick = {
-                        try {
-                            pinStore.save(localPinText)
-                            localPinText = ""
-                            localPinSaved = true
-                            fulfilmentNotice = "PIN encrypted and saved on this device only. It was not uploaded."
-                        } catch (error: Exception) {
-                            fulfilmentNotice = error.message ?: "Could not save the local PIN."
-                        }
-                    },
-                    enabled = localPinText.length in 4..8,
-                    modifier = Modifier.weight(1f)
-                ) { Text("Save encrypted PIN") }
-                OutlinedButton(onClick = { pinStore.clear(); localPinSaved = false; localPinText = "" }) {
-                    Text("Clear PIN")
-                }
-            }
-            Text(if (localPinSaved) "An encrypted local PIN is saved on this device." else "No local PIN saved. Automatic PIN mode cannot complete PIN-protected offers yet.", color = Muted, style = MaterialTheme.typography.bodySmall)
-        }
+        InfoCard(
+            "PIN safety",
+            "BingwaPulse never stores, reads or automatically enters the SIM PIN. If a provider unexpectedly requests a PIN, the session pauses for you to handle it on the phone."
+        )
 
         HorizontalDivider(color = Color(0xFF263B70))
         Text("OFFER-TO-USSD MENU RULES", color = Navy, fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.titleMedium)
         InfoCard(
             "Configure the actual provider menu here",
-            "Choose an active offer, enter the exact amount paid by the customer, the provider USSD code, and the screen-by-screen actions. The worker follows only these configured screen matches; it does not guess menu numbers."
+            "Choose the exact Signature offer and validity, enter its saved USSD entry code, then configure the provider screens. The recipe must match the offer name and validity and explicitly choose Buy with Airtime."
         )
         val selectedOffer = fulfilmentOffers.firstOrNull { it.id == selectedOfferId }
         Box {
             OutlinedButton(onClick = { offerMenuExpanded = true }, modifier = Modifier.fillMaxWidth()) {
-                Text(selectedOffer?.let { "${it.name} · ${it.category}" } ?: "Choose an active offer")
+                Text(selectedOffer?.let { "${it.name} · ${it.validityLabel ?: "validity not set"}" } ?: "Choose an active offer")
             }
             DropdownMenu(expanded = offerMenuExpanded, onDismissRequest = { offerMenuExpanded = false }) {
                 fulfilmentOffers.forEach { offer ->
                     DropdownMenuItem(
-                        text = { Text("${offer.name} · ${offer.category}") },
+                        text = { Text("${offer.name} · ${offer.validityLabel ?: "validity not set"}") },
                         onClick = { selectedOfferId = offer.id; offerMenuExpanded = false }
                     )
                 }
@@ -1749,7 +1712,7 @@ private fun UssdAutomationSettingsScreen() {
             modifier = Modifier.fillMaxWidth()
         )
         Text(
-            "Each step uses match_text plus action: reply, tap_text or manual_pin. Use {recipient_phone} for the customer's delivery number. The PIN itself is never saved in this menu script.",
+            "The first offer-selection step must match the exact offer name and validity shown by the provider. A separate step must select Buy with Airtime. Use {recipient_phone} for the delivery number. PINs are never stored or entered by BingwaPulse.",
             color = Muted, style = MaterialTheme.typography.bodySmall
         )
         Row(Modifier.fillMaxWidth(), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
@@ -1767,8 +1730,30 @@ private fun UssdAutomationSettingsScreen() {
                         step?.optString("action") == "reply" && step.optString("value").matches(Regex("^[0-9]{4,8}$"))
                     }
                 } == true
-                if (selected == null || amount == null || amount <= 0L || !ussdEntryCode.matches(Regex("^\\\\*[0-9*]+#$")) || steps == null || steps.length() == 0 || rawPinInScript) {
-                    fulfilmentNotice = if (rawPinInScript) "Do not put the SIM PIN in menu steps. Use the manual_pin action; automatic PINs are stored only in the encrypted local vault." else "Choose an offer and enter a valid amount, USSD code and non-empty JSON menu steps."
+                val exactOfferValidityStep = selected?.validityLabel?.takeIf { it.isNotBlank() }?.let { validity ->
+                    steps?.let { array ->
+                        (0 until array.length()).any { index ->
+                            val match = array.optJSONObject(index)?.optString("match_text").orEmpty()
+                            match.contains(selected.name, ignoreCase = true) && match.contains(validity, ignoreCase = true)
+                        }
+                    } == true
+                } == true
+                val buyWithAirtimeStep = steps?.let { array ->
+                    (0 until array.length()).any { index ->
+                        val step = array.optJSONObject(index)
+                        step?.optString("match_text").orEmpty().contains("Buy with Airtime", ignoreCase = true) &&
+                            step?.optString("action") in setOf("reply", "tap_text")
+                    }
+                } == true
+                if (selected == null || selected.validityLabel.isNullOrBlank() || amount == null || amount <= 0L ||
+                    !ussdEntryCode.matches(Regex("^\\\\*[0-9*]+#$")) || steps == null || steps.length() == 0 ||
+                    rawPinInScript || !exactOfferValidityStep || !buyWithAirtimeStep) {
+                    fulfilmentNotice = when {
+                        rawPinInScript -> "A SIM PIN must never be placed in menu steps."
+                        !exactOfferValidityStep -> "Add a screen step that matches the exact offer name and validity."
+                        !buyWithAirtimeStep -> "Add a separate screen-matched step that selects Buy with Airtime."
+                        else -> "Choose an offer with a validity label and enter a valid amount, USSD code and menu steps."
+                    }
                 } else {
                     ruleBusy = true
                     scope.launch {
