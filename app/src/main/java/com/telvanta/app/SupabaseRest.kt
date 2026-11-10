@@ -611,6 +611,102 @@ class BingwaSupabaseApi {
         request("POST", "/rest/v1/rpc/record_fulfilment_attempt_result", body, session.accessToken)
     }
 
+
+    fun getPlatformWalletSnapshot(
+        session: BingwaSession,
+        businessId: String
+    ): PlatformWalletSnapshot {
+        require(businessId.isNotBlank())
+
+        val planRows = JSONArray(request(
+            "GET",
+            "/rest/v1/platform_subscription_plans?select=code,name,duration_seconds,price_kes,description&is_active=eq.true&order=sort_order.asc",
+            token = session.accessToken
+        ))
+        val plans = buildList {
+            for (i in 0 until planRows.length()) {
+                val row = planRows.getJSONObject(i)
+                add(PlatformSubscriptionPlan(
+                    code = row.getString("code"),
+                    name = row.getString("name"),
+                    durationSeconds = row.optLong("duration_seconds"),
+                    priceKes = row.optInt("price_kes"),
+                    description = row.optString("description")
+                ))
+            }
+        }
+
+        val packageRows = JSONArray(request(
+            "GET",
+            "/rest/v1/platform_token_packages?select=code,tokens,price_kes&is_active=eq.true&order=sort_order.asc",
+            token = session.accessToken
+        ))
+        val packages = buildList {
+            for (i in 0 until packageRows.length()) {
+                val row = packageRows.getJSONObject(i)
+                add(PlatformTokenPackage(
+                    code = row.getString("code"),
+                    tokens = row.optInt("tokens"),
+                    priceKes = row.optInt("price_kes")
+                ))
+            }
+        }
+
+        val subscriptionRows = JSONArray(request(
+            "GET",
+            "/rest/v1/business_platform_subscriptions?select=id,plan_code,status,starts_at,ends_at&business_id=eq.$businessId&order=created_at.desc&limit=30",
+            token = session.accessToken
+        ))
+        val subscriptions = buildList {
+            for (i in 0 until subscriptionRows.length()) {
+                val row = subscriptionRows.getJSONObject(i)
+                add(PlatformSubscriptionRecord(
+                    id = row.getString("id"),
+                    planCode = row.getString("plan_code"),
+                    status = row.optString("status"),
+                    startsAt = row.optString("starts_at"),
+                    endsAt = row.optString("ends_at")
+                ))
+            }
+        }
+
+        val balanceRows = JSONArray(request(
+            "GET",
+            "/rest/v1/platform_wallet_balances?select=token_balance,reserved_tokens&business_id=eq.$businessId&limit=1",
+            token = session.accessToken
+        ))
+        val balance = if (balanceRows.length() == 0) 0L else balanceRows.getJSONObject(0).optLong("token_balance")
+        val reserved = if (balanceRows.length() == 0) 0L else balanceRows.getJSONObject(0).optLong("reserved_tokens")
+
+        val ledgerRows = JSONArray(request(
+            "GET",
+            "/rest/v1/business_platform_token_ledger?select=id,entry_type,tokens_delta,source_type,note,created_at&business_id=eq.$businessId&order=created_at.desc&limit=30",
+            token = session.accessToken
+        ))
+        val ledger = buildList {
+            for (i in 0 until ledgerRows.length()) {
+                val row = ledgerRows.getJSONObject(i)
+                add(PlatformTokenLedgerEntry(
+                    id = row.getString("id"),
+                    entryType = row.optString("entry_type"),
+                    tokensDelta = row.optInt("tokens_delta"),
+                    sourceType = row.optString("source_type"),
+                    note = row.optString("note").takeIf { it.isNotBlank() && it != "null" },
+                    createdAt = row.optString("created_at")
+                ))
+            }
+        }
+
+        return PlatformWalletSnapshot(
+            plans = plans,
+            packages = packages,
+            subscriptions = subscriptions,
+            tokenEntries = ledger,
+            tokenBalance = balance,
+            reservedTokens = reserved
+        )
+    }
+
     private fun parseSession(json: JSONObject, existingBusinessId: String? = null): BingwaSession {
         val user = json.optJSONObject("user") ?: throw IOException("The authentication response did not include a user.")
         val access = json.optString("access_token")
