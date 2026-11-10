@@ -340,6 +340,42 @@ class BingwaSupabaseApi {
         )
     }
 
+    fun getPaymentIngressTill(session: BingwaSession, businessId: String): String? {
+        val rows = JSONArray(request(
+            "GET",
+            "/rest/v1/payment_ingress_channels?select=shortcode&business_id=eq.$businessId&channel_type=eq.till&is_active=eq.true&limit=1",
+            token = session.accessToken
+        ))
+        return if (rows.length() == 0) null else rows.getJSONObject(0).optString("shortcode").takeIf { it.isNotBlank() }
+    }
+
+    fun savePaymentIngressTill(session: BingwaSession, businessId: String, shortcode: String) {
+        val till = shortcode.trim()
+        require(businessId.isNotBlank() && till.matches(Regex("^[0-9]{5,8}$"))) {
+            "Enter the exact 5–8 digit M-PESA Till number."
+        }
+        val existing = JSONArray(request(
+            "GET",
+            "/rest/v1/payment_ingress_channels?select=id,business_id&shortcode=eq.$till&limit=1",
+            token = session.accessToken
+        ))
+        if (existing.length() > 0 && existing.getJSONObject(0).optString("business_id") != businessId) {
+            throw IOException("This Till number is already assigned to another business workspace.")
+        }
+        val body = JSONObject()
+            .put("business_id", businessId)
+            .put("shortcode", till)
+            .put("channel_type", "till")
+            .put("is_active", true)
+        request(
+            "POST",
+            "/rest/v1/payment_ingress_channels?on_conflict=shortcode",
+            body,
+            session.accessToken,
+            "resolution=merge-duplicates,return=minimal"
+        )
+    }
+
     fun listMpesaNotificationCandidates(
         session: BingwaSession,
         businessId: String
