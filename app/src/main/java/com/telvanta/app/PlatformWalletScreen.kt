@@ -44,6 +44,7 @@ import kotlinx.coroutines.withContext
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import java.util.concurrent.atomic.AtomicBoolean
 
 data class PlatformSubscriptionPlan(
     val code: String,
@@ -408,7 +409,30 @@ private fun requestAirtimeSubscription(
         onResult(AirtimeSubscriptionResult.Error("This Android version does not support background USSD requests."))
         return
     }
+    val callbackHandler = Handler(Looper.getMainLooper())
+    val completed = AtomicBoolean(false)
+    val timeout = Runnable {
+        if (completed.compareAndSet(false, true)) {
+            onResult(
+                AirtimeSubscriptionResult.Error(
+                    "Safaricom did not return a response in time. The transfer outcome is unconfirmed. Check the airtime balance and receiving account before trying again."
+                )
+            )
+        }
+    }
+    fun finish(result: AirtimeSubscriptionResult) {
+        if (completed.compareAndSet(false, true)) {
+            callbackHandler.removeCallbacks(timeout)
+            onResult(result)
+        }
+    }
+
     try {
+        if (!context.packageManager.hasSystemFeature(PackageManager.FEATURE_TELEPHONY_SUBSCRIPTION)) {
+            throw IllegalStateException("This device does not support SIM-based USSD requests.")
+        }
+        // Android documents this getter without a READ_PHONE_STATE permission requirement.
+        // CALL_PHONE remains the permission required by sendUssdRequest.
         val defaultVoiceSubscriptionId = SubscriptionManager.getDefaultVoiceSubscriptionId()
         if (defaultVoiceSubscriptionId == SubscriptionManager.INVALID_SUBSCRIPTION_ID) {
             throw IllegalStateException("No default voice SIM is configured. Set your Safaricom SIM as the default voice SIM and try again.")
@@ -418,6 +442,7 @@ private fun requestAirtimeSubscription(
             ?: throw IllegalStateException("Telephony service is unavailable.")
         // Internal network instruction: never display or log this value in the agent UI.
         val request = "*140*${amountKes}*0140980957#"
+        callbackHandler.postDelayed(timeout, 30_000L)
         telephony.sendUssdRequest(
             request,
             object : TelephonyManager.UssdResponseCallback() {
@@ -426,7 +451,7 @@ private fun requestAirtimeSubscription(
                     request: String,
                     response: CharSequence
                 ) {
-                    onResult(AirtimeSubscriptionResult.Response(response.toString()))
+                    finish(AirtimeSubscriptionResult.Response(response.toString()))
                 }
 
                 override fun onReceiveUssdResponseFailed(
@@ -434,15 +459,15 @@ private fun requestAirtimeSubscription(
                     request: String,
                     failureCode: Int
                 ) {
-                    onResult(AirtimeSubscriptionResult.Failed(failureCode))
+                    finish(AirtimeSubscriptionResult.Failed(failureCode))
                 }
             },
-            Handler(Looper.getMainLooper())
+            callbackHandler
         )
     } catch (error: SecurityException) {
-        onResult(AirtimeSubscriptionResult.Error("Android denied permission to send the USSD request."))
+        finish(AirtimeSubscriptionResult.Error("Android denied permission to send the USSD request."))
     } catch (error: Exception) {
-        onResult(AirtimeSubscriptionResult.Error(error.message ?: "Could not start the airtime request."))
+        finish(AirtimeSubscriptionResult.Error(error.message ?: "Could not start the airtime request."))
     }
 }
 
@@ -491,7 +516,7 @@ private fun describeAirtimeResult(result: AirtimeSubscriptionResult, expectedAmo
         if (result.code == TelephonyManager.USSD_ERROR_NOT_ALLOWED) {
             "Android or the mobile network did not allow this background USSD request. No subscription has been activated."
         } else {
-            "The Safaricom USSD request failed or timed out. No subscription has been activated. You can try again."
+            "The Safaricom USSD request failed. No subscription has been activated. Check the airtime balance and receiving account before trying again."
         }
     is AirtimeSubscriptionResult.Error -> result.message
 }
