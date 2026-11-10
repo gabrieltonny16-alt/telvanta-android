@@ -1552,6 +1552,7 @@ private fun UssdAutomationSettingsScreen() {
                     fulfilmentOrders = withContext(Dispatchers.IO) { api.listFulfilmentOrders(active, businessId) }
                     if (selectedWorkerDevice.isBlank()) selectedWorkerDevice = workerDevices.firstOrNull()?.id.orEmpty()
                     if (selectedOfferId.isBlank()) selectedOfferId = fulfilmentOffers.firstOrNull()?.id.orEmpty()
+                    if (ussdEntryCode.isBlank()) ussdEntryCode = fulfilmentOffers.firstOrNull()?.entryCode.orEmpty()
                 }
             } catch (error: Exception) {
                 fulfilmentNotice = error.message ?: "Could not load fulfilment controls."
@@ -1722,7 +1723,7 @@ private fun UssdAutomationSettingsScreen() {
                 fulfilmentOffers.forEach { offer ->
                     DropdownMenuItem(
                         text = { Text("${offer.name} · ${offer.validityLabel ?: "validity not set"}") },
-                        onClick = { selectedOfferId = offer.id; offerMenuExpanded = false }
+                        onClick = { selectedOfferId = offer.id; ussdEntryCode = offer.entryCode.orEmpty(); offerMenuExpanded = false }
                     )
                 }
             }
