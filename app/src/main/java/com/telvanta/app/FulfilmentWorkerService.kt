@@ -115,7 +115,7 @@ class FulfilmentWorkerService : Service() {
                     api.heartbeatWorkerDevice(session, businessId, deviceId)
                 }
                 if (jobVault.load() != null) {
-                    finishUnknown(api, session, businessId, deviceId, job, "USSD_TIMEOUT", "No definitive carrier result arrived before timeout.")
+                    finishUnknown(api, session, businessId, deviceId, job, "USSD_TIMEOUT", "No definitive carrier result arrived before timeout.", dismissUssd = true)
                 }
             } catch (error: Exception) {
                 updateNotification("Worker paused: ${error.message ?: "connection error"}")
@@ -131,7 +131,8 @@ class FulfilmentWorkerService : Service() {
         deviceId: String,
         job: JSONObject,
         code: String,
-        detail: String
+        detail: String,
+        dismissUssd: Boolean = false
     ) {
         runCatching {
             api.recordFulfilmentAttemptResult(
@@ -145,6 +146,9 @@ class FulfilmentWorkerService : Service() {
             .remove(UssdAccessibilityService.KEY_ACTIVE_STEP)
             .remove(UssdAccessibilityService.KEY_JOB_STARTED_AT)
             .apply()
+        if (dismissUssd) {
+            sendBroadcast(Intent(UssdAccessibilityService.ACTION_DISMISS_USSD).setPackage(packageName))
+        }
         updateNotification("Order needs reconciliation; automatic retry is disabled")
     }
 
