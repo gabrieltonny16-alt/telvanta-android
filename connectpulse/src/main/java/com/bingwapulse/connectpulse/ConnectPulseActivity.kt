@@ -1,6 +1,8 @@
 package com.bingwapulse.connectpulse
 
 import android.os.Bundle
+import android.content.Intent
+import android.provider.Settings
 import android.content.Context
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -248,6 +250,28 @@ private fun ConnectPulseHome() {
             if (message.isNotBlank()) {
                 Card(colors = CardDefaults.cardColors(containerColor = PanelBright), shape = RoundedCornerShape(16.dp)) {
                     Text(message, color = Cyan, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(15.dp))
+                }
+            }
+
+            Card(colors = CardDefaults.cardColors(containerColor = Panel), shape = RoundedCornerShape(22.dp)) {
+                Column(Modifier.padding(17.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("RECEIVER CONFIRMATION", color = Cyan, fontWeight = FontWeight.ExtraBold, fontSize = 11.sp, letterSpacing = 1.4.sp)
+                    Text("Allow ConnectPulse to detect the Safaricom confirmation notification on this receiving phone.", color = White, fontWeight = FontWeight.Bold)
+                    Text("This uses Android Notification Access. ConnectPulse does not become your default SMS app and does not read or delete SMS inbox messages. Keep Messages notifications enabled so Android can deliver the confirmation preview.", color = Muted, fontSize = 12.sp)
+                    Button(
+                        onClick = {
+                            runCatching {
+                                context.startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
+                            }.onFailure {
+                                message = "Open Android Settings and search for Notification Access."
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth().height(50.dp),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = ElectricBlue, contentColor = Color.White)
+                    ) {
+                        Text("OPEN NOTIFICATION ACCESS SETTINGS", fontWeight = FontWeight.ExtraBold, fontSize = 11.sp)
+                    }
                 }
             }
 
