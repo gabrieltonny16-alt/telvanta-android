@@ -60,15 +60,22 @@ Deno.serve(async (request) => {
   }
 
   const shortcode = String(payload.BusinessShortCode ?? "").trim();
-  const transactionType = String(payload.TransactionType ?? "").trim().toLowerCase();
+  const transactionType = String(payload.TransactionType ?? "").trim().toLowerCase().replace(/[^a-z]/g, "");
   const receipt = String(payload.TransID ?? "").trim().toUpperCase();
   const amountKes = Number(payload.TransAmount);
   const amountMinor = Math.round(amountKes * 100);
-  const msisdn = String(payload.MSISDN ?? "").replace(/[^0-9]/g, "");
+  const rawMsisdn = String(payload.MSISDN ?? "").trim().slice(0, 80);
+  const normalizedMsisdn = rawMsisdn.replace(/[^0-9]/g, "");
+  const payerPhone = /^254[17][0-9]{8}$/.test(normalizedMsisdn) ? normalizedMsisdn : null;
   const occurredAt = parseSafaricomTimestamp(payload.TransTime);
+  const isBuyGoods = transactionType.includes("buygoods") ||
+    transactionType.includes("customermerchantpayment") ||
+    transactionType.includes("customerbuygoodsonline");
 
-  if (!shortcode || !transactionType.includes("buy goods") || !Number.isFinite(amountKes) ||
-      amountKes <= 0 || !Number.isSafeInteger(amountMinor) || !/^254[17][0-9]{8}$/.test(msisdn)) {
+  // Safaricom C2B v1 may hash MSISDN and C2B v2 may mask it. Preserve that
+  // source value, but only treat a complete Kenyan MSISDN as a usable phone.
+  if (!shortcode || !isBuyGoods || !Number.isFinite(amountKes) ||
+      amountKes <= 0 || !Number.isSafeInteger(amountMinor) || !rawMsisdn) {
     return json({ ResultCode: 1, ResultDesc: "Invalid Buy Goods payment details" }, 400);
   }
 
@@ -116,7 +123,7 @@ Deno.serve(async (request) => {
   if (existing) {
     const conflict = Number(existing.amount_minor) !== amountMinor ||
       existing.shortcode !== shortcode ||
-      (existing.payer_phone && existing.payer_phone !== msisdn);
+      (existing.payer_phone && payerPhone && existing.payer_phone !== payerPhone);
     if (conflict) {
       await supabase.from("payment_ingress_events")
         .update({ verification_status: "ambiguous" })
@@ -130,8 +137,8 @@ Deno.serve(async (request) => {
       .update({
         provider: "safaricom_c2b",
         source_kind: "daraja_callback",
-        payer_phone: msisdn,
-        raw_msisdn: msisdn,
+        payer_phone: payerPhone ?? existing.payer_phone,
+        raw_msisdn: rawMsisdn,
         occurred_at: occurredAt,
         payload_sha256: payloadHash,
         verification_status: "verified",
@@ -148,8 +155,8 @@ Deno.serve(async (request) => {
     transaction_ref: receipt,
     amount_minor: amountMinor,
     shortcode,
-    payer_phone: msisdn,
-    raw_msisdn: msisdn,
+    payer_phone: payerPhone,
+    raw_msisdn: rawMsisdn,
     occurred_at: occurredAt,
     source_kind: "daraja_callback",
     payload_sha256: payloadHash,
@@ -165,7 +172,7 @@ Deno.serve(async (request) => {
       .eq("transaction_ref", receipt)
       .maybeSingle();
     if (duplicate && Number(duplicate.amount_minor) === amountMinor &&
-        duplicate.shortcode === shortcode && duplicate.payer_phone === msisdn) {
+        duplicate.shortcode === shortcode && (!payerPhone || duplicate.payer_phone === payerPhone)) {
       return json({ ResultCode: 0, ResultDesc: "Accepted" });
     }
     return json({ error: "Could not store verified payment event" }, 500);
