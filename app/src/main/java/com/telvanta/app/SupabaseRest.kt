@@ -612,6 +612,60 @@ class BingwaSupabaseApi {
     }
 
 
+    fun createSambazaSubscriptionIntent(
+        session: BingwaSession,
+        businessId: String,
+        planCode: String
+    ): String {
+        require(businessId.isNotBlank() && planCode.isNotBlank())
+        val response = JSONObject(request(
+            "POST",
+            "/functions/v1/sambaza-subscriptions",
+            JSONObject()
+                .put("action", "create-intent")
+                .put("business_id", businessId)
+                .put("plan_code", planCode),
+            token = session.accessToken
+        ))
+        return response.getString("attempt_id")
+    }
+
+    fun recordSambazaSenderResponse(
+        session: BingwaSession,
+        businessId: String,
+        attemptId: String,
+        responseText: String
+    ) {
+        require(businessId.isNotBlank() && attemptId.isNotBlank() && responseText.isNotBlank())
+        request(
+            "POST",
+            "/functions/v1/sambaza-subscriptions",
+            JSONObject()
+                .put("action", "sender-result")
+                .put("business_id", businessId)
+                .put("attempt_id", attemptId)
+                .put("response", responseText.take(1200)),
+            token = session.accessToken
+        )
+    }
+
+    fun cancelSambazaSubscriptionIntent(
+        session: BingwaSession,
+        businessId: String,
+        attemptId: String
+    ) {
+        require(businessId.isNotBlank() && attemptId.isNotBlank())
+        request(
+            "POST",
+            "/functions/v1/sambaza-subscriptions",
+            JSONObject()
+                .put("action", "cancel-intent")
+                .put("business_id", businessId)
+                .put("attempt_id", attemptId),
+            token = session.accessToken
+        )
+    }
+
     fun getPlatformWalletSnapshot(
         session: BingwaSession,
         businessId: String
