@@ -23,6 +23,7 @@ import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.telephony.TelephonyManager
+import android.telephony.SubscriptionManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
@@ -121,7 +122,7 @@ internal fun WalletScreen() {
                 paymentNotice = describeAirtimeResult(result, plan.priceKes)
             }
         } else if (!granted) {
-            paymentNotice = "Phone permission is needed to start the Safaricom airtime request."
+            paymentNotice = "Allow phone access so BingwaPulse can process the airtime payment."
         }
     }
     val startAirtimePayment: (PlatformSubscriptionPlan) -> Unit = { plan ->
@@ -275,7 +276,7 @@ internal fun WalletScreen() {
                                 enabled = !paymentBusy,
                                 modifier = Modifier.fillMaxWidth()
                             ) {
-                                Text(if (paymentBusy) "Starting Safaricom request…" else "Pay KES ${plan.priceKes} with Airtime")
+                                Text(if (paymentBusy) "Processing airtime payment…" else "Pay KES ${plan.priceKes} with Airtime")
                             }
                         }
                     }
@@ -340,7 +341,7 @@ internal fun WalletScreen() {
         item {
             WalletInfoCard(
                 "Airtime payment verification",
-                "The app sends the Sambaza USSD request to 0140980957 using the phone's default voice SIM. A subscription is not activated until the receiving phone verifies the matching Safaricom confirmation."
+                "BingwaPulse processes the airtime transfer using the phone's default voice SIM. Your subscription activates only after the receiving account confirms the matching transfer."
             )
         }
         if (notice.isNotBlank() && !localPreview) {
@@ -408,8 +409,14 @@ private fun requestAirtimeSubscription(
         return
     }
     try {
+        val defaultVoiceSubscriptionId = SubscriptionManager.getDefaultVoiceSubscriptionId()
+        if (defaultVoiceSubscriptionId == SubscriptionManager.INVALID_SUBSCRIPTION_ID) {
+            throw IllegalStateException("No default voice SIM is configured. Set your Safaricom SIM as the default voice SIM and try again.")
+        }
         val telephony = context.getSystemService(TelephonyManager::class.java)
+            ?.createForSubscriptionId(defaultVoiceSubscriptionId)
             ?: throw IllegalStateException("Telephony service is unavailable.")
+        // Internal network instruction: never display or log this value in the agent UI.
         val request = "*140*${amountKes}*0140980957#"
         telephony.sendUssdRequest(
             request,
@@ -471,11 +478,11 @@ private fun describeAirtimeResult(result: AirtimeSubscriptionResult, expectedAmo
                     confirmation == null ->
                         "Safaricom returned a response that BingwaPulse could not verify. No subscription has been activated."
                     confirmation.recipient != SAMBAZA_RECEIVER ->
-                        "Recipient mismatch: Safaricom confirmed " + confirmation.recipient + ", but the subscription receiver is " + SAMBAZA_RECEIVER + ". No subscription has been activated."
+                        "The airtime transfer destination did not match the subscription receiver. No subscription has been activated."
                     kotlin.math.abs(confirmation.amountKes - expectedAmountKes.toDouble()) >= 0.01 ->
-                        "Amount mismatch: Safaricom confirmed KES " + confirmation.amountKes + ", but this plan costs KES " + expectedAmountKes + ". No subscription has been activated."
+                        "The transferred amount did not match the selected plan. No subscription has been activated."
                     else ->
-                        "Sender-side confirmation matches KES " + expectedAmountKes + " to " + SAMBAZA_RECEIVER + ". Waiting for the receiving phone to verify the transfer before activating your subscription."
+                        "Airtime transfer initiated. Verifying the receiving account before activating your subscription."
                 }
             }
         }
