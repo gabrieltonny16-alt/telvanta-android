@@ -1192,7 +1192,7 @@ private fun PaymentInboxScreen() {
     Text("M-PESA Payment Inbox", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.ExtraBold, color = Navy)
     InfoCard(
         "Payment evidence and order staging",
-        "BingwaPulse reads M-PESA notifications and stages exact offer matches for review. Before verifying, compare the receipt and amount with the actual Till transaction record. Notification text alone is not payment verification."
+        "Trusted Safaricom C2B callbacks can verify Till receipts and match them to a pending SiteLink order once the Till and callback URLs are configured. Phone notifications remain supporting evidence only; notification text alone never verifies payment."
     )
     if (store.isLocalWorkspace()) {
         InfoCard("Account connection required", "Payment review is unavailable in local preview mode. Sign in and connect a business workspace to load its candidates.")
