@@ -107,8 +107,31 @@ object ConnectPulseApi {
         return post(body).optString("status", "unknown")
     }
 
-    private fun post(body: JSONObject): JSONObject {
-        val connection = (URL(ENDPOINT).openConnection() as HttpURLConnection).apply {
+    fun reportSambazaReceiverNotification(
+        credentials: ConnectPulseCredentials,
+        sourcePackage: String,
+        title: String,
+        text: String,
+        postedAtEpochMillis: Long
+    ): JSONObject {
+        val body = JSONObject()
+            .put("action", "receiver-confirmation")
+            .put("device_id", credentials.deviceId)
+            .put("credential", credentials.credential)
+            .put("source_package", sourcePackage.take(160))
+            .put("notification_title", title.take(120))
+            .put("notification_text", text.take(1200))
+            .put("posted_at", java.time.Instant.ofEpochMilli(postedAtEpochMillis).toString())
+        return postTo(
+            "https://tuuhucisljlaaovtnbeu.supabase.co/functions/v1/sambaza-subscriptions",
+            body
+        )
+    }
+
+    private fun post(body: JSONObject): JSONObject = postTo(ENDPOINT, body)
+
+    private fun postTo(endpoint: String, body: JSONObject): JSONObject {
+        val connection = (URL(endpoint).openConnection() as HttpURLConnection).apply {
             requestMethod = "POST"
             connectTimeout = 15_000
             readTimeout = 20_000
