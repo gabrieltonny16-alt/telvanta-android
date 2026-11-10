@@ -271,11 +271,11 @@ internal fun WalletScreen() {
                             }
                             Text(plan.description, color = WalletMuted, style = MaterialTheme.typography.bodySmall)
                             Button(
-                                onClick = { paymentNotice = "Airtime checkout is not enabled yet. The receiving-phone verification must be connected before agents can safely send airtime." },
-                                enabled = false,
+                                onClick = { startAirtimePayment(plan) },
+                                enabled = !paymentBusy,
                                 modifier = Modifier.fillMaxWidth()
                             ) {
-                                Text("Airtime checkout setup")
+                                Text(if (paymentBusy) "Starting Safaricom request…" else "Pay KES ${plan.priceKes} with Airtime")
                             }
                         }
                     }
