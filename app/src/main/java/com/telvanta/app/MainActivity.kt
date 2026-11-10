@@ -22,6 +22,8 @@ import androidx.activity.compose.setContent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
@@ -1981,146 +1983,159 @@ private fun BingwaDashboard(db: LocalDatabase, onNavigate: (String) -> Unit) {
     val transactions = remember(refreshKey) { db.transactions() }
     val customers = remember(refreshKey) { db.count("customers") }
     val offers = remember(refreshKey) { db.count("offers") }
-    val pending = orders.count { it.status == "PENDING" || it.status == "PAYMENT_UNVERIFIED" }
-    val failed = orders.count { it.status == "FAILED" }
-    val successful = orders.count { it.status == "DELIVERED_MANUALLY_RECORDED" }
-    val processing = orders.count { it.status in setOf("QUEUED", "CLAIMED", "USSD_SENT", "PROCESSING") }
+    val delivered = orders.filter { it.status == "DELIVERED_MANUALLY_RECORDED" }
+    val failed = orders.count { it.status == "FAILED" || it.status == "CANCELLED" }
+    val pending = orders.count { it.status in setOf("PENDING", "PAYMENT_UNVERIFIED", "QUEUED", "CLAIMED", "USSD_SENT", "PROCESSING") }
+    val completed = delivered.size + failed
+    val successRate = if (completed > 0) delivered.size * 100 / completed else null
     val hour = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
     val greeting = if (hour < 12) "Good Morning" else if (hour < 17) "Good Afternoon" else "Good Evening"
     val date = SimpleDateFormat("EEEE, MMMM d", Locale.getDefault()).format(Date())
-    val recentTransactions = transactions.take(4)
-
-    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(26.dp),
-            colors = CardDefaults.cardColors(containerColor = Color(0xFF151E37))
-        ) {
-            Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(13.dp)) {
-                Text("$greeting, GABRIEL", color = Color.White, fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.headlineSmall)
-                Text(date, color = Muted, style = MaterialTheme.typography.bodyLarge)
-                Spacer(Modifier.height(2.dp))
-                Text("Subscription", color = Muted, style = MaterialTheme.typography.bodyLarge)
-                Text("Tokens: —", color = Cyan, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleLarge)
-                Text("Token balance is not connected to a subscription service yet.", color = Muted, style = MaterialTheme.typography.labelSmall)
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    DashboardMetric("Successful", successful, Color(0xFF36BFEF), Modifier.weight(1f))
-                    DashboardMetric("Failed", failed, Color(0xFFFF6B6B), Modifier.weight(1f))
-                    DashboardMetric("Pending", pending, Color(0xFFFFA726), Modifier.weight(1f))
+    val calendar = java.util.Calendar.getInstance()
+    val startToday = (calendar.clone() as java.util.Calendar).apply { set(java.util.Calendar.HOUR_OF_DAY, 0); set(java.util.Calendar.MINUTE, 0); set(java.util.Calendar.SECOND, 0); set(java.util.Calendar.MILLISECOND, 0) }.timeInMillis
+    val startWeek = startToday - 6L * 86400000L
+    val todayUsage = delivered.filter { it.createdAt >= startToday }.sumOf { it.price }
+    val weekUsage = delivered.filter { it.createdAt >= startWeek }.sumOf { it.price }
+    val dailyUsage = (0..6).map { day ->
+        val from = startWeek + day * 86400000L
+        delivered.filter { it.createdAt >= from && it.createdAt < from + 86400000L }.sumOf { it.price }
+    }
+    val recent = transactions.take(4)
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(26.dp), colors = CardDefaults.cardColors(containerColor = Color(0xFF102319))) {
+            Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(greeting + ", GABRIEL", color = Color.White, fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.headlineSmall)
+                Text(date, color = Color(0xFFA7B8AC), style = MaterialTheme.typography.bodyLarge)
+                Text("Subscription", color = Color(0xFFA7B8AC))
+                Text("Tokens: —", color = Color(0xFF19D66A), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleLarge)
+                Text("Subscription token balance is not yet connected.", color = Color(0xFFA7B8AC), style = MaterialTheme.typography.labelSmall)
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                    DashboardMetric("Successful", delivered.size, Color(0xFF39A653), Modifier.weight(1f))
+                    DashboardMetric("Failed", failed, Color(0xFFE44848), Modifier.weight(1f))
+                    DashboardMetric("Pending", pending, Color(0xFFFF9418), Modifier.weight(1f))
                 }
-                Text("This week's commission: KES —", color = Color.White, style = MaterialTheme.typography.bodyLarge)
-                Text("Commission tracking is not available in the current local database.", color = Muted, style = MaterialTheme.typography.labelSmall)
+                Text("This week commission: —", color = Color.White, style = MaterialTheme.typography.bodyLarge)
+                Text("Commission tracking is not connected to verified commission records.", color = Color(0xFFA7B8AC), style = MaterialTheme.typography.labelSmall)
             }
         }
-
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(24.dp),
-            colors = CardDefaults.cardColors(containerColor = Color(0xFF151E37))
-        ) {
-            Row(
-                Modifier.fillMaxWidth().padding(18.dp),
-                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(14.dp)
-            ) {
-                Surface(color = Color(0xFF1B2D5C), shape = RoundedCornerShape(50)) {
-                    Text("▣", color = Cyan, modifier = Modifier.padding(14.dp), style = MaterialTheme.typography.headlineSmall)
-                }
+        Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(24.dp), colors = CardDefaults.cardColors(containerColor = Color(0xFF102319))) {
+            Row(Modifier.fillMaxWidth().padding(18.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                Surface(color = Color(0xFF17452B), shape = RoundedCornerShape(50)) { Text("▣", color = Color(0xFF19D66A), modifier = Modifier.padding(14.dp), style = MaterialTheme.typography.headlineSmall) }
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text("Airtime Balance", color = Muted, style = MaterialTheme.typography.bodyLarge)
-                    Text("Ksh —", color = Color.White, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.headlineSmall)
-                    Text("Airtime used today: KES —", color = Muted, style = MaterialTheme.typography.bodyMedium)
-                    Text("Provider airtime balance is not connected.", color = Muted, style = MaterialTheme.typography.labelSmall)
+                    Text("Airtime Balance", color = Color(0xFFA7B8AC))
+                    Text("KES —", color = Color.White, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.headlineSmall)
+                    Text("Airtime used today: KES " + money(todayUsage), color = Color(0xFFA7B8AC))
+                    Text("Live provider airtime balance is not connected.", color = Color(0xFFA7B8AC), style = MaterialTheme.typography.labelSmall)
                 }
-                IconButton(onClick = { refreshKey++ }) {
-                    Text("↻", color = Cyan, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.headlineLarge)
-                }
+                IconButton(onClick = { refreshKey++ }) { Text("↻", color = Color(0xFF19D66A), style = MaterialTheme.typography.headlineLarge) }
             }
         }
-
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            listOf("Overview", "Transactions", "Analytics").forEach { item ->
-                val active = tab == item
-                TextButton(onClick = { tab = item }, modifier = Modifier.weight(1f)) {
+            listOf("Overview", "Transactions", "Analytics").forEach { label ->
+                TextButton(onClick = { tab = label }, modifier = Modifier.weight(1f)) {
                     Column(horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally) {
-                        Text(item, color = if (active) Cyan else Muted, fontWeight = if (active) FontWeight.Bold else FontWeight.Normal, maxLines = 1, style = MaterialTheme.typography.labelLarge)
-                        if (active) HorizontalDivider(color = Cyan, thickness = 2.dp)
+                        Text(label, color = if (tab == label) Color(0xFF19D66A) else Color(0xFFA7B8AC), fontWeight = if (tab == label) FontWeight.Bold else FontWeight.Normal, maxLines = 1)
+                        if (tab == label) HorizontalDivider(color = Color(0xFF19D66A), thickness = 2.dp)
                     }
                 }
             }
         }
-
         when (tab) {
             "Transactions" -> TransactionsScreen(db) { }
-            "Analytics" -> StatisticsScreen(db)
+            "Analytics" -> {
+                Text("Your performance", color = Color.White, fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.titleLarge)
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    DashboardInsightCard("KES " + money(todayUsage), "Airtime used today", Color(0xFF2878D0), Modifier.weight(1f))
+                    DashboardInsightCard("—", "Today commission", Color(0xFF39A653), Modifier.weight(1f))
+                }
+                DashboardInsightCard(successRate?.let { it.toString() + "%" } ?: "—", "Success rate", Color(0xFF0B8790), Modifier.fillMaxWidth())
+                Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = Color(0xFF102319)), shape = RoundedCornerShape(22.dp)) {
+                    Column(Modifier.padding(17.dp), verticalArrangement = Arrangement.spacedBy(13.dp)) {
+                        Text("Transaction performance", color = Color.White, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleLarge)
+                        DashboardStatusRow("Successful", delivered.size, Color(0xFF39A653), orders.size)
+                        DashboardStatusRow("Failed", failed, Color(0xFFE44848), orders.size)
+                        DashboardStatusRow("Pending", pending, Color(0xFFFF9418), orders.size)
+                    }
+                }
+                Text("Airtime used in the last 7 days: KES " + money(weekUsage), color = Color(0xFFA7B8AC))
+            }
             else -> {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(22.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFF151E37))
-                ) {
+                Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(22.dp), colors = CardDefaults.cardColors(containerColor = Color(0xFF102319))) {
                     Column(Modifier.padding(17.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         Text("Airtime used per day", color = Color.White, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleLarge)
-                        Text("Today and last 7 days", color = Muted, style = MaterialTheme.typography.bodyMedium)
-                        Text("No verified airtime-usage records are available yet.", color = Muted, style = MaterialTheme.typography.bodyMedium)
+                        Text("Today KES " + money(todayUsage) + "  •  Last 7 days KES " + money(weekUsage), color = Color(0xFFA7B8AC))
+                        DashboardUsageChart(dailyUsage)
+                        Text("Calculated from locally recorded delivered orders.", color = Color(0xFFA7B8AC), style = MaterialTheme.typography.labelSmall)
                     }
                 }
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(22.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFF151E37))
-                ) {
-                    Column(Modifier.padding(17.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Text("This week's commission", color = Color.White, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleLarge)
-                        Text("KES —", color = Cyan, fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.headlineMedium)
-                        Text("Commission records are not available yet.", color = Muted, style = MaterialTheme.typography.bodyMedium)
+                Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(22.dp), colors = CardDefaults.cardColors(containerColor = Color(0xFF102319))) {
+                    Column(Modifier.fillMaxWidth().height(155.dp).padding(17.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Text("This week commission", color = Color.White, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleLarge)
+                        Box(Modifier.fillMaxSize(), contentAlignment = androidx.compose.ui.Alignment.Center) { Text("No verified commission records available yet", color = Color(0xFFA7B8AC)) }
                     }
                 }
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(22.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFF151E37))
-                ) {
-                    Column(Modifier.padding(17.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("Worker status", color = Color.White, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleLarge)
-                        Text("Processing · $processing", color = if (processing > 0) Cyan else Muted, fontWeight = FontWeight.SemiBold)
-                        Text("Automated delivery worker and pause/stop controls are not implemented in this build. No bundle purchases are triggered here.", color = Muted, style = MaterialTheme.typography.bodySmall)
-                    }
-                }
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(22.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFF151E37))
-                ) {
-                    Column(Modifier.padding(17.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = Color(0xFF102319)), shape = RoundedCornerShape(22.dp)) {
+                    Column(Modifier.padding(17.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
                         Text("Business snapshot", color = Color.White, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleLarge)
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            DashboardMetric("Orders", orders.size, Cyan, Modifier.weight(1f))
-                            DashboardMetric("Customers", customers, Color(0xFF41D9FF), Modifier.weight(1f))
-                            DashboardMetric("Offers", offers, Color(0xFF8CCBFF), Modifier.weight(1f))
+                            DashboardMetric("Orders", orders.size, Color(0xFF19D66A), Modifier.weight(1f))
+                            DashboardMetric("Customers", customers, Color(0xFF19D66A), Modifier.weight(1f))
+                            DashboardMetric("Offers", offers, Color(0xFF19D66A), Modifier.weight(1f))
                         }
-                        TextButton(onClick = { onNavigate("Orders") }) { Text("View orders") }
+                        TextButton(onClick = { onNavigate("Orders") }) { Text("View orders", color = Color(0xFF19D66A)) }
                     }
                 }
-                if (recentTransactions.isNotEmpty()) {
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(22.dp),
-                        colors = CardDefaults.cardColors(containerColor = Color(0xFF151E37))
-                    ) {
-                        Column(Modifier.padding(17.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Text("Recent transactions", color = Color.White, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleLarge)
-                            recentTransactions.forEach { tx ->
-                                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                    Text(tx.reference.ifBlank { "Order #${tx.orderId}" }, color = Color.White, modifier = Modifier.weight(1f))
-                                    Text("KES ${money(tx.amount)}", color = Cyan, fontWeight = FontWeight.SemiBold)
-                                }
-                                Text("${tx.status} · ${dateText(tx.createdAt)}", color = Muted, style = MaterialTheme.typography.labelSmall)
+                if (recent.isNotEmpty()) Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = Color(0xFF102319)), shape = RoundedCornerShape(22.dp)) {
+                    Column(Modifier.padding(17.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("Recent transactions", color = Color.White, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleLarge)
+                        recent.forEach { tx ->
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                Text(tx.reference.ifBlank { "Order #" + tx.orderId }, color = Color.White, modifier = Modifier.weight(1f))
+                                Text("KES " + money(tx.amount), color = Color(0xFF19D66A), fontWeight = FontWeight.SemiBold)
                             }
+                            Text(tx.status + " · " + dateText(tx.createdAt), color = Color(0xFFA7B8AC), style = MaterialTheme.typography.labelSmall)
                         }
                     }
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun DashboardInsightCard(value: String, label: String, accent: Color, modifier: Modifier = Modifier) {
+    Card(modifier = modifier, colors = CardDefaults.cardColors(containerColor = Color(0xFF102319)), shape = RoundedCornerShape(20.dp)) {
+        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(value, color = accent, fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.headlineSmall)
+            Text(label, color = Color(0xFFA7B8AC), style = MaterialTheme.typography.bodySmall)
+        }
+    }
+}
+
+@Composable
+private fun DashboardStatusRow(label: String, count: Int, accent: Color, total: Int) {
+    val fraction = if (total > 0) count.toFloat() / total.toFloat() else 0f
+    Row(Modifier.fillMaxWidth(), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        Text(label, color = Color.White, modifier = Modifier.width(100.dp))
+        Box(Modifier.weight(1f).height(9.dp).clip(RoundedCornerShape(20.dp)).background(Color(0xFF203529))) {
+            Box(Modifier.fillMaxWidth(fraction.coerceIn(0f, 1f)).fillMaxHeight().background(accent, RoundedCornerShape(20.dp)))
+        }
+        Text(count.toString(), color = accent, fontWeight = FontWeight.Bold)
+    }
+}
+
+@Composable
+private fun DashboardUsageChart(values: List<Double>) {
+    val labels = listOf("6d", "5d", "4d", "3d", "2d", "1d", "Today")
+    val maxValue = (values.maxOrNull() ?: 0.0).coerceAtLeast(1.0)
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        androidx.compose.foundation.Canvas(Modifier.fillMaxWidth().height(165.dp)) {
+            val left = 18.dp.toPx(); val right = size.width - 10.dp.toPx(); val top = 12.dp.toPx(); val bottom = size.height - 18.dp.toPx()
+            for (i in 0..3) { val y = top + (bottom - top) * i / 3f; drawLine(Color(0xFF33463A), androidx.compose.ui.geometry.Offset(left, y), androidx.compose.ui.geometry.Offset(right, y), strokeWidth = 1.dp.toPx()) }
+            val points = values.mapIndexed { index, value -> androidx.compose.ui.geometry.Offset(left + (right - left) * index / (values.size - 1).coerceAtLeast(1), bottom - (value.toFloat() / maxValue.toFloat()) * (bottom - top)) }
+            for (i in 0 until points.lastIndex) drawLine(Color(0xFF2878D0), points[i], points[i + 1], strokeWidth = 3.dp.toPx(), cap = androidx.compose.ui.graphics.StrokeCap.Round)
+            points.forEach { drawCircle(Color(0xFF2878D0), 4.dp.toPx(), it) }
+        }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { labels.forEach { Text(it, color = Color(0xFFA7B8AC), style = MaterialTheme.typography.labelSmall) } }
     }
 }
