@@ -116,7 +116,8 @@ data class FulfilmentOffer(
     val name: String,
     val category: String,
     val providerId: String,
-    val isActive: Boolean
+    val isActive: Boolean,
+    val validityLabel: String?
 )
 
 data class FulfilmentOrderSummary(
@@ -450,7 +451,7 @@ class BingwaSupabaseApi {
 
 
     fun listFulfilmentOffers(session: BingwaSession, businessId: String): List<FulfilmentOffer> {
-        val query = "/rest/v1/offers?select=id,name,category,provider_id,is_active&business_id=eq.$businessId&is_active=eq.true&order=name.asc"
+        val query = "/rest/v1/offers?select=id,name,category,provider_id,is_active,validity_label&business_id=eq.$businessId&is_active=eq.true&order=name.asc"
         val rows = JSONArray(request("GET", query, token = session.accessToken))
         return buildList {
             for (i in 0 until rows.length()) {
@@ -460,7 +461,8 @@ class BingwaSupabaseApi {
                     name = row.optString("name"),
                     category = row.optString("category"),
                     providerId = row.optString("provider_id"),
-                    isActive = row.optBoolean("is_active", false)
+                    isActive = row.optBoolean("is_active", false),
+                    validityLabel = row.optString("validity_label").takeIf { it.isNotBlank() && it != "null" }
                 ))
             }
         }
