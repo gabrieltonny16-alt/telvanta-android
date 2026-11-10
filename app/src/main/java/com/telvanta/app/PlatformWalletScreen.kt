@@ -410,7 +410,7 @@ internal fun WalletScreen() {
         item {
             WalletInfoCard(
                 "Airtime payment verification",
-                "BingwaPulse processes the airtime transfer using the phone's default voice SIM. Your subscription activates only after the receiving account confirms the matching transfer."
+                "BingwaPulse starts the Sambaza transfer from your default voice SIM. Your subscription activates immediately when the sender-side Safaricom response confirms the exact selected amount and intended recipient. Receiver SMS is not required."
             )
         }
         if (notice.isNotBlank() && !localPreview) {
