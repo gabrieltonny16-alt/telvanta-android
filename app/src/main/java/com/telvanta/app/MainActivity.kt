@@ -1993,6 +1993,13 @@ private fun BingwaDashboard(db: LocalDatabase, onNavigate: (String) -> Unit) {
     val context = LocalContext.current
     val orders = remember(refreshKey) { db.orders() }
 
+    val balancePermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { grants ->
+        if (grants.values.all { it }) airtimeResponse = "Permissions granted. Tap refresh to check the Safaricom balance."
+        else airtimeResponse = "Phone and SIM permissions are needed for a USSD balance check."
+    }
+
     fun checkAirtimeBalance() {
         val needed = arrayOf(android.Manifest.permission.READ_PHONE_STATE, android.Manifest.permission.CALL_PHONE)
         val missing = needed.filter { context.checkSelfPermission(it) != PackageManager.PERMISSION_GRANTED }
@@ -2045,12 +2052,6 @@ private fun BingwaDashboard(db: LocalDatabase, onNavigate: (String) -> Unit) {
         }
     }
 
-    val balancePermissionLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestMultiplePermissions()
-    ) { grants ->
-        if (grants.values.all { it }) checkAirtimeBalance()
-        else airtimeResponse = "Phone and SIM permissions are needed for a USSD balance check."
-    }
     val transactions = remember(refreshKey) { db.transactions() }
     val customers = remember(refreshKey) { db.count("customers") }
     val offers = remember(refreshKey) { db.count("offers") }
@@ -2114,7 +2115,7 @@ private fun BingwaDashboard(db: LocalDatabase, onNavigate: (String) -> Unit) {
                         }
                     }
                 }
-                IconButton(onClick = { checkAirtimeBalance() }, enabled = !airtimeBusy) { Text(if (airtimeBusy) "…" else "↻", color = Color(0xFF19D66A), style = MaterialTheme.typography.headlineLarge) }
+                IconButton(onClick = { refreshKey++; checkAirtimeBalance() }, enabled = !airtimeBusy) { Text(if (airtimeBusy) "…" else "↻", color = Color(0xFF19D66A), style = MaterialTheme.typography.headlineLarge) }
             }
         }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
