@@ -649,6 +649,24 @@ class BingwaSupabaseApi {
         )
     }
 
+    fun getSambazaSubscriptionStatus(
+        session: BingwaSession,
+        businessId: String,
+        attemptId: String
+    ): String {
+        require(businessId.isNotBlank() && attemptId.isNotBlank())
+        val response = JSONObject(request(
+            "POST",
+            "/functions/v1/sambaza-subscriptions",
+            JSONObject()
+                .put("action", "status")
+                .put("business_id", businessId)
+                .put("attempt_id", attemptId),
+            token = session.accessToken
+        ))
+        return response.optString("status", "unknown")
+    }
+
     fun cancelSambazaSubscriptionIntent(
         session: BingwaSession,
         businessId: String,
