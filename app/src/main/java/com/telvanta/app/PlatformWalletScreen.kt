@@ -118,7 +118,7 @@ internal fun WalletScreen() {
             paymentBusy = true
             requestAirtimeSubscription(context, plan.priceKes) { result ->
                 paymentBusy = false
-                paymentNotice = describeAirtimeResult(result)
+                paymentNotice = describeAirtimeResult(result, plan.priceKes)
             }
         } else if (!granted) {
             paymentNotice = "Phone permission is needed to start the Safaricom airtime request."
@@ -136,7 +136,7 @@ internal fun WalletScreen() {
             paymentBusy = true
             requestAirtimeSubscription(context, plan.priceKes) { result ->
                 paymentBusy = false
-                paymentNotice = describeAirtimeResult(result)
+                paymentNotice = describeAirtimeResult(result, plan.priceKes)
             }
         }
     }
@@ -439,7 +439,23 @@ private fun requestAirtimeSubscription(
     }
 }
 
-private fun describeAirtimeResult(result: AirtimeSubscriptionResult): String = when (result) {
+private const val SAMBAZA_RECEIVER = "0140980957"
+
+private data class ParsedSambazaConfirmation(
+    val amountKes: Double,
+    val recipient: String
+)
+
+private fun parseSambazaConfirmation(message: String): ParsedSambazaConfirmation? {
+    val match = Regex(
+        """(?i)transferred\s+([0-9]+(?:\.[0-9]{1,2})?)\s*KSH.*?\bto\s+(0[0-9]{9,11})\b"""
+    ).find(message) ?: return null
+    val amount = match.groupValues[1].toDoubleOrNull() ?: return null
+    val recipient = match.groupValues[2]
+    return ParsedSambazaConfirmation(amountKes = amount, recipient = recipient)
+}
+
+private fun describeAirtimeResult(result: AirtimeSubscriptionResult, expectedAmountKes: Int): String = when (result) {
     is AirtimeSubscriptionResult.Response -> {
         val normalized = result.message.lowercase()
         when {
@@ -448,9 +464,20 @@ private fun describeAirtimeResult(result: AirtimeSubscriptionResult): String = w
                 "INSUFFICIENT:You don't have enough Safaricom airtime for this subscription. Top up and try again."
             listOf("confirm", "press 1", "reply 1", "select 1", "are you sure")
                 .any { normalized.contains(it) } ->
-                "Safaricom requires another confirmation step. This first implementation cannot safely complete that prompt yet. No subscription has been activated."
-            else ->
-                "The USSD request returned a response. BingwaPulse is waiting for the receiving phone (0140980957) to verify the Sambaza confirmation. Your subscription is not active yet."
+                "Safaricom requires another confirmation step. No subscription has been activated."
+            else -> {
+                val confirmation = parseSambazaConfirmation(result.message)
+                when {
+                    confirmation == null ->
+                        "Safaricom returned a response that BingwaPulse could not verify. No subscription has been activated."
+                    confirmation.recipient != SAMBAZA_RECEIVER ->
+                        "Recipient mismatch: Safaricom confirmed " + confirmation.recipient + ", but the subscription receiver is " + SAMBAZA_RECEIVER + ". No subscription has been activated."
+                    kotlin.math.abs(confirmation.amountKes - expectedAmountKes.toDouble()) >= 0.01 ->
+                        "Amount mismatch: Safaricom confirmed KES " + confirmation.amountKes + ", but this plan costs KES " + expectedAmountKes + ". No subscription has been activated."
+                    else ->
+                        "Sender-side confirmation matches KES " + expectedAmountKes + " to " + SAMBAZA_RECEIVER + ". Waiting for the receiving phone to verify the transfer before activating your subscription."
+                }
+            }
         }
     }
     is AirtimeSubscriptionResult.Failed ->
