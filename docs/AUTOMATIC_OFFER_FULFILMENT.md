@@ -72,6 +72,21 @@ The PAID transition requires trusted payment verification. DELIVERED requires pr
 12. Existing Sambaza subscription tests remain unchanged and pass.
 13. Automated tests and a controlled on-device test pass before any real customer fulfilment is enabled.
 
-## Current known implementation gap
+## Implementation status — 11 November 2026
 
-The existing Android worker can claim an eligible order, launch its saved USSD code and wait for the accessibility service. The accessibility service executes configured menu steps and records a carrier result. However, the current backend foundation documentation still says payment candidates are unverified, worker claim/acknowledgement is incomplete, and automated bundle purchasing is not enabled. Therefore the end-to-end acceptance criteria above are not yet proven.
+Implemented in the current development branch and Supabase project:
+- The Android foreground worker calls the database's atomic claim procedure and records fulfilment attempt results. The database already enforces verified-payment, provider, device, offer-rule and business kill-switch gates.
+- Local Signature/My Offers records now synchronize to the business cloud catalogue as provider, offer and agent-offer records. The saved Signature entry code and validity label are carried into the cloud offer.
+- The offer schema now has a dedicated `validity_label`. A server-side order guard refuses QUEUED/CLAIMED transitions unless the offer is active/current, its exact validity is present, its provider is active for USSD, payment is verified, and the configured recipe contains both an exact offer-name + validity screen match and a **Buy with Airtime** action.
+- Delivery-result recording now rejects a generic transaction ID or generic M-PESA message. It requires explicit carrier purchase-success language and the exact offer name.
+- The Android accessibility flow no longer reads or uses a stored PIN. A manual PIN prompt pauses the recipe until the next configured screen appears. A definitive result is saved server-side before the USSD dialog is dismissed.
+- Unit tests cover conservative screen classification, including transaction-reference-only and generic M-PESA messages.
+
+Still blocking a fully automatic end-to-end production journey:
+- Phone notifications remain untrusted evidence. The current Payment Inbox manager-review action is the only active path that can mark an SMS-staged payment verified. A trusted Safaricom C2B callback endpoint and Till URL registration are not yet configured for this business.
+- Signature candidates are user-supplied extracted catalogue entries; their entry codes are saved, but provider menu recipes still need a verified screen-by-screen definition. The app currently requires the exact offer/validity match and Buy with Airtime step to be configured and tested before enabling a rule.
+- The provider's live USSD menu behaviour, agent-SIM airtime purchase, recipient delivery confirmation, and session dismissal must pass a controlled device/carrier test. A backend string match alone is not proof of delivery.
+- Customer success notifications after delivery are not yet connected.
+- The live BingwaPulse project currently has no business, provider, offer, device or customer-order records, so no real order can yet traverse the pipeline.
+
+The development branch and database changes do not enable live fulfilment by themselves. End-to-end acceptance criteria remain unproven until a real business/device/catalogue is configured, trusted payment verification is connected, and the full carrier journey passes on the target Android SIM.
