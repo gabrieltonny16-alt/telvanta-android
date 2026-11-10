@@ -642,6 +642,7 @@ private fun SignatureOffersScreen(db: LocalDatabase, onMessage: (String) -> Unit
     var downloadCandidate by remember { mutableStateOf<CandidateOffer?>(null) }
     var downloadPrice by remember { mutableStateOf("") }
     val saved = remember(reload) { db.offers().filter { it.source.contains("signature", ignoreCase = true) } }
+    CloudOfferSyncEffect(db, reload, onMessage)
     val categories = listOf("ALL", "DATA", "VOICE", "SMS", "COMBO")
     val visible = candidates.filter {
         (category == "ALL" || it.category.equals(category, true)) &&
@@ -856,6 +857,36 @@ private fun PlannedFeatureScreen(title: String, details: String) {
 }
 
 @Composable
+private fun CloudOfferSyncEffect(db: LocalDatabase, revision: Int, onMessage: (String) -> Unit) {
+    val context = LocalContext.current
+    val store = remember { SecureSessionStore(context) }
+    val api = remember { BingwaSupabaseApi() }
+    LaunchedEffect(revision) {
+        if (store.isLocalWorkspace()) return@LaunchedEffect
+        val saved = store.load() ?: return@LaunchedEffect
+        try {
+            var active = if (saved.expiresAtEpochSeconds <= System.currentTimeMillis() / 1000L + 60L) {
+                withContext(Dispatchers.IO) { api.refreshSession(saved) }.also(store::save)
+            } else saved
+            val businessId = active.businessId
+                ?: withContext(Dispatchers.IO) { api.firstBusinessId(active) }
+                ?: throw IllegalStateException("No business workspace is connected.")
+            if (active.businessId != businessId) {
+                active = active.copy(businessId = businessId)
+                store.save(active)
+            }
+            val localOffers = db.offers()
+            withContext(Dispatchers.IO) {
+                localOffers.forEach { offer -> api.syncLocalOfferToCloud(active, businessId, offer) }
+            }
+            if (localOffers.isNotEmpty()) onMessage("${localOffers.size} local offer(s) synchronized with the cloud catalogue.")
+        } catch (error: Exception) {
+            onMessage(error.message ?: "Could not synchronize local offers with the cloud catalogue.")
+        }
+    }
+}
+
+@Composable
 private fun OffersScreen(db: LocalDatabase, onMessage: (String) -> Unit) {
     var selectedCategory by remember { mutableStateOf("All") }
     var reload by remember { mutableIntStateOf(0) }
@@ -869,6 +900,7 @@ private fun OffersScreen(db: LocalDatabase, onMessage: (String) -> Unit) {
     var active by remember { mutableStateOf(false) }
     val categories = listOf("All", "Data", "Minutes", "SMS", "Combo")
     val offers = remember(reload) { db.offers() }
+    CloudOfferSyncEffect(db, reload, onMessage)
     val visible = offers.filter { selectedCategory == "All" || it.category.equals(selectedCategory, true) || (selectedCategory == "Minutes" && it.category.equals("VOICE", true)) }
     fun clearEditor() { editId = null; name = ""; category = "Data"; duration = ""; code = ""; price = ""; active = false }
     Text("My Offers", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = Cyan)
