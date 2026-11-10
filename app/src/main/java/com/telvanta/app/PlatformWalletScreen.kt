@@ -11,10 +11,20 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
+import android.Manifest
+import android.content.Context
+import android.content.pm.PackageManager
+import android.os.Build
+import android.os.Handler
+import android.os.Looper
+import android.telephony.TelephonyManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -96,6 +106,40 @@ internal fun WalletScreen() {
     var snapshot by remember { mutableStateOf<PlatformWalletSnapshot?>(null) }
     var loading by remember { mutableStateOf(false) }
     var notice by remember { mutableStateOf("") }
+    var paymentNotice by remember { mutableStateOf("") }
+    var paymentBusy by remember { mutableStateOf(false) }
+    var pendingPlan by remember { mutableStateOf<PlatformSubscriptionPlan?>(null) }
+    val callPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        val plan = pendingPlan
+        pendingPlan = null
+        if (granted && plan != null) {
+            paymentBusy = true
+            requestAirtimeSubscription(context, plan.priceKes) { result ->
+                paymentBusy = false
+                paymentNotice = describeAirtimeResult(result)
+            }
+        } else if (!granted) {
+            paymentNotice = "Phone permission is needed to start the Safaricom airtime request."
+        }
+    }
+    val startAirtimePayment: (PlatformSubscriptionPlan) -> Unit = { plan ->
+        paymentNotice = ""
+        pendingPlan = plan
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M &&
+            context.checkSelfPermission(Manifest.permission.CALL_PHONE) != PackageManager.PERMISSION_GRANTED
+        ) {
+            callPermissionLauncher.launch(Manifest.permission.CALL_PHONE)
+        } else {
+            pendingPlan = null
+            paymentBusy = true
+            requestAirtimeSubscription(context, plan.priceKes) { result ->
+                paymentBusy = false
+                paymentNotice = describeAirtimeResult(result)
+            }
+        }
+    }
     val localPreview = remember { store.isLocalWorkspace() }
 
     fun refreshWallet() {
@@ -226,6 +270,13 @@ internal fun WalletScreen() {
                                 Text("KES ${plan.priceKes}", color = WalletAccent, fontWeight = FontWeight.ExtraBold)
                             }
                             Text(plan.description, color = WalletMuted, style = MaterialTheme.typography.bodySmall)
+                            Button(
+                                onClick = { startAirtimePayment(plan) },
+                                enabled = !paymentBusy && !localPreview && session != null,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text(if (paymentBusy) "Processing…" else "Pay with Airtime")
+                            }
                         }
                     }
                 }
@@ -278,10 +329,18 @@ internal fun WalletScreen() {
             }
         }
 
+        if (paymentNotice.isNotBlank()) {
+            item {
+                WalletInfoCard(
+                    if (paymentNotice.startsWith("INSUFFICIENT:")) "Insufficient Airtime" else "Airtime Payment Status",
+                    paymentNotice.removePrefix("INSUFFICIENT:")
+                )
+            }
+        }
         item {
             WalletInfoCard(
-                "Checkout is not activated",
-                "The plans and token packages are now listed from the platform catalogue. Payment collection and wallet top-ups remain disabled until you approve and configure a verified payment method. No money is charged from this screen."
+                "Airtime payment verification",
+                "The app sends the Sambaza USSD request to 0140980957 using the phone's default voice SIM. A subscription is not activated until the receiving phone verifies the matching Safaricom confirmation."
             )
         }
         if (notice.isNotBlank() && !localPreview) {
@@ -327,3 +386,78 @@ private fun formatWalletDate(value: String): String =
             .withZone(ZoneId.of("Africa/Nairobi"))
             .format(Instant.parse(value))
     }.getOrDefault(value)
+
+
+private sealed interface AirtimeSubscriptionResult {
+    data class Response(val message: String) : AirtimeSubscriptionResult
+    data class Failed(val code: Int) : AirtimeSubscriptionResult
+    data class Error(val message: String) : AirtimeSubscriptionResult
+}
+
+private fun requestAirtimeSubscription(
+    context: Context,
+    amountKes: Int,
+    onResult: (AirtimeSubscriptionResult) -> Unit
+) {
+    if (amountKes <= 0) {
+        onResult(AirtimeSubscriptionResult.Error("Invalid subscription amount."))
+        return
+    }
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+        onResult(AirtimeSubscriptionResult.Error("This Android version does not support background USSD requests."))
+        return
+    }
+    try {
+        val telephony = context.getSystemService(TelephonyManager::class.java)
+            ?: throw IllegalStateException("Telephony service is unavailable.")
+        val request = "*140*${amountKes}*0140980957#"
+        telephony.sendUssdRequest(
+            request,
+            object : TelephonyManager.UssdResponseCallback() {
+                override fun onReceiveUssdResponse(
+                    telephonyManager: TelephonyManager,
+                    request: String,
+                    response: CharSequence
+                ) {
+                    onResult(AirtimeSubscriptionResult.Response(response.toString()))
+                }
+
+                override fun onReceiveUssdResponseFailed(
+                    telephonyManager: TelephonyManager,
+                    request: String,
+                    failureCode: Int
+                ) {
+                    onResult(AirtimeSubscriptionResult.Failed(failureCode))
+                }
+            },
+            Handler(Looper.getMainLooper())
+        )
+    } catch (error: SecurityException) {
+        onResult(AirtimeSubscriptionResult.Error("Android denied permission to send the USSD request."))
+    } catch (error: Exception) {
+        onResult(AirtimeSubscriptionResult.Error(error.message ?: "Could not start the airtime request."))
+    }
+}
+
+private fun describeAirtimeResult(result: AirtimeSubscriptionResult): String = when (result) {
+    is AirtimeSubscriptionResult.Response -> {
+        val normalized = result.message.lowercase()
+        when {
+            listOf("insufficient airtime", "not enough airtime", "insufficient balance", "low balance")
+                .any { normalized.contains(it) } ->
+                "INSUFFICIENT:You don't have enough Safaricom airtime for this subscription. Top up and try again."
+            listOf("confirm", "press 1", "reply 1", "select 1", "are you sure")
+                .any { normalized.contains(it) } ->
+                "Safaricom requires another confirmation step. This first implementation cannot safely complete that prompt yet. No subscription has been activated."
+            else ->
+                "The USSD request returned a response. BingwaPulse is waiting for the receiving phone (0140980957) to verify the Sambaza confirmation. Your subscription is not active yet."
+        }
+    }
+    is AirtimeSubscriptionResult.Failed ->
+        if (result.code == TelephonyManager.USSD_ERROR_NOT_ALLOWED) {
+            "Android or the mobile network did not allow this background USSD request. No subscription has been activated."
+        } else {
+            "The Safaricom USSD request failed or timed out. No subscription has been activated. You can try again."
+        }
+    is AirtimeSubscriptionResult.Error -> result.message
+}
