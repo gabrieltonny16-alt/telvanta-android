@@ -1,6 +1,10 @@
 package com.telvanta.app
 
 import android.accessibilityservice.AccessibilityService
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.accessibilityservice.AccessibilityServiceInfo
 import android.os.VibrationEffect
 import android.os.Vibrator
@@ -16,6 +20,15 @@ import java.util.concurrent.Executors
 class UssdAccessibilityService : AccessibilityService() {
     private val automationExecutor = Executors.newSingleThreadExecutor()
     private var lastManualPinPromptAt = 0L
+    private var dismissReceiverRegistered = false
+    private val dismissReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (intent?.action == ACTION_DISMISS_USSD) {
+                performGlobalAction(GLOBAL_ACTION_BACK)
+                recordState("USSD_SESSION_DISMISSED", "USSD session closed after the worker stopped the attempt.")
+            }
+        }
+    }
 
     override fun onServiceConnected() {
         super.onServiceConnected()
@@ -26,6 +39,15 @@ class UssdAccessibilityService : AccessibilityService() {
             notificationTimeout = 100L
         }
         recordState("SERVICE_CONNECTED", "Accessibility service enabled")
+        if (!dismissReceiverRegistered) {
+            val filter = IntentFilter(ACTION_DISMISS_USSD)
+            if (Build.VERSION.SDK_INT >= 33) registerReceiver(dismissReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
+            else {
+                @Suppress("DEPRECATION")
+                registerReceiver(dismissReceiver, filter)
+            }
+            dismissReceiverRegistered = true
+        }
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
@@ -204,7 +226,11 @@ class UssdAccessibilityService : AccessibilityService() {
         getSharedPreferences(PREFS, MODE_PRIVATE).edit().putString(KEY_STATE, state)
             .putString(KEY_DETAIL, redactSensitiveText(detail).take(2500)).putLong(KEY_UPDATED_AT, System.currentTimeMillis()).apply()
     }
-    override fun onDestroy() { automationExecutor.shutdown(); super.onDestroy() }
+    override fun onDestroy() {
+        if (dismissReceiverRegistered) runCatching { unregisterReceiver(dismissReceiver) }
+        automationExecutor.shutdown()
+        super.onDestroy()
+    }
 
     companion object {
         const val PREFS = "bingwapulse_accessibility"
@@ -213,5 +239,6 @@ class UssdAccessibilityService : AccessibilityService() {
         const val KEY_UPDATED_AT = "updated_at"
         const val KEY_ACTIVE_STEP = "active_fulfilment_step"
         const val KEY_JOB_STARTED_AT = "active_fulfilment_started_at"
+        const val ACTION_DISMISS_USSD = "com.telvanta.app.ACTION_DISMISS_USSD"
     }
 }
