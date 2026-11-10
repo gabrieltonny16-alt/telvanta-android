@@ -66,8 +66,27 @@ class UssdAccessibilityService : AccessibilityService() {
         }
         val step = steps.optJSONObject(stepIndex) ?: return
         val matchText = step.optString("match_text").trim()
-        if (matchText.isBlank() || !screenText.contains(matchText, ignoreCase = true)) return
         val action = step.optString("action").lowercase()
+
+        // A manual PIN step is a pause, not a completed automation action.
+        // Advance only after the PIN prompt disappears and the next configured
+        // screen signature is visible; never inspect or capture the entered PIN.
+        if (action == "manual_pin") {
+            if (matchText.isNotBlank() && screenText.contains(matchText, ignoreCase = true)) {
+                promptManualPin()
+                recordState("WAITING_FOR_MANUAL_PIN", "Enter the SIM PIN directly in the Android USSD prompt. BingwaPulse does not read or store it.")
+                return
+            }
+            val nextStep = steps.optJSONObject(stepIndex + 1) ?: return
+            val nextMatch = nextStep.optString("match_text").trim()
+            if (nextMatch.isNotBlank() && screenText.contains(nextMatch, ignoreCase = true)) {
+                prefs.edit().putInt(KEY_ACTIVE_STEP, stepIndex + 1).apply()
+                executeConfiguredStep(screenText, root)
+            }
+            return
+        }
+
+        if (matchText.isBlank() || !screenText.contains(matchText, ignoreCase = true)) return
         val value = step.optString("value")
             .replace("{recipient_phone}", job.optString("recipient_phone"))
             .replace("{payer_phone}", job.optString("payer_phone"))
@@ -76,12 +95,7 @@ class UssdAccessibilityService : AccessibilityService() {
         val completed = when (action) {
             "reply" -> enterReply(root, value)
             "tap_text" -> tapVisibleText(root, value)
-            "manual_pin" -> {
-                // PIN entry is always a human-only step. Never retrieve, store, or
-                // transmit a PIN from app storage or accessibility text.
-                promptManualPin()
-                true
-            }
+            "manual_pin" -> false // handled above as a human-only pause
             else -> { recordState("CONFIGURATION_ERROR", "Unsupported configured action at step ${stepIndex + 1}: $action"); false }
         }
         if (completed) {
