@@ -1030,6 +1030,41 @@ private fun PaymentInboxScreen() {
     var notice by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
     var pendingVerification by remember { mutableStateOf<MpesaNotificationReviewCandidate?>(null) }
+    var tillNumber by remember { mutableStateOf("1561763") }
+    var tillBusy by remember { mutableStateOf(false) }
+    var tillNotice by remember { mutableStateOf("") }
+
+    fun saveTillConfiguration() {
+        val current = session
+        if (current == null) {
+            tillNotice = "Sign in to a business workspace first."
+            return
+        }
+        if (!tillNumber.trim().matches(Regex("^[0-9]{5,8}$"))) {
+            tillNotice = "Enter the exact 5–8 digit M-PESA Till number."
+            return
+        }
+        scope.launch {
+            tillBusy = true
+            try {
+                var active = current
+                if (active.expiresAtEpochSeconds <= System.currentTimeMillis() / 1000L + 60L) {
+                    active = withContext(Dispatchers.IO) { api.refreshSession(active) }
+                    store.save(active)
+                    session = active
+                }
+                val businessId = active.businessId
+                    ?: withContext(Dispatchers.IO) { api.firstBusinessId(active) }
+                    ?: throw IllegalStateException("Create your business workspace first.")
+                withContext(Dispatchers.IO) { api.savePaymentIngressTill(active, businessId, tillNumber) }
+                tillNotice = "Till saved. Safaricom C2B URL registration and the callback token are the remaining payment-verification setup."
+            } catch (error: Exception) {
+                tillNotice = error.message ?: "Could not save the Till configuration."
+            } finally {
+                tillBusy = false
+            }
+        }
+    }
 
     fun refreshCandidates() {
         if (store.isLocalWorkspace()) {
@@ -1139,7 +1174,20 @@ private fun PaymentInboxScreen() {
         }
     }
 
-    LaunchedEffect(Unit) { refreshCandidates() }
+    LaunchedEffect(Unit) {
+        refreshCandidates()
+        val current = session
+        if (current != null && !store.isLocalWorkspace()) {
+            runCatching {
+                val active = current
+                val businessId = active.businessId ?: withContext(Dispatchers.IO) { api.firstBusinessId(active) }
+                if (businessId != null) {
+                    val savedTill = withContext(Dispatchers.IO) { api.getPaymentIngressTill(active, businessId) }
+                    if (!savedTill.isNullOrBlank()) tillNumber = savedTill
+                }
+            }
+        }
+    }
 
     Text("M-PESA Payment Inbox", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.ExtraBold, color = Navy)
     InfoCard(
@@ -1150,6 +1198,26 @@ private fun PaymentInboxScreen() {
         InfoCard("Account connection required", "Payment review is unavailable in local preview mode. Sign in and connect a business workspace to load its candidates.")
         return
     }
+    Text("TRUSTED TILL PAYMENT SETUP", color = Navy, fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.titleMedium)
+    InfoCard(
+        "Automatic Till verification",
+        "Save the receiving Till here. The deployed C2B callback verifies real Safaricom receipts and matches them to a single pending SiteLink order. If the callback cannot identify one order safely, it leaves the payment for reconciliation."
+    )
+    OutlinedTextField(
+        value = tillNumber,
+        onValueChange = { tillNumber = it.filter(Char::isDigit).take(8) },
+        label = { Text("M-PESA Buy Goods Till number") },
+        singleLine = true,
+        modifier = Modifier.fillMaxWidth()
+    )
+    Button(onClick = { saveTillConfiguration() }, enabled = !tillBusy && tillNumber.length in 5..8, modifier = Modifier.fillMaxWidth()) {
+        Text(if (tillBusy) "Saving Till…" else "Save Till for automatic verification")
+    }
+    if (tillNotice.isNotBlank()) Text(tillNotice, color = Cyan, style = MaterialTheme.typography.bodySmall)
+    InfoCard(
+        "Safaricom C2B registration URLs",
+        "Validation: https://tuuhucisljlaaovtnbeu.supabase.co/functions/v1/mpesa-c2b-callback?mode=validate&token=YOUR_SECRET_TOKEN\n\nConfirmation: https://tuuhucisljlaaovtnbeu.supabase.co/functions/v1/mpesa-c2b-callback?mode=confirm&token=YOUR_SECRET_TOKEN\n\nSet the same strong token as the Supabase Edge Function secret MPESA_C2B_CALLBACK_TOKEN, then register both URLs for this Till in Safaricom Daraja. This is C2B confirmation only; it does not send STK prompts."
+    )
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
         Button(onClick = { refreshCandidates() }, enabled = !busy, modifier = Modifier.weight(1f)) {
             Text(if (busy) "Loading…" else "Refresh inbox")
