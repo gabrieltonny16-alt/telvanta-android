@@ -271,11 +271,11 @@ internal fun WalletScreen() {
                             }
                             Text(plan.description, color = WalletMuted, style = MaterialTheme.typography.bodySmall)
                             Button(
-                                onClick = { startAirtimePayment(plan) },
-                                enabled = !paymentBusy && !localPreview && session != null,
+                                onClick = { paymentNotice = "Airtime checkout is not enabled yet. The receiving-phone verification must be connected before agents can safely send airtime." },
+                                enabled = false,
                                 modifier = Modifier.fillMaxWidth()
                             ) {
-                                Text(if (paymentBusy) "Processing…" else "Pay with Airtime")
+                                Text("Airtime checkout setup")
                             }
                         }
                     }
