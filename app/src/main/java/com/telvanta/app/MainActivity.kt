@@ -10,6 +10,11 @@ import android.net.Uri
 import android.os.Environment
 import android.content.pm.PackageManager
 import android.os.Build
+import android.telephony.TelephonyManager
+import android.telephony.SubscriptionManager
+import android.telephony.SubscriptionInfo
+import android.os.Handler
+import android.os.Looper
 import java.net.HttpURLConnection
 import java.net.URL
 import org.json.JSONObject
@@ -1979,7 +1984,73 @@ private fun UssdAutomationSettingsScreen() {
 private fun BingwaDashboard(db: LocalDatabase, onNavigate: (String) -> Unit) {
     var tab by remember { mutableStateOf("Overview") }
     var refreshKey by remember { mutableIntStateOf(0) }
+    var airtimeBalance by remember { mutableStateOf<String?>(null) }
+    var airtimeResponse by remember { mutableStateOf("Tap refresh to check the Safaricom SIM balance.") }
+    var airtimeBusy by remember { mutableStateOf(false) }
+    var simOptions by remember { mutableStateOf<List<SubscriptionInfo>>(emptyList()) }
+    var selectedSimId by remember { mutableIntStateOf(SubscriptionManager.INVALID_SUBSCRIPTION_ID) }
+    var simMenuExpanded by remember { mutableStateOf(false) }
+    val context = LocalContext.current
     val orders = remember(refreshKey) { db.orders() }
+
+    fun checkAirtimeBalance() {
+        val needed = arrayOf(android.Manifest.permission.READ_PHONE_STATE, android.Manifest.permission.CALL_PHONE)
+        val missing = needed.filter { context.checkSelfPermission(it) != PackageManager.PERMISSION_GRANTED }
+        if (missing.isNotEmpty()) {
+            airtimeResponse = "Allow Phone and SIM information permissions to check the balance."
+            balancePermissionLauncher.launch(missing.toTypedArray())
+            return
+        }
+        try {
+            val manager = context.getSystemService(SubscriptionManager::class.java)
+            val active = manager.activeSubscriptionInfoList.orEmpty()
+            simOptions = active
+            if (active.isEmpty()) {
+                airtimeResponse = "No active SIM was found. Insert or enable a Safaricom SIM and try again."
+                return
+            }
+            val chosenId = if (selectedSimId != SubscriptionManager.INVALID_SUBSCRIPTION_ID &&
+                active.any { it.subscriptionId == selectedSimId }) selectedSimId
+                else active.firstOrNull { it.subscriptionId == SubscriptionManager.getDefaultVoiceSubscriptionId() }?.subscriptionId
+                    ?: active.first().subscriptionId
+            selectedSimId = chosenId
+            val telephony = context.getSystemService(TelephonyManager::class.java).createForSubscriptionId(chosenId)
+            airtimeBusy = true
+            airtimeResponse = "Contacting Safaricom…"
+            telephony.sendUssdRequest("*144#", object : TelephonyManager.UssdResponseCallback() {
+                override fun onReceiveUssdResponse(
+                    telephonyManager: TelephonyManager,
+                    request: String,
+                    response: CharSequence
+                ) {
+                    airtimeBusy = false
+                    val result = response.toString().trim()
+                    airtimeBalance = Regex("(?i)(?:KES|KSH|KSHS?)\\s*([0-9,]+(?:\\.[0-9]{1,2})?)")
+                        .find(result)?.groupValues?.getOrNull(1)?.replace(",", "")?.let { "KES $it" }
+                    airtimeResponse = if (airtimeBalance != null) result else
+                        "Safaricom replied, but the balance format could not be recognised. Carrier response: $result"
+                }
+                override fun onReceiveUssdResponseFailed(
+                    telephonyManager: TelephonyManager,
+                    request: String,
+                    failureCode: Int
+                ) {
+                    airtimeBusy = false
+                    airtimeResponse = "Safaricom balance check failed (code $failureCode). Check network/SIM and retry."
+                }
+            }, Handler(Looper.getMainLooper()))
+        } catch (error: Exception) {
+            airtimeBusy = false
+            airtimeResponse = error.message ?: "Could not start the Safaricom balance check."
+        }
+    }
+
+    val balancePermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { grants ->
+        if (grants.values.all { it }) checkAirtimeBalance()
+        else airtimeResponse = "Phone and SIM permissions are needed for a USSD balance check."
+    }
     val transactions = remember(refreshKey) { db.transactions() }
     val customers = remember(refreshKey) { db.count("customers") }
     val offers = remember(refreshKey) { db.count("offers") }
@@ -2023,11 +2094,27 @@ private fun BingwaDashboard(db: LocalDatabase, onNavigate: (String) -> Unit) {
                 Surface(color = Color(0xFF17452B), shape = RoundedCornerShape(50)) { Text("▣", color = Color(0xFF19D66A), modifier = Modifier.padding(14.dp), style = MaterialTheme.typography.headlineSmall) }
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text("Airtime Balance", color = Color(0xFFA7B8AC))
-                    Text("KES —", color = Color.White, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.headlineSmall)
+                    Text(airtimeBalance ?: "KES —", color = Color.White, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.headlineSmall)
                     Text("Airtime used today: KES " + money(todayUsage), color = Color(0xFFA7B8AC))
-                    Text("Live provider airtime balance is not connected.", color = Color(0xFFA7B8AC), style = MaterialTheme.typography.labelSmall)
+                    Text(airtimeResponse, color = Color(0xFFA7B8AC), style = MaterialTheme.typography.labelSmall)
+                    if (simOptions.size > 1) {
+                        Box {
+                            TextButton(onClick = { simMenuExpanded = true }) {
+                                val selectedSim = simOptions.firstOrNull { it.subscriptionId == selectedSimId }
+                                Text("SIM: " + (selectedSim?.displayName?.toString() ?: "Choose SIM"), color = Color(0xFF19D66A))
+                            }
+                            DropdownMenu(expanded = simMenuExpanded, onDismissRequest = { simMenuExpanded = false }) {
+                                simOptions.forEach { sim ->
+                                    DropdownMenuItem(
+                                        text = { Text(sim.displayName?.toString() ?: "SIM " + sim.simSlotIndex) },
+                                        onClick = { selectedSimId = sim.subscriptionId; simMenuExpanded = false; airtimeBalance = null; airtimeResponse = "Selected " + (sim.displayName?.toString() ?: "SIM " + sim.simSlotIndex) + ". Tap refresh to check its balance." }
+                                    )
+                                }
+                            }
+                        }
+                    }
                 }
-                IconButton(onClick = { refreshKey++ }) { Text("↻", color = Color(0xFF19D66A), style = MaterialTheme.typography.headlineLarge) }
+                IconButton(onClick = { checkAirtimeBalance() }, enabled = !airtimeBusy) { Text(if (airtimeBusy) "…" else "↻", color = Color(0xFF19D66A), style = MaterialTheme.typography.headlineLarge) }
             }
         }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
