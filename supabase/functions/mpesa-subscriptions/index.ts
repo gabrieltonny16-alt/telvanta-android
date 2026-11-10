@@ -154,20 +154,21 @@ Deno.serve(async (req: Request) => {
     }
 
     const shortcode = Deno.env.get("MPESA_BUSINESS_SHORTCODE") ?? "";
+    const tillNumber = Deno.env.get("MPESA_TILL_NUMBER") ?? "";
     const consumerKey = Deno.env.get("MPESA_CONSUMER_KEY") ?? "";
     const consumerSecret = Deno.env.get("MPESA_CONSUMER_SECRET") ?? "";
     const passkey = Deno.env.get("MPESA_PASSKEY") ?? "";
     const callbackToken = Deno.env.get("MPESA_CALLBACK_TOKEN") ?? "";
     const environment = (Deno.env.get("MPESA_ENV") ?? "sandbox").toLowerCase();
-    if (!shortcode || !consumerKey || !consumerSecret || !passkey || callbackToken.length < 32) {
+    if (!shortcode || !tillNumber || !consumerKey || !consumerSecret || !passkey || callbackToken.length < 32) {
       return json({ error: "M-PESA Daraja is not configured yet. No payment request was sent.", code: "MPESA_NOT_CONFIGURED" }, 503);
     }
     if (environment !== "sandbox" && environment !== "production") {
       return json({ error: "M-PESA environment must be sandbox or production." }, 503);
     }
     // This integration is explicitly for the user's approved Buy Goods Till.
-    if (shortcode !== "1561763") {
-      return json({ error: "Configured M-PESA shortcode does not match the approved Buy Goods Till." }, 409);
+    if (tillNumber !== "1561763") {
+      return json({ error: "Configured M-PESA Till does not match the approved Buy Goods Till." }, 409);
     }
 
     const { data: openAttempt } = await db.from("mpesa_subscription_attempts")
@@ -198,7 +199,7 @@ Deno.serve(async (req: Request) => {
           TransactionType: "CustomerBuyGoodsOnline",
           Amount: plan.price_kes,
           PartyA: payerPhone,
-          PartyB: shortcode,
+          PartyB: tillNumber,
           PhoneNumber: payerPhone,
           CallBackURL: callbackUrl,
           AccountReference: `BPS${attempt.id.replaceAll("-", "").slice(0, 9)}`,
