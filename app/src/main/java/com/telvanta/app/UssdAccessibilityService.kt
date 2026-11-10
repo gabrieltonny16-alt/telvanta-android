@@ -5,6 +5,8 @@ import android.accessibilityservice.AccessibilityServiceInfo
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import org.json.JSONObject
@@ -169,7 +171,12 @@ class UssdAccessibilityService : AccessibilityService() {
                     redactSensitiveText(screenText), errorCode = errorCode, errorDetail = errorDetail)
                 SecureFulfilmentJobStore(this).clear()
                 prefs.edit().remove(KEY_ACTIVE_STEP).remove(KEY_JOB_STARTED_AT).apply()
-                recordState(state, screenText)
+                // Dismiss the system USSD dialog only after the server accepts a
+                // definitive carrier result. A failed sync leaves the session visible.
+                Handler(Looper.getMainLooper()).post {
+                    performGlobalAction(GLOBAL_ACTION_BACK)
+                    recordState(state, screenText)
+                }
             } catch (error: Exception) {
                 recordState("RESULT_NOT_SYNCED", error.message ?: "Could not save carrier result. Manager reconciliation is required.")
             }
