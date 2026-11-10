@@ -40,6 +40,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import java.time.Instant
 import java.time.ZoneId
@@ -150,6 +151,29 @@ internal fun WalletScreen() {
                                             )
                                         }
                                         paymentNotice = "Airtime transfer detected. Waiting for the receiving phone to confirm delivery. Your subscription activates only after that confirmation is verified."
+                                        paymentBusy = false
+                                        var activated = false
+                                        for (poll in 0 until 120) {
+                                            delay(5_000L)
+                                            val state = withContext(Dispatchers.IO) {
+                                                api.getSambazaSubscriptionStatus(activeSession, businessId, attemptId)
+                                            }
+                                            if (state == "activated") {
+                                                snapshot = withContext(Dispatchers.IO) {
+                                                    api.getPlatformWalletSnapshot(activeSession, businessId)
+                                                }
+                                                paymentNotice = "Subscription active. Receiver confirmation was verified and your business wallet has been updated."
+                                                activated = true
+                                                break
+                                            }
+                                            if (state == "expired" || state == "failed") {
+                                                paymentNotice = "The receiver confirmation was not received in time. No subscription was activated. Check the receiving phone and try again."
+                                                break
+                                            }
+                                        }
+                                        if (!activated && paymentNotice.startsWith("Airtime transfer detected")) {
+                                            paymentNotice = "Still waiting for the receiving phone. If its SMS notification is hidden or Notification Access is off, BingwaPulse cannot verify the transfer yet."
+                                        }
                                     }
                                 }
                                 is AirtimeSubscriptionResult.Failed -> {
