@@ -1991,6 +1991,21 @@ private fun BingwaDashboard(db: LocalDatabase, onNavigate: (String) -> Unit) {
     var selectedSimId by remember { mutableIntStateOf(SubscriptionManager.INVALID_SUBSCRIPTION_ID) }
     var simMenuExpanded by remember { mutableStateOf(false) }
     val context = LocalContext.current
+    val sessionStore = remember { SecureSessionStore(context) }
+    val walletApi = remember { BingwaSupabaseApi() }
+    var walletSnapshot by remember { mutableStateOf<PlatformWalletSnapshot?>(null) }
+    LaunchedEffect(refreshKey) {
+        val saved = sessionStore.load()
+        if (saved != null && !sessionStore.isLocalWorkspace()) {
+            runCatching {
+                val businessId = saved.businessId ?: withContext(Dispatchers.IO) { walletApi.firstBusinessId(saved) }
+                    ?: throw IllegalStateException("No business workspace is linked.")
+                val active = if (saved.businessId == businessId) saved else saved.copy(businessId = businessId)
+                if (saved.businessId == null) sessionStore.save(active)
+                withContext(Dispatchers.IO) { walletApi.getPlatformWalletSnapshot(active, businessId) }
+            }.onSuccess { walletSnapshot = it }
+        }
+    }
     val orders = remember(refreshKey) { db.orders() }
 
     val balancePermissionLauncher = rememberLauncherForActivityResult(
@@ -2079,8 +2094,18 @@ private fun BingwaDashboard(db: LocalDatabase, onNavigate: (String) -> Unit) {
                 Text(greeting + ", GABRIEL", color = Color.White, fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.headlineSmall)
                 Text(date, color = Color(0xFFA7B8AC), style = MaterialTheme.typography.bodyLarge)
                 Text("Subscription", color = Color(0xFFA7B8AC))
-                Text("Tokens: —", color = Color(0xFF19D66A), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleLarge)
-                Text("Subscription token balance is not yet connected.", color = Color(0xFFA7B8AC), style = MaterialTheme.typography.labelSmall)
+                Text(
+                    walletSnapshot?.activeSubscription?.let { planName(walletSnapshot?.plans.orEmpty(), it.planCode) }
+                        ?: if (walletSnapshot == null) "Loading subscription…" else "No active subscription",
+                    color = Color(0xFF19D66A), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleLarge
+                )
+                Text(
+                    "Tokens: " + (walletSnapshot?.availableTokens?.toString() ?: "—"),
+                    color = Color(0xFF19D66A), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium
+                )
+                walletSnapshot?.activeSubscription?.let { active ->
+                    Text("Active until " + formatWalletDate(active.endsAt), color = Color(0xFFA7B8AC), style = MaterialTheme.typography.labelSmall)
+                }
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
                     DashboardMetric("Successful", delivered.size, Color(0xFF39A653), Modifier.weight(1f))
                     DashboardMetric("Failed", failed, Color(0xFFE44848), Modifier.weight(1f))
