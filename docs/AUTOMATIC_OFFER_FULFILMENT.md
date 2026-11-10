@@ -83,7 +83,7 @@ Implemented in the current development branch and Supabase project:
 - Unit tests cover conservative screen classification, including transaction-reference-only and generic M-PESA messages.
 
 Still blocking a fully automatic end-to-end production journey:
-- Phone notifications remain untrusted evidence. The current Payment Inbox manager-review action is the only active path that can mark an SMS-staged payment verified. A trusted Safaricom C2B callback endpoint and Till URL registration are not yet configured for this business.
+- A trusted Safaricom C2B callback endpoint is now deployed, and the database can match verified Till receipts to a pre-created SiteLink order while preserving the selected recipient. It is not yet active for this business until the callback token is configured, the Till is saved in Payment Inbox, and Safaricom confirms both callback URL registrations. Phone notifications alone remain untrusted evidence.
 - Signature candidates are user-supplied extracted catalogue entries; their entry codes are saved, but provider menu recipes still need a verified screen-by-screen definition. The app currently requires the exact offer/validity match and Buy with Airtime step to be configured and tested before enabling a rule.
 - The provider's live USSD menu behaviour, agent-SIM airtime purchase, recipient delivery confirmation, and session dismissal must pass a controlled device/carrier test. A backend string match alone is not proof of delivery.
 - Customer success notifications after delivery are not yet connected.
