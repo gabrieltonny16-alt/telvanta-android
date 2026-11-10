@@ -635,9 +635,9 @@ class BingwaSupabaseApi {
         businessId: String,
         attemptId: String,
         responseText: String
-    ) {
+    ): String {
         require(businessId.isNotBlank() && attemptId.isNotBlank() && responseText.isNotBlank())
-        request(
+        val response = JSONObject(request(
             "POST",
             "/functions/v1/sambaza-subscriptions",
             JSONObject()
@@ -646,7 +646,8 @@ class BingwaSupabaseApi {
                 .put("attempt_id", attemptId)
                 .put("response", responseText.take(1200)),
             token = session.accessToken
-        )
+        ))
+        return response.optString("status", "unknown")
     }
 
     fun getSambazaSubscriptionStatus(
