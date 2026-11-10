@@ -1455,7 +1455,6 @@ private fun UssdAutomationSettingsScreen() {
     val scope = rememberCoroutineScope()
     var fulfilmentEnabled by remember { mutableStateOf(false) }
     var fulfilmentPaused by remember { mutableStateOf(true) }
-    var requireManualPin by remember { mutableStateOf(true) }
     var fulfilmentBusy by remember { mutableStateOf(false) }
     var fulfilmentNotice by remember { mutableStateOf("") }
     var workerDevices by remember { mutableStateOf<List<BingwaDevice>>(emptyList()) }
@@ -1514,7 +1513,6 @@ private fun UssdAutomationSettingsScreen() {
                     val settings = withContext(Dispatchers.IO) { api.getFulfilmentControls(active, businessId) }
                     fulfilmentEnabled = settings.optBoolean("fulfilment_enabled", false)
                     fulfilmentPaused = settings.optBoolean("fulfilment_paused", true)
-                    requireManualPin = true
                     workerDevices = withContext(Dispatchers.IO) { api.listDevices(active, businessId) }
                         .filter { it.status == "online" && it.assignedUserId == active.userId }
                     fulfilmentOffers = withContext(Dispatchers.IO) { api.listFulfilmentOffers(active, businessId) }
