@@ -26,7 +26,8 @@ data class UssdScreenClassification(
 object UssdScreenClassifier {
     private val paymentMethodPatterns = listOf(
         Regex("""(?i)\bairtime\b"""),
-        Regex("""(?i)\bm-?pesa\b"""),
+        // A generic M-PESA mention (e.g. a payment notification) is not a
+        // payment-method menu. Require explicit menu/payment-method wording.
         Regex("""(?i)\bbonga(?:\s+points?)?\b"""),
         Regex("""(?i)\bpayment\s+method\b"""),
         Regex("""(?i)\bpay\s+using\b"""),
