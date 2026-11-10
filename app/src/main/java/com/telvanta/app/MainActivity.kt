@@ -888,6 +888,10 @@ private fun CloudOfferSyncEffect(db: LocalDatabase, revision: Int, onMessage: (S
 
 @Composable
 private fun OffersScreen(db: LocalDatabase, onMessage: (String) -> Unit) {
+    val context = LocalContext.current
+    val secureStore = remember { SecureSessionStore(context) }
+    val api = remember { BingwaSupabaseApi() }
+    val scope = rememberCoroutineScope()
     var selectedCategory by remember { mutableStateOf("All") }
     var reload by remember { mutableIntStateOf(0) }
     var showEditor by remember { mutableStateOf(false) }
@@ -925,7 +929,28 @@ private fun OffersScreen(db: LocalDatabase, onMessage: (String) -> Unit) {
                     try { db.setOfferActive(offer.id, enabled); reload++; onMessage(if (enabled) "Offer activated on SiteLink." else "Offer deactivated on SiteLink.") }
                     catch (e: Exception) { onMessage(e.message ?: "Could not update offer.") }
                 })
-                TextButton(onClick = { db.deleteOffer(offer.id); reload++; onMessage("Offer deleted from My Offers.") }) { Text("▣", color = Color(0xFFFF5B55), fontSize = 20.sp) }
+                TextButton(onClick = {
+                    scope.launch {
+                        try {
+                            if (!secureStore.isLocalWorkspace()) {
+                                var session = secureStore.load() ?: throw IllegalStateException("Sign in before deleting a cloud-published offer.")
+                                if (session.expiresAtEpochSeconds <= System.currentTimeMillis() / 1000L + 60L) {
+                                    session = withContext(Dispatchers.IO) { api.refreshSession(session) }
+                                    secureStore.save(session)
+                                }
+                                val businessId = session.businessId
+                                    ?: withContext(Dispatchers.IO) { api.firstBusinessId(session) }
+                                    ?: throw IllegalStateException("No business workspace is connected.")
+                                withContext(Dispatchers.IO) { api.syncLocalOfferToCloud(session, businessId, offer.copy(active = false)) }
+                            }
+                            db.deleteOffer(offer.id)
+                            reload++
+                            onMessage("Offer unpublished from the cloud catalogue and removed locally.")
+                        } catch (error: Exception) {
+                            onMessage(error.message ?: "Could not safely remove the offer.")
+                        }
+                    }
+                }) { Text("▣", color = Color(0xFFFF5B55), fontSize = 20.sp) }
                 TextButton(onClick = {
                     editId = offer.id; name = offer.name; category = offer.category; duration = offer.duration
                     code = offer.ussdCode; price = offer.price.toString(); active = offer.active; showEditor = true
