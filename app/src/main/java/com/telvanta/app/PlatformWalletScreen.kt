@@ -593,10 +593,6 @@ private fun describeAirtimeResult(result: AirtimeSubscriptionResult, expectedAmo
         }
     }
     is AirtimeSubscriptionResult.Failed ->
-        if (result.code == TelephonyManager.USSD_ERROR_NOT_ALLOWED) {
-            "Android or the mobile network did not allow this background USSD request. No subscription has been activated."
-        } else {
-            "The Safaricom USSD request failed. No subscription has been activated. Check the airtime balance and receiving account before trying again."
-        }
+        "The Safaricom USSD request did not complete. No subscription has been activated. Check the airtime balance and receiving account before trying again."
     is AirtimeSubscriptionResult.Error -> result.message
 }
