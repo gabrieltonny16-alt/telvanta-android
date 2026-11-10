@@ -1514,7 +1514,7 @@ private fun UssdAutomationSettingsScreen() {
                     val settings = withContext(Dispatchers.IO) { api.getFulfilmentControls(active, businessId) }
                     fulfilmentEnabled = settings.optBoolean("fulfilment_enabled", false)
                     fulfilmentPaused = settings.optBoolean("fulfilment_paused", true)
-                    requireManualPin = settings.optBoolean("fulfilment_require_manual_pin", true)
+                    requireManualPin = true
                     workerDevices = withContext(Dispatchers.IO) { api.listDevices(active, businessId) }
                         .filter { it.status == "online" && it.assignedUserId == active.userId }
                     fulfilmentOffers = withContext(Dispatchers.IO) { api.listFulfilmentOffers(active, businessId) }
@@ -1734,7 +1734,7 @@ private fun UssdAutomationSettingsScreen() {
                     steps?.let { array ->
                         (0 until array.length()).any { index ->
                             val match = array.optJSONObject(index)?.optString("match_text").orEmpty()
-                            match.contains(selected.name, ignoreCase = true) && match.contains(validity, ignoreCase = true)
+                            match.contains(selected?.name.orEmpty(), ignoreCase = true) && match.contains(validity, ignoreCase = true)
                         }
                     } == true
                 } == true
@@ -1900,11 +1900,8 @@ private fun UssdAutomationSettingsScreen() {
                             withContext(Dispatchers.IO) { api.refreshSession(active) } else active
                         val businessId = refreshed.businessId ?: withContext(Dispatchers.IO) { api.firstBusinessId(refreshed) }
                             ?: throw IllegalStateException("No business workspace is connected.")
-                        if (!requireManualPin && !pinStore.hasPin()) {
-                            throw IllegalStateException("Save the encrypted local USSD PIN before disabling manual PIN entry.")
-                        }
                         withContext(Dispatchers.IO) {
-                            api.setFulfilmentControls(refreshed, businessId, fulfilmentEnabled, fulfilmentPaused, requireManualPin)
+                            api.setFulfilmentControls(refreshed, businessId, fulfilmentEnabled, fulfilmentPaused, true)
                         }
                         fulfilmentNotice = "Fulfilment controls saved. New worker claims follow these settings."
                     } catch (error: Exception) {
