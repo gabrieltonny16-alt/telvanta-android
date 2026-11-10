@@ -66,9 +66,10 @@ Deno.serve(async (req: Request) => {
         return json({ error: "Incomplete Daraja callback." }, 400);
       }
       const { data: attempt, error } = await db.from("mpesa_subscription_attempts")
-        .select("id,expected_amount_kes,payer_phone,status,checkout_request_id,expires_at")
+        .select("id,expected_amount_kes,payer_phone,status,checkout_request_id,merchant_request_id,expires_at")
         .eq("checkout_request_id", checkoutId).maybeSingle();
       if (error || !attempt) return json({ error: "Payment attempt not found." }, 404);
+      if (attempt.merchant_request_id !== merchantId) return json({ error: "Daraja merchant request does not match." }, 409);
       if (attempt.status === "completed") return json({ ResultCode: 0, ResultDesc: "Already processed." });
       if (attempt.status !== "pending") return json({ ResultCode: 0, ResultDesc: "Attempt is not pending." });
 
@@ -117,6 +118,24 @@ Deno.serve(async (req: Request) => {
     if (!user) return json({ error: "Your session is invalid. Sign in again." }, 401);
 
     const businessId = String(body.business_id ?? "");
+    const action = String(body.action ?? "create-intent");
+    if (action === "status") {
+      const attemptId = String(body.attempt_id ?? "");
+      if (!/^[0-9a-f-]{36}$/i.test(attemptId) || !/^[0-9a-f-]{36}$/i.test(businessId)) {
+        return json({ error: "Payment attempt is invalid." }, 400);
+      }
+      const { data: statusRow, error: statusError } = await db.from("mpesa_subscription_attempts")
+        .select("status,expected_amount_kes,mpesa_receipt,activated_subscription_id,expires_at")
+        .eq("id", attemptId).eq("business_id", businessId).eq("requested_by", user.id).maybeSingle();
+      if (statusError || !statusRow) return json({ error: "Payment attempt was not found." }, 404);
+      return json({
+        status: statusRow.status,
+        amount_kes: statusRow.expected_amount_kes,
+        receipt: statusRow.mpesa_receipt,
+        subscription_id: statusRow.activated_subscription_id,
+        expires_at: statusRow.expires_at,
+      });
+    }
     const planCode = String(body.plan_code ?? "");
     const payerPhone = normalizePhone(String(body.payer_phone ?? ""));
     if (!/^[0-9a-f-]{36}$/i.test(businessId) || !/^[a-z0-9_-]{2,40}$/.test(planCode) || !payerPhone) {
