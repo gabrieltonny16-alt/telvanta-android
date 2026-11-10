@@ -450,6 +450,74 @@ class BingwaSupabaseApi {
 
 
 
+    fun syncLocalOfferToCloud(session: BingwaSession, businessId: String, offer: OfferRow) {
+        require(businessId.isNotBlank())
+        val roundedSellingPrice = offer.price.toInt()
+        require(offer.price > 0.0 && kotlin.math.abs(offer.price - roundedSellingPrice.toDouble()) < 0.0001) {
+            "Cloud offers require a whole-KES selling price. Update this offer before syncing."
+        }
+
+        val providerName = if (offer.source.contains("signature", ignoreCase = true)) "Safaricom Signature" else "Safaricom"
+        val providerBody = JSONObject()
+            .put("business_id", businessId)
+            .put("name", providerName)
+            .put("adapter_key", "ussd_assisted")
+            .put("status", "active")
+        val providerRows = JSONArray(request(
+            "POST",
+            "/rest/v1/providers?on_conflict=business_id,name",
+            providerBody,
+            session.accessToken,
+            "resolution=merge-duplicates,return=representation"
+        ))
+        if (providerRows.length() == 0) throw IOException("Safaricom provider could not be synchronized.")
+        val providerId = providerRows.getJSONObject(0).getString("id")
+
+        val category = when (offer.category.trim().lowercase()) {
+            "data" -> "data"
+            "voice", "minutes" -> "minutes"
+            "sms" -> "sms"
+            "combo" -> "combo"
+            else -> throw IllegalArgumentException("Unsupported offer category: ${offer.category}")
+        }
+        val externalRef = offer.sourceId.takeIf { it.isNotBlank() } ?: "local-${offer.id}"
+        val offerBody = JSONObject()
+            .put("business_id", businessId)
+            .put("provider_id", providerId)
+            .put("external_offer_ref", externalRef)
+            .put("code", offer.ussdCode.takeIf { it.isNotBlank() } ?: JSONObject.NULL)
+            .put("name", offer.name)
+            .put("category", category)
+            .put("description", listOf(offer.source, offer.simProfile, offer.tags).filter { it.isNotBlank() }.joinToString(" · "))
+            .put("provider_cost_kes", (offer.originalPrice ?: 0.0).toInt().coerceAtLeast(0))
+            .put("validity_label", offer.duration.takeIf { it.isNotBlank() } ?: JSONObject.NULL)
+            .put("is_active", offer.active)
+            .put("source_observed_at", java.time.Instant.now().toString())
+        val offerRows = JSONArray(request(
+            "POST",
+            "/rest/v1/offers?on_conflict=business_id,provider_id,external_offer_ref",
+            offerBody,
+            session.accessToken,
+            "resolution=merge-duplicates,return=representation"
+        ))
+        if (offerRows.length() == 0) throw IOException("Offer could not be synchronized to the business catalogue.")
+        val cloudOfferId = offerRows.getJSONObject(0).getString("id")
+
+        val agentOfferBody = JSONObject()
+            .put("business_id", businessId)
+            .put("offer_id", cloudOfferId)
+            .put("agent_user_id", session.userId)
+            .put("selling_price_kes", roundedSellingPrice)
+            .put("is_published", offer.active)
+        request(
+            "POST",
+            "/rest/v1/agent_offers?on_conflict=offer_id,agent_user_id",
+            agentOfferBody,
+            session.accessToken,
+            "resolution=merge-duplicates,return=minimal"
+        )
+    }
+
     fun listFulfilmentOffers(session: BingwaSession, businessId: String): List<FulfilmentOffer> {
         val query = "/rest/v1/offers?select=id,name,category,provider_id,is_active,validity_label&business_id=eq.$businessId&is_active=eq.true&order=name.asc"
         val rows = JSONArray(request("GET", query, token = session.accessToken))
