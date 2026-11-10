@@ -1033,6 +1033,60 @@ private fun PaymentInboxScreen() {
     var tillNumber by remember { mutableStateOf("1561763") }
     var tillBusy by remember { mutableStateOf(false) }
     var tillNotice by remember { mutableStateOf("") }
+    var businessName by remember { mutableStateOf("GABRIEL'S INTERNET SERVICES") }
+    var workspaceExists by remember { mutableStateOf(session?.businessId != null) }
+    var workspaceBusy by remember { mutableStateOf(false) }
+    var workspaceNotice by remember { mutableStateOf("") }
+
+    fun createBusinessWorkspace() {
+        val current = session
+        if (current == null) {
+            workspaceNotice = "Sign in to BingwaPulse before creating a business workspace."
+            return
+        }
+        val name = businessName.trim()
+        if (name.length !in 2..120) {
+            workspaceNotice = "Business name must contain 2–120 characters."
+            return
+        }
+        scope.launch {
+            workspaceBusy = true
+            try {
+                var active = current
+                if (active.expiresAtEpochSeconds <= System.currentTimeMillis() / 1000L + 60L) {
+                    active = withContext(Dispatchers.IO) { api.refreshSession(active) }
+                    store.save(active)
+                }
+                val existingId = active.businessId
+                    ?: withContext(Dispatchers.IO) { api.firstBusinessId(active) }
+                val businessId = existingId ?: run {
+                    val baseSlug = name.lowercase()
+                        .replace(Regex("[^a-z0-9]+"), "-")
+                        .trim('-')
+                        .take(40)
+                        .ifBlank { "bingwapulse-business" }
+                    val slug = "$baseSlug-${active.userId.takeLast(6).lowercase()}"
+                    withContext(Dispatchers.IO) { api.createBusiness(active, name, slug) }
+                }
+                active = active.copy(businessId = businessId)
+                store.save(active)
+                session = active
+                workspaceExists = true
+                workspaceNotice = if (existingId == null) {
+                    "Business workspace created. Next, save the Till and sync your Signature offers."
+                } else {
+                    "Your existing business workspace is connected."
+                }
+                candidates = withContext(Dispatchers.IO) {
+                    api.listMpesaNotificationCandidates(active, businessId)
+                }
+            } catch (error: Exception) {
+                workspaceNotice = error.message ?: "Could not create the business workspace."
+            } finally {
+                workspaceBusy = false
+            }
+        }
+    }
 
     fun saveTillConfiguration() {
         val current = session
@@ -1179,11 +1233,17 @@ private fun PaymentInboxScreen() {
         val current = session
         if (current != null && !store.isLocalWorkspace()) {
             runCatching {
-                val active = current
+                var active = current
                 val businessId = active.businessId ?: withContext(Dispatchers.IO) { api.firstBusinessId(active) }
                 if (businessId != null) {
+                    active = active.copy(businessId = businessId)
+                    store.save(active)
+                    session = active
+                    workspaceExists = true
                     val savedTill = withContext(Dispatchers.IO) { api.getPaymentIngressTill(active, businessId) }
                     if (!savedTill.isNullOrBlank()) tillNumber = savedTill
+                } else {
+                    workspaceExists = false
                 }
             }
         }
@@ -1196,6 +1256,33 @@ private fun PaymentInboxScreen() {
     )
     if (store.isLocalWorkspace()) {
         InfoCard("Account connection required", "Payment review is unavailable in local preview mode. Sign in and connect a business workspace to load its candidates.")
+        return
+    }
+    if (session == null) {
+        InfoCard("Sign in required", "Sign in to your BingwaPulse account before creating the business workspace and connecting its Till.")
+        return
+    }
+    if (!workspaceExists) {
+        Text("BUSINESS WORKSPACE", color = Navy, fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.titleMedium)
+        InfoCard(
+            "Create your business workspace",
+            "This creates the owner workspace for your offers, agent phone, Till payments and customer orders. It does not initiate a payment."
+        )
+        OutlinedTextField(
+            value = businessName,
+            onValueChange = { businessName = it.take(120) },
+            label = { Text("Business name") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth()
+        )
+        Button(
+            onClick = { createBusinessWorkspace() },
+            enabled = !workspaceBusy && businessName.trim().length in 2..120,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text(if (workspaceBusy) "Creating workspace…" else "Create business workspace")
+        }
+        if (workspaceNotice.isNotBlank()) Text(workspaceNotice, color = Cyan, fontWeight = FontWeight.SemiBold)
         return
     }
     Text("TRUSTED TILL PAYMENT SETUP", color = Navy, fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.titleMedium)
