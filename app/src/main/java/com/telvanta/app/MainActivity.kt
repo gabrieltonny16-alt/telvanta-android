@@ -1462,17 +1462,13 @@ private fun PaymentInboxScreen() {
                     }
                 }
                 if (candidate.stagingStatus == "staged_for_review") {
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Button(onClick = { pendingVerification = candidate }, enabled = !busy, modifier = Modifier.weight(1f)) {
-                            Text("Verify against Till")
-                        }
-                        OutlinedButton(onClick = { submitReview(candidate, "reject") }, enabled = !busy) {
-                            Text("Reject")
-                        }
-                    }
+                    InfoCard(
+                        "Automatic match not completed",
+                        "No single recent Quick Dial order matched this receipt. The payment is held safely; no bundle will be sent until the order can be matched."
+                    )
                 }
                 if (candidate.stagingStatus == "verified") {
-                    Text("Verified by a manager · order marked PAID. Bundle fulfilment is tracked separately.", color = Cyan, style = MaterialTheme.typography.bodySmall)
+                    Text("Automatically matched · payment marked PAID · fulfilment queued for the worker.", color = Cyan, style = MaterialTheme.typography.bodySmall)
                 }
             }
         }
