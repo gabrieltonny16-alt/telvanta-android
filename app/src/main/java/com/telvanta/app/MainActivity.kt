@@ -1686,6 +1686,7 @@ private fun UssdAutomationSettingsScreen() {
   {"match_text":"Enter recipient phone","action":"reply","value":"{recipient_phone}"}
 ]""") }
     var confirmMenuVerified by remember { mutableStateOf(false) }
+    var menuVerificationNote by remember { mutableStateOf("") }
     var ruleBusy by remember { mutableStateOf(false) }
     val accountSession = remember { secureStore.load() }
 
@@ -1929,6 +1930,16 @@ private fun UssdAutomationSettingsScreen() {
             Checkbox(checked = confirmMenuVerified, onCheckedChange = { confirmMenuVerified = it })
             Text("I tested this exact menu flow on the target SIM and verified every step.", color = Navy, style = MaterialTheme.typography.bodySmall)
         }
+        if (confirmMenuVerified) {
+            OutlinedTextField(
+                value = menuVerificationNote,
+                onValueChange = { menuVerificationNote = it.take(500) },
+                label = { Text("Verification note (what you tested and confirmed)") },
+                minLines = 2,
+                maxLines = 4,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
         Button(
             onClick = {
                 val amount = amountKesText.toLongOrNull()
@@ -1957,11 +1968,12 @@ private fun UssdAutomationSettingsScreen() {
                 } == true
                 if (selected == null || selected.validityLabel.isNullOrBlank() || amount == null || amount <= 0L ||
                     !ussdEntryCode.matches(Regex("^\\\\*[0-9*]+#$")) || steps == null || steps.length() == 0 ||
-                    rawPinInScript || !exactOfferValidityStep || !buyWithAirtimeStep) {
+                    rawPinInScript || !exactOfferValidityStep || !buyWithAirtimeStep || (confirmMenuVerified && menuVerificationNote.trim().length < 12)) {
                     fulfilmentNotice = when {
                         rawPinInScript -> "A SIM PIN must never be placed in menu steps."
                         !exactOfferValidityStep -> "Add a screen step that matches the exact offer name and validity."
                         !buyWithAirtimeStep -> "Add a separate screen-matched step that selects Buy with Airtime."
+                        confirmMenuVerified && menuVerificationNote.trim().length < 12 -> "Describe the successful test in a verification note (at least 12 characters)."
                         else -> "Choose an offer with a validity label and enter a valid amount, USSD code and menu steps."
                     }
                 } else {
@@ -1976,7 +1988,7 @@ private fun UssdAutomationSettingsScreen() {
                             val businessId = active.businessId ?: withContext(Dispatchers.IO) { api.firstBusinessId(active) }
                                 ?: throw IllegalStateException("No business workspace is connected.")
                             withContext(Dispatchers.IO) {
-                                api.saveFulfilmentRule(active, businessId, amount, selected.id, ussdEntryCode.trim(), steps, confirmMenuVerified)
+                                api.saveFulfilmentRule(active, businessId, amount, selected.id, ussdEntryCode.trim(), steps, confirmMenuVerified, menuVerificationNote)
                             }
                             fulfilmentRules = withContext(Dispatchers.IO) { api.listFulfilmentRules(active, businessId) }
                             fulfilmentNotice = if (confirmMenuVerified) "Menu rule saved and enabled after your verification." else "Menu rule saved disabled. Verify the exact provider flow before enabling it."
