@@ -511,6 +511,19 @@ private fun QuickDialScreen(db: LocalDatabase, onMessage: (String) -> Unit) {
                             active = active.copy(businessId = businessId)
                             secureStore.save(active)
                         }
+                        withContext(Dispatchers.IO) {
+                            val controls = api.getFulfilmentControls(active, businessId)
+                            if (!controls.optBoolean("fulfilment_enabled", false) ||
+                                controls.optBoolean("fulfilment_paused", true)) {
+                                api.setFulfilmentControls(
+                                    active,
+                                    businessId,
+                                    enabled = true,
+                                    paused = false,
+                                    requireManualPin = controls.optBoolean("fulfilment_require_manual_pin", true)
+                                )
+                            }
+                        }
                         withContext(Dispatchers.IO) { api.syncLocalOfferToCloud(active, businessId, offer) }
                         val cloudOffer = withContext(Dispatchers.IO) {
                             api.listFulfilmentOffers(active, businessId).firstOrNull {
