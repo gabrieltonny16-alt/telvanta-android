@@ -2318,12 +2318,19 @@ private fun BingwaDashboard(db: LocalDatabase, onNavigate: (String) -> Unit) {
         delivered.filter { it.createdAt >= from && it.createdAt < from + 86400000L }.sumOf { it.price }
     }
     val recent = transactions.take(4)
-    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(26.dp), colors = CardDefaults.cardColors(containerColor = Color(0xFF0B0F19))) {
-            Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text(greeting + ", GABRIEL", color = Color.White, fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.headlineSmall)
-                Text(date, color = Color(0xFF94A3B8), style = MaterialTheme.typography.bodyLarge)
-                Text("Subscription", color = Color(0xFF94A3B8))
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(22.dp), colors = CardDefaults.cardColors(containerColor = Color(0xFF0B0F19)), border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF1E3A5F))) {
+            Column(Modifier.padding(15.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text(greeting + ", GABRIEL", color = Color.White, fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.titleLarge)
+                        Text(date, color = Color(0xFF94A3B8), style = MaterialTheme.typography.labelSmall)
+                    }
+                    Surface(color = Color(0xFF10243A), shape = RoundedCornerShape(50)) {
+                        Text("BUSINESS", color = Color(0xFF00F2FE), modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                    }
+                }
+                Text("SUBSCRIPTION", color = Color(0xFF94A3B8), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
                 Text(
                     walletSnapshot?.activeSubscription?.let { planName(walletSnapshot?.plans.orEmpty(), it.planCode) }
                         ?: if (walletSnapshot == null) "Loading subscription…" else "No active subscription",
@@ -2341,18 +2348,18 @@ private fun BingwaDashboard(db: LocalDatabase, onNavigate: (String) -> Unit) {
                     DashboardMetric("Failed", failed, Color(0xFFE44848), Modifier.weight(1f))
                     DashboardMetric("Pending", pending, Color(0xFFFF9418), Modifier.weight(1f))
                 }
-                Text("This week commission: —", color = Color.White, style = MaterialTheme.typography.bodyLarge)
-                Text("Commission tracking is not connected to verified commission records.", color = Color(0xFF94A3B8), style = MaterialTheme.typography.labelSmall)
+                Text("Commission", color = Color(0xFF94A3B8), style = MaterialTheme.typography.labelSmall)
+                Text("Not available yet", color = Color.White, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyMedium)
             }
         }
-        Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(24.dp), colors = CardDefaults.cardColors(containerColor = Color(0xFF0B0F19))) {
-            Row(Modifier.fillMaxWidth().padding(18.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+        Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = Color(0xFF0B0F19)), border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF1E3A5F))) {
+            Row(Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
                 Surface(color = Color(0xFF10243A), shape = RoundedCornerShape(50)) { Text("▣", color = Color(0xFF00F2FE), modifier = Modifier.padding(14.dp), style = MaterialTheme.typography.headlineSmall) }
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text("Airtime Balance", color = Color(0xFF94A3B8))
                     Text(airtimeBalance ?: "KES —", color = Color.White, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.headlineSmall)
                     Text("Airtime used today: KES " + money(todayUsage), color = Color(0xFF94A3B8))
-                    Text(airtimeResponse, color = Color(0xFF94A3B8), style = MaterialTheme.typography.labelSmall)
+                    Text(airtimeResponse, color = Color(0xFF94A3B8), style = MaterialTheme.typography.labelSmall, maxLines = 2)
                     if (simOptions.size > 1) {
                         Box {
                             TextButton(onClick = { simMenuExpanded = true }) {
