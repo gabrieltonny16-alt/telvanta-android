@@ -93,19 +93,33 @@ class UssdAccessibilityService : AccessibilityService() {
         val action = step.optString("action").lowercase()
         val offerName = job.optString("offer_name").trim()
         val validityLabel = job.optString("validity_label").trim()
-        val containsOfferIdentity = containsExactPhrase(matchText, offerName) ||
+        val stepTargetsOffer = containsExactPhrase(matchText, offerName) ||
             containsExactPhrase(matchText, validityLabel)
+        val screenMentionsOffer = containsExactPhrase(screenText, offerName) ||
+            containsExactPhrase(screenText, validityLabel)
+        val targetOfferOption = if (offerName.isNotBlank() && validityLabel.isNotBlank()) {
+            UssdMenuParser.parse(screenText).firstOrNull { option ->
+                containsExactPhrase(option.label, offerName) &&
+                    containsExactPhrase(option.label, validityLabel)
+            }
+        } else null
         var confirmsOfferIdentity = false
 
-        // The exact offer name AND exact validity must be visible together before
-        // any later Buy with Airtime action is permitted.
-        if (containsOfferIdentity) {
-            if (offerName.isBlank() || validityLabel.isBlank() ||
-                !containsExactPhrase(matchText, offerName) ||
-                !containsExactPhrase(matchText, validityLabel) ||
-                !containsExactPhrase(screenText, offerName) ||
-                !containsExactPhrase(screenText, validityLabel)) {
-                recordState("OFFER_IDENTITY_MISMATCH", "Provider screen did not show the exact offer name and validity. Automation stopped without selecting an offer.")
+        // Offer name and validity must belong to the same numbered menu option.
+        if (stepTargetsOffer || screenMentionsOffer) {
+            if (offerName.isBlank() || validityLabel.isBlank() || targetOfferOption == null) {
+                recordState("OFFER_IDENTITY_MISMATCH", "The exact offer name and validity were not found together in one provider menu option. No selection was made.")
+                return
+            }
+            val configuredValue = valueForStep(step, job)
+            if (action == "reply" && configuredValue.toIntOrNull() != targetOfferOption.optionNumber) {
+                recordState("OFFER_OPTION_MISMATCH", "Configured reply does not select the numbered option containing the exact offer name and validity. Automation stopped.")
+                return
+            }
+            if (action == "tap_text" &&
+                (!containsExactPhrase(configuredValue, offerName) ||
+                 !containsExactPhrase(configuredValue, validityLabel))) {
+                recordState("OFFER_OPTION_MISMATCH", "Configured tap target does not identify the exact offer name and validity. Automation stopped.")
                 return
             }
             confirmsOfferIdentity = true
@@ -156,11 +170,7 @@ class UssdAccessibilityService : AccessibilityService() {
             recordState("UNEXPECTED_USSD_SCREEN", "Configured action '$action' was not allowed on screen type '${classification.type}'. No response was sent.")
             return
         }
-        val value = step.optString("value")
-            .replace("{recipient_phone}", job.optString("recipient_phone"))
-            .replace("{payer_phone}", job.optString("payer_phone"))
-            .replace("{offer_name}", job.optString("offer_name"))
-            .replace("{customer_price_kes}", job.optString("customer_price_kes"))
+        val value = valueForStep(step, job)
         val completed = when (action) {
             "reply" -> enterReply(root, value)
             "tap_text" -> tapVisibleText(root, value)
@@ -175,6 +185,13 @@ class UssdAccessibilityService : AccessibilityService() {
                 "Configured step ${stepIndex + 1}/${steps.length()} matched '$matchText' and action '$action'.")
         } else recordState("USSD_ACTION_NOT_COMPLETED", "Could not safely perform '$action' for '$matchText'. No fallback tap was attempted.")
     }
+
+    private fun valueForStep(step: JSONObject, job: JSONObject): String =
+        step.optString("value")
+            .replace("{recipient_phone}", job.optString("recipient_phone"))
+            .replace("{payer_phone}", job.optString("payer_phone"))
+            .replace("{offer_name}", job.optString("offer_name"))
+            .replace("{customer_price_kes}", job.optString("customer_price_kes"))
 
     private fun containsExactPhrase(text: String, phrase: String): Boolean {
         if (text.isBlank() || phrase.isBlank()) return false
