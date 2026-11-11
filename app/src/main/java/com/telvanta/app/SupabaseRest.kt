@@ -136,7 +136,10 @@ data class FulfilmentRuleSummary(
     val offerId: String,
     val menuEntryCode: String,
     val isEnabled: Boolean,
-    val verifiedAt: String?
+    val verifiedAt: String?,
+    val verifiedBy: String?,
+    val verificationNote: String?,
+    val version: Int
 )
 
 data class MpesaNotificationReviewCandidate(
@@ -575,7 +578,7 @@ class BingwaSupabaseApi {
     }
 
     fun listFulfilmentRules(session: BingwaSession, businessId: String): List<FulfilmentRuleSummary> {
-        val query = "/rest/v1/payment_offer_rules?select=id,amount_minor,offer_id,menu_entry_code,is_enabled,menu_flow_verified_at&business_id=eq.$businessId&order=amount_minor.asc"
+        val query = "/rest/v1/payment_offer_rules?select=id,amount_minor,offer_id,menu_entry_code,is_enabled,menu_flow_verified_at,menu_flow_verified_by,menu_flow_verified_note,menu_flow_version&business_id=eq.$businessId&order=amount_minor.asc"
         val rows = JSONArray(request("GET", query, token = session.accessToken))
         return buildList {
             for (i in 0 until rows.length()) {
@@ -586,7 +589,10 @@ class BingwaSupabaseApi {
                     offerId = row.optString("offer_id"),
                     menuEntryCode = row.optString("menu_entry_code"),
                     isEnabled = row.optBoolean("is_enabled", false),
-                    verifiedAt = row.optString("menu_flow_verified_at").takeIf { it.isNotBlank() && it != "null" }
+                    verifiedAt = row.optString("menu_flow_verified_at").takeIf { it.isNotBlank() && it != "null" },
+                    verifiedBy = row.optString("menu_flow_verified_by").takeIf { it.isNotBlank() && it != "null" },
+                    verificationNote = row.optString("menu_flow_verified_note").takeIf { it.isNotBlank() && it != "null" },
+                    version = row.optInt("menu_flow_version", 1)
                 ))
             }
         }
