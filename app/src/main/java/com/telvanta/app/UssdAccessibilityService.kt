@@ -141,7 +141,17 @@ class UssdAccessibilityService : AccessibilityService() {
             return
         }
 
-        if (matchText.isBlank() || !screenText.contains(matchText, ignoreCase = true)) return
+        if (matchText.isBlank() || !containsExactPhrase(screenText, matchText)) return
+        val actionScreenAllowed = when (action) {
+            "reply" -> classification.type in setOf(UssdScreenType.MENU, UssdScreenType.PAYMENT_METHOD, UssdScreenType.PURCHASE_CONFIRMATION)
+            "tap_text" -> classification.type in setOf(UssdScreenType.MENU, UssdScreenType.PAYMENT_METHOD)
+            "manual_pin" -> classification.type == UssdScreenType.PURCHASE_CONFIRMATION
+            else -> false
+        }
+        if (!actionScreenAllowed) {
+            recordState("UNEXPECTED_USSD_SCREEN", "Configured action '$action' was not allowed on screen type '${classification.type}'. No response was sent.")
+            return
+        }
         val value = step.optString("value")
             .replace("{recipient_phone}", job.optString("recipient_phone"))
             .replace("{payer_phone}", job.optString("payer_phone"))
@@ -175,39 +185,48 @@ class UssdAccessibilityService : AccessibilityService() {
 
     private fun enterReply(root: AccessibilityNodeInfo?, value: String): Boolean {
         if (root == null || value.isBlank()) return false
-        val input = findEditable(root) ?: return false
-        val args = android.os.Bundle().apply { putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, value) }
-        if (!input.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, args)) return false
-        val sendButton = findButton(root, listOf("send", "ok", "reply", "submit", "continue"))
-        return sendButton?.performAction(AccessibilityNodeInfo.ACTION_CLICK) == true
+        val inputs = findEditables(root)
+        val buttons = findButtons(root, listOf("send", "ok", "reply", "submit", "continue"))
+        if (inputs.size != 1 || buttons.size != 1) return false
+        val args = android.os.Bundle().apply {
+            putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, value)
+        }
+        if (!inputs.single().performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, args)) return false
+        return buttons.single().performAction(AccessibilityNodeInfo.ACTION_CLICK)
     }
 
     private fun tapVisibleText(root: AccessibilityNodeInfo?, value: String): Boolean {
         if (root == null || value.isBlank()) return false
-        var target: AccessibilityNodeInfo? = findTextNode(root, value) ?: return false
-        while (target != null && !target.isClickable) target = target.parent
-        return target?.performAction(AccessibilityNodeInfo.ACTION_CLICK) == true
+        val targets = findTextTargets(root, value)
+        if (targets.size != 1) return false
+        return targets.single().performAction(AccessibilityNodeInfo.ACTION_CLICK)
     }
 
-    private fun findEditable(node: AccessibilityNodeInfo?): AccessibilityNodeInfo? {
-        if (node == null) return null
-        if (node.isEditable && node.isEnabled) return node
-        for (i in 0 until node.childCount) findEditable(node.getChild(i))?.let { return it }
-        return null
+    private fun findEditables(node: AccessibilityNodeInfo?, result: MutableList<AccessibilityNodeInfo> = mutableListOf()): List<AccessibilityNodeInfo> {
+        if (node == null) return result
+        if (node.isEditable && node.isEnabled) result.add(node)
+        for (i in 0 until node.childCount) findEditables(node.getChild(i), result)
+        return result
     }
-    private fun findButton(node: AccessibilityNodeInfo?, labels: List<String>): AccessibilityNodeInfo? {
-        if (node == null) return null
+
+    private fun findButtons(node: AccessibilityNodeInfo?, labels: List<String>, result: MutableList<AccessibilityNodeInfo> = mutableListOf()): List<AccessibilityNodeInfo> {
+        if (node == null) return result
         val label = (node.text?.toString() ?: node.contentDescription?.toString()).orEmpty().trim().lowercase()
-        if (node.isEnabled && node.isClickable && labels.any { label == it || label.contains(it) }) return node
-        for (i in 0 until node.childCount) findButton(node.getChild(i), labels)?.let { return it }
-        return null
+        if (node.isEnabled && node.isClickable && labels.any { label == it || label.contains(it) }) result.add(node)
+        for (i in 0 until node.childCount) findButtons(node.getChild(i), labels, result)
+        return result.distinctBy { it.boundsInScreen.toShortString() }
     }
-    private fun findTextNode(node: AccessibilityNodeInfo?, value: String): AccessibilityNodeInfo? {
-        if (node == null) return null
+
+    private fun findTextTargets(node: AccessibilityNodeInfo?, value: String, result: MutableList<AccessibilityNodeInfo> = mutableListOf()): List<AccessibilityNodeInfo> {
+        if (node == null) return result
         val label = (node.text?.toString() ?: node.contentDescription?.toString()).orEmpty().trim()
-        if (label.equals(value, true) || label.startsWith("$value ") || label.startsWith("$value:")) return node
-        for (i in 0 until node.childCount) findTextNode(node.getChild(i), value)?.let { return it }
-        return null
+        if (label.equals(value, true)) {
+            var target: AccessibilityNodeInfo? = node
+            while (target != null && !target.isClickable) target = target.parent
+            if (target != null) result.add(target)
+        }
+        for (i in 0 until node.childCount) findTextTargets(node.getChild(i), value, result)
+        return result.distinctBy { it.boundsInScreen.toShortString() }
     }
     private fun promptManualPin() {
         val now = System.currentTimeMillis()
