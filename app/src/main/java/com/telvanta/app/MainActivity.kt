@@ -388,6 +388,35 @@ private fun QuickDialScreen(db: LocalDatabase, onMessage: (String) -> Unit) {
     val scope = rememberCoroutineScope()
     val secureStore = remember { SecureSessionStore(context) }
     val api = remember { BingwaSupabaseApi() }
+    var pendingDialCode by remember { mutableStateOf<String?>(null) }
+    var pendingWorkerBusinessId by remember { mutableStateOf<String?>(null) }
+    var pendingWorkerDeviceId by remember { mutableStateOf<String?>(null) }
+    val callPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        val code = pendingDialCode
+        val businessId = pendingWorkerBusinessId
+        val deviceId = pendingWorkerDeviceId
+        if (granted && !businessId.isNullOrBlank() && !deviceId.isNullOrBlank()) {
+            try {
+                val workerIntent = Intent(context, FulfilmentWorkerService::class.java)
+                    .putExtra(FulfilmentWorkerService.EXTRA_BUSINESS_ID, businessId)
+                    .putExtra(FulfilmentWorkerService.EXTRA_DEVICE_ID, deviceId)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) context.startForegroundService(workerIntent)
+                else context.startService(workerIntent)
+            } catch (error: Exception) {
+                onMessage("Order saved, but the automatic worker could not start: ${error.message ?: "unknown error"}.")
+            }
+        } else if (!granted) {
+            onMessage("Order saved. Allow Phone permission to let BingwaPulse run automatic USSD fulfilment.")
+        }
+        if (!code.isNullOrBlank()) {
+            runCatching {
+                context.startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:" + Uri.encode(code))))
+            }.onFailure { onMessage("Order saved, but the phone dialler could not be opened.") }
+        }
+        pendingDialCode = null
+        pendingWorkerBusinessId = null
+        pendingWorkerDeviceId = null
+    }
     val offers = remember(refresh) { db.offers() }
     val selectedOffer = offers.firstOrNull { it.id == selectedOfferId }
     val dialableOffers = offers.filter { it.ussdCode.isNotBlank() }
@@ -492,8 +521,36 @@ private fun QuickDialScreen(db: LocalDatabase, onMessage: (String) -> Unit) {
                         withContext(Dispatchers.IO) {
                             api.createQuickDialOrder(active, businessId, cloudOffer.id, recipient, offer.price.toInt())
                         }
-                        context.startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:" + Uri.encode(code))))
-                        onMessage("Order prepared for $recipient. Choose the SIM and press Dial. Matching Till payment and fulfilment are handled automatically when the business worker is online.")
+                        val device = withContext(Dispatchers.IO) {
+                            api.listDevices(active, businessId).firstOrNull {
+                                it.assignedUserId == active.userId && it.status == "online"
+                            } ?: api.registerCurrentWorkerDevice(
+                                active,
+                                businessId,
+                                listOf(Build.MANUFACTURER, Build.MODEL).filter { it.isNotBlank() }
+                                    .joinToString(" ").ifBlank { "BingwaPulse Android worker" }.take(100)
+                            )
+                        }
+                        pendingDialCode = code
+                        pendingWorkerBusinessId = businessId
+                        pendingWorkerDeviceId = device.id
+                        val phonePermissionGranted = androidx.core.content.ContextCompat.checkSelfPermission(
+                            context, android.Manifest.permission.CALL_PHONE
+                        ) == PackageManager.PERMISSION_GRANTED
+                        if (phonePermissionGranted) {
+                            val workerIntent = Intent(context, FulfilmentWorkerService::class.java)
+                                .putExtra(FulfilmentWorkerService.EXTRA_BUSINESS_ID, businessId)
+                                .putExtra(FulfilmentWorkerService.EXTRA_DEVICE_ID, device.id)
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) context.startForegroundService(workerIntent)
+                            else context.startService(workerIntent)
+                            context.startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:" + Uri.encode(code))))
+                            pendingDialCode = null
+                            pendingWorkerBusinessId = null
+                            pendingWorkerDeviceId = null
+                            onMessage("Order prepared for $recipient. Automatic worker started. Choose your SIM and press Dial.")
+                        } else {
+                            callPermissionLauncher.launch(android.Manifest.permission.CALL_PHONE)
+                        }
                     } catch (error: Exception) {
                         onMessage(error.message ?: "Quick Dial could not prepare this order.")
                     } finally {
