@@ -127,14 +127,18 @@ class UssdAccessibilityService : AccessibilityService() {
         // Advance only after the PIN prompt disappears and the next configured
         // screen signature is visible; never inspect or capture the entered PIN.
         if (action == "manual_pin") {
-            if (matchText.isNotBlank() && screenText.contains(matchText, ignoreCase = true)) {
+            if (matchText.isNotBlank() &&
+                containsExactPhrase(screenText, matchText) &&
+                classification.type == UssdScreenType.PURCHASE_CONFIRMATION) {
                 promptManualPin()
                 recordState("WAITING_FOR_MANUAL_PIN", "Enter the SIM PIN directly in the Android USSD prompt. BingwaPulse does not read or store it.")
                 return
             }
             val nextStep = steps.optJSONObject(stepIndex + 1) ?: return
             val nextMatch = nextStep.optString("match_text").trim()
-            if (nextMatch.isNotBlank() && screenText.contains(nextMatch, ignoreCase = true)) {
+            if (nextMatch.isNotBlank() &&
+                containsExactPhrase(screenText, nextMatch) &&
+                classification.type in setOf(UssdScreenType.MENU, UssdScreenType.PAYMENT_METHOD, UssdScreenType.PURCHASE_CONFIRMATION)) {
                 prefs.edit().putInt(KEY_ACTIVE_STEP, stepIndex + 1).apply()
                 executeConfiguredStep(screenText, root)
             }
