@@ -6,12 +6,6 @@ alter table public.businesses
   alter column fulfilment_enabled set default true,
   alter column fulfilment_paused set default false;
 
-update public.businesses
-set fulfilment_enabled = true,
-    fulfilment_paused = false,
-    updated_at = now()
-where fulfilment_enabled = false or fulfilment_paused = true;
-
 create or replace function public.create_quick_dial_order(
   p_business_id uuid,
   p_offer_id uuid,
