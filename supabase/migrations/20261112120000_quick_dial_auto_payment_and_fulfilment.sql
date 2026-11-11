@@ -231,3 +231,38 @@ drop trigger if exists zz_payment_notification_quick_dial_auto_match
 create trigger zz_payment_notification_quick_dial_auto_match
 after insert or update of staging_status on public.payment_notification_candidates
 for each row execute function private.auto_match_mpesa_notification_to_quick_dial_order();
+
+
+-- Manual "verify payment" is not a supported path. Valid notification evidence is
+-- matched automatically to a unique Quick Dial order; all other candidates remain held.
+alter function public.review_mpesa_notification_candidate(uuid,uuid,text)
+  rename to review_mpesa_notification_candidate_legacy;
+
+revoke all on function public.review_mpesa_notification_candidate_legacy(uuid,uuid,text)
+  from public,anon,authenticated;
+
+create or replace function public.review_mpesa_notification_candidate(
+  p_business_id uuid,
+  p_candidate_id uuid,
+  p_decision text
+) returns table(candidate_id uuid, order_id uuid, payment_status text, order_status text)
+language plpgsql
+security definer
+set search_path = public, private, pg_temp
+as $$
+begin
+  if p_decision <> 'reject' then
+    raise exception 'Payments are verified automatically from a valid, uniquely matched Till notification; manual verification is disabled.'
+      using errcode='42501';
+  end if;
+  return query
+    select * from public.review_mpesa_notification_candidate_legacy(
+      p_business_id,p_candidate_id,'reject'
+    );
+end;
+$$;
+
+revoke all on function public.review_mpesa_notification_candidate(uuid,uuid,text)
+  from public,anon;
+grant execute on function public.review_mpesa_notification_candidate(uuid,uuid,text)
+  to authenticated;
