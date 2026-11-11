@@ -80,6 +80,7 @@ class FulfilmentWorkerService : Service() {
                 jobVault.save(job.toString())
                 prefs.edit()
                     .putInt(UssdAccessibilityService.KEY_ACTIVE_STEP, 0)
+                    .remove(UssdAccessibilityService.KEY_OFFER_IDENTITY_CONFIRMED)
                     .putLong(UssdAccessibilityService.KEY_JOB_STARTED_AT, System.currentTimeMillis())
                     .apply()
 
@@ -145,6 +146,7 @@ class FulfilmentWorkerService : Service() {
         getSharedPreferences(UssdAccessibilityService.PREFS, MODE_PRIVATE).edit()
             .remove(UssdAccessibilityService.KEY_ACTIVE_STEP)
             .remove(UssdAccessibilityService.KEY_JOB_STARTED_AT)
+            .remove(UssdAccessibilityService.KEY_OFFER_IDENTITY_CONFIRMED)
             .apply()
         if (dismissUssd) {
             sendBroadcast(Intent(UssdAccessibilityService.ACTION_DISMISS_USSD).setPackage(packageName))
