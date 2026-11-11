@@ -2049,7 +2049,8 @@ private fun UssdAutomationSettingsScreen() {
             val offerName = fulfilmentOffers.firstOrNull { it.id == rule.offerId }?.name ?: "Offer"
             InfoCard(
                 "KES ${rule.amountMinor / 100} · $offerName",
-                "${rule.menuEntryCode} · ${if (rule.isEnabled && rule.verifiedAt != null) "VERIFIED / ENABLED" else "DISABLED / NOT VERIFIED"}"
+                "${rule.menuEntryCode} · ${if (rule.isEnabled && rule.verifiedAt != null && rule.verifiedBy != null) "VERIFIED / ENABLED" else "DISABLED / NOT VERIFIED"} · v${rule.version}" +
+                    (rule.verificationNote?.let { "\\nManager test: $it" } ?: "")
             )
         }
 
