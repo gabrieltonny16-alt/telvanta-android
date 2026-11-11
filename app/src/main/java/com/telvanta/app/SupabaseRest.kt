@@ -599,11 +599,15 @@ class BingwaSupabaseApi {
         offerId: String,
         ussdCode: String,
         menuSteps: org.json.JSONArray,
-        enableAfterManagerVerification: Boolean
+        enableAfterManagerVerification: Boolean,
+        verificationNote: String = ""
     ) {
         require(amountKes > 0L && offerId.isNotBlank())
         require(ussdCode.matches(Regex("^\\\\*[0-9*]+#$")))
         require(menuSteps.length() > 0)
+        if (enableAfterManagerVerification) {
+            require(verificationNote.trim().length >= 12) { "Add a short note describing the successful recipe test." }
+        }
         val now = java.time.Instant.now().toString()
         val body = JSONObject()
             .put("business_id", businessId)
@@ -613,6 +617,8 @@ class BingwaSupabaseApi {
             .put("menu_steps", menuSteps)
             .put("is_enabled", enableAfterManagerVerification)
             .put("menu_flow_verified_at", if (enableAfterManagerVerification) now else JSONObject.NULL)
+            .put("menu_flow_verified_by", if (enableAfterManagerVerification) session.userId else JSONObject.NULL)
+            .put("menu_flow_verified_note", if (enableAfterManagerVerification) verificationNote.trim().take(500) else JSONObject.NULL)
         request(
             "POST",
             "/rest/v1/payment_offer_rules?on_conflict=business_id,amount_minor",
