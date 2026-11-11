@@ -17,9 +17,9 @@ import java.util.concurrent.Executors
 /**
  * Opt-in M-PESA notification reader and authenticated relay.
  *
- * Notifications are untrusted evidence. They are uploaded under the signed-in user's
- * Supabase JWT and are stored as UNVERIFIED candidates. They never mark a payment paid,
- * create an order, or start a USSD purchase.
+ * Notifications are captured under the signed-in user's Supabase JWT. The server
+ * validates the receipt and automatically matches it to one pending Quick Dial order.
+ * Incomplete, duplicate or ambiguous notifications remain held and never dispatch USSD.
  */
 class MpesaNotificationListenerService : NotificationListenerService() {
     private val relayExecutor = Executors.newSingleThreadExecutor()
@@ -141,7 +141,7 @@ class MpesaNotificationListenerService : NotificationListenerService() {
         val rawText = prefs.getString(KEY_TEXT, "").orEmpty()
         if (rawText.isBlank()) return
         val status = prefs.getString(KEY_SYNC_STATUS, "").orEmpty()
-        if (status == "SYNCED_UNVERIFIED") return
+        if (status == "SYNCED") return
         enqueueRelay(
             prefs.getString(KEY_PACKAGE, "").orEmpty(),
             prefs.getString(KEY_TITLE, "").orEmpty(),
@@ -210,7 +210,7 @@ class MpesaNotificationListenerService : NotificationListenerService() {
                     postedAtEpochMillis = postedAt
                 )
                 prefs.edit()
-                    .putString(KEY_SYNC_STATUS, "SYNCED_UNVERIFIED")
+                    .putString(KEY_SYNC_STATUS, "SYNCED")
                     .putLong(KEY_SYNCED_AT, System.currentTimeMillis())
                     .remove(KEY_SYNC_ERROR)
                     .apply()
