@@ -558,6 +558,28 @@ class BingwaSupabaseApi {
         )
     }
 
+    fun createQuickDialOrder(
+        session: BingwaSession,
+        businessId: String,
+        offerId: String,
+        recipientPhone: String,
+        amountKes: Int
+    ): JSONObject {
+        require(businessId.isNotBlank() && offerId.isNotBlank() && amountKes > 0)
+        val body = JSONObject()
+            .put("p_business_id", businessId)
+            .put("p_offer_id", offerId)
+            .put("p_recipient_phone", recipientPhone)
+            .put("p_amount_kes", amountKes)
+        val response = request(
+            "POST",
+            "/rest/v1/rpc/create_quick_dial_order",
+            body,
+            session.accessToken
+        )
+        return JSONObject(response)
+    }
+
     fun listFulfilmentOffers(session: BingwaSession, businessId: String): List<FulfilmentOffer> {
         val query = "/rest/v1/offers?select=id,name,category,provider_id,is_active,validity_label,code&business_id=eq.$businessId&is_active=eq.true&order=name.asc"
         val rows = JSONArray(request("GET", query, token = session.accessToken))
