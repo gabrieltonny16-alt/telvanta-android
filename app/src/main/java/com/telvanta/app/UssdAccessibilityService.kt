@@ -91,6 +91,37 @@ class UssdAccessibilityService : AccessibilityService() {
         val step = steps.optJSONObject(stepIndex) ?: return
         val matchText = step.optString("match_text").trim()
         val action = step.optString("action").lowercase()
+        val offerName = job.optString("offer_name").trim()
+        val validityLabel = job.optString("validity_label").trim()
+        val containsOfferIdentity = containsExactPhrase(matchText, offerName) ||
+            containsExactPhrase(matchText, validityLabel)
+        var confirmsOfferIdentity = false
+
+        // The exact offer name AND exact validity must be visible together before
+        // any later Buy with Airtime action is permitted.
+        if (containsOfferIdentity) {
+            if (offerName.isBlank() || validityLabel.isBlank() ||
+                !containsExactPhrase(matchText, offerName) ||
+                !containsExactPhrase(matchText, validityLabel) ||
+                !containsExactPhrase(screenText, offerName) ||
+                !containsExactPhrase(screenText, validityLabel)) {
+                recordState("OFFER_IDENTITY_MISMATCH", "Provider screen did not show the exact offer name and validity. Automation stopped without selecting an offer.")
+                return
+            }
+            confirmsOfferIdentity = true
+        }
+
+        val buyWithAirtimeStep = containsExactPhrase(matchText, "Buy with Airtime")
+        if (buyWithAirtimeStep) {
+            if (!prefs.getBoolean(KEY_OFFER_IDENTITY_CONFIRMED, false)) {
+                recordState("OFFER_IDENTITY_NOT_CONFIRMED", "Buy with Airtime was blocked because the exact offer name and validity were not confirmed first.")
+                return
+            }
+            if (!containsExactPhrase(screenText, "Buy with Airtime")) {
+                recordState("PAYMENT_METHOD_MISMATCH", "The provider screen did not show the exact Buy with Airtime option. Automation stopped.")
+                return
+            }
+        }
 
         // A manual PIN step is a pause, not a completed automation action.
         // Advance only after the PIN prompt disappears and the next configured
@@ -123,10 +154,23 @@ class UssdAccessibilityService : AccessibilityService() {
             else -> { recordState("CONFIGURATION_ERROR", "Unsupported configured action at step ${stepIndex + 1}: $action"); false }
         }
         if (completed) {
-            prefs.edit().putInt(KEY_ACTIVE_STEP, stepIndex + 1).apply()
+            prefs.edit().putInt(KEY_ACTIVE_STEP, stepIndex + 1)
+                .also { if (confirmsOfferIdentity) it.putBoolean(KEY_OFFER_IDENTITY_CONFIRMED, true) }
+                .apply()
             recordState(if (action == "manual_pin") "WAITING_FOR_MANUAL_PIN" else "USSD_STEP_SENT",
                 "Configured step ${stepIndex + 1}/${steps.length()} matched '$matchText' and action '$action'.")
         } else recordState("USSD_ACTION_NOT_COMPLETED", "Could not safely perform '$action' for '$matchText'. No fallback tap was attempted.")
+    }
+
+    private fun containsExactPhrase(text: String, phrase: String): Boolean {
+        if (text.isBlank() || phrase.isBlank()) return false
+        val normalizedText = text.replace(Regex("\\s+"), " ").trim()
+        val normalizedPhrase = phrase.replace(Regex("\\s+"), " ").trim()
+        val pattern = Regex(
+            "(?<![\\p{L}\\p{N}])" + Regex.escape(normalizedPhrase) + "(?![\\p{L}\\p{N}])",
+            RegexOption.IGNORE_CASE
+        )
+        return pattern.containsMatchIn(normalizedText)
     }
 
     private fun enterReply(root: AccessibilityNodeInfo?, value: String): Boolean {
@@ -192,7 +236,7 @@ class UssdAccessibilityService : AccessibilityService() {
                     job.getString("device_id"), job.getInt("attempt_no"), state, prefs.getInt(KEY_ACTIVE_STEP, 0),
                     redactSensitiveText(screenText), errorCode = errorCode, errorDetail = errorDetail)
                 SecureFulfilmentJobStore(this).clear()
-                prefs.edit().remove(KEY_ACTIVE_STEP).remove(KEY_JOB_STARTED_AT).apply()
+                prefs.edit().remove(KEY_ACTIVE_STEP).remove(KEY_JOB_STARTED_AT).remove(KEY_OFFER_IDENTITY_CONFIRMED).apply()
                 // Dismiss the system USSD dialog only after the server accepts a
                 // definitive carrier result. A failed sync leaves the session visible.
                 Handler(Looper.getMainLooper()).post {
@@ -239,6 +283,7 @@ class UssdAccessibilityService : AccessibilityService() {
         const val KEY_UPDATED_AT = "updated_at"
         const val KEY_ACTIVE_STEP = "active_fulfilment_step"
         const val KEY_JOB_STARTED_AT = "active_fulfilment_started_at"
+        const val KEY_OFFER_IDENTITY_CONFIRMED = "active_offer_identity_confirmed"
         const val ACTION_DISMISS_USSD = "com.telvanta.app.ACTION_DISMISS_USSD"
     }
 }
