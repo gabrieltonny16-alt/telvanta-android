@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -249,7 +250,10 @@ internal fun WalletScreen() {
     }
 
     LazyColumn(
-        modifier = Modifier.fillMaxWidth(),
+        // WalletScreen is hosted inside MainActivity's outer LazyColumn.
+        // Give this nested list a finite height constraint to prevent Compose's
+        // unbounded vertical-scroll measurement crash when Wallet is opened.
+        modifier = Modifier.fillMaxWidth().heightIn(max = 12000.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         item {
