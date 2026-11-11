@@ -887,7 +887,13 @@ private fun CloudOfferSyncEffect(db: LocalDatabase, revision: Int, onMessage: (S
             }
             if (localOffers.isNotEmpty()) onMessage("${localOffers.size} local offer(s) synchronized with the cloud catalogue.")
         } catch (error: Exception) {
-            onMessage(error.message ?: "Could not synchronize local offers with the clprivate fun OffersScreen(db: LocalDatabase, onMessage: (String) -> Unit) {
+            onMessage(error.message ?: "Could not synchronize local offers with the cloud catalogue.")
+        }
+    }
+}
+
+@Composable
+private fun OffersScreen(db: LocalDatabase, onMessage: (String) -> Unit) {
     val context = LocalContext.current
     val secureStore = remember { SecureSessionStore(context) }
     val api = remember { BingwaSupabaseApi() }
@@ -1005,9 +1011,6 @@ private fun CloudOfferSyncEffect(db: LocalDatabase, revision: Int, onMessage: (S
             }) { Text("Save") }
         },
         dismissButton = { TextButton(onClick = { showEditor = false; clearEditor() }) { Text("Cancel") } }
-    )
-}
-; clearEditor() }) { Text("Cancel") } }
     )
 }
 
