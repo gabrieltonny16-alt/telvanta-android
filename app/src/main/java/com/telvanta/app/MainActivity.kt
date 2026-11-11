@@ -383,7 +383,11 @@ private fun QuickDialScreen(db: LocalDatabase, onMessage: (String) -> Unit) {
     var customerPhone by remember { mutableStateOf("") }
     var selectedOfferId by remember { mutableStateOf<Long?>(null) }
     var refresh by remember { mutableIntStateOf(0) }
+    var busy by remember { mutableStateOf(false) }
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val secureStore = remember { SecureSessionStore(context) }
+    val api = remember { BingwaSupabaseApi() }
     val offers = remember(refresh) { db.offers() }
     val selectedOffer = offers.firstOrNull { it.id == selectedOfferId }
     val dialableOffers = offers.filter { it.ussdCode.isNotBlank() }
@@ -393,13 +397,13 @@ private fun QuickDialScreen(db: LocalDatabase, onMessage: (String) -> Unit) {
         OutlinedTextField(
             value = customerPhone,
             onValueChange = { customerPhone = it.filter { ch -> ch.isDigit() || ch == '+' }.take(16) },
-            label = { Text("Customer Phone") },
-            placeholder = { Text("Enter customer number (optional)") },
+            label = { Text("Recipient Phone") },
+            placeholder = { Text("Enter recipient number") },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true
         )
         if (dialableOffers.isEmpty()) {
-            InfoCard("No dialable offers yet", "Quick Dial reads saved offers from My Offers. Add an offer with a USSD code in Offers, then return here. Offers without a saved USSD code cannot be dialled.")
+            InfoCard("No dialable offers yet", "Quick Dial reads saved offers from My Offers. Add an offer with a USSD code in Offers, then return here.")
         } else {
             rows.forEach { rowOffers ->
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(9.dp)) {
@@ -436,32 +440,75 @@ private fun QuickDialScreen(db: LocalDatabase, onMessage: (String) -> Unit) {
             onClick = {
                 val offer = selectedOffer
                 if (offer == null) {
-                    onMessage("Select an offer before opening the dialler.")
-                } else {
-                    val code = offer.ussdCode.trim()
-                    val inner = if (code.length >= 2) code.substring(1, code.length - 1) else ""
-                    val valid = code.length in 3..30 && code.startsWith("*") && code.endsWith("#") &&
-                        inner.all { it.isDigit() || it == '*' || it == '#' }
-                    if (!valid) {
-                        onMessage("This offer's saved USSD code is invalid. Edit it in Offers before dialling.")
-                    } else {
-                        try {
-                            context.startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:" + Uri.encode(code))))
-                            onMessage("Opened the phone dialler for ${offer.name}. Review the code, choose the SIM and press Call yourself. The customer phone field is not inserted into the code automatically.")
-                        } catch (_: Exception) {
-                            onMessage("No compatible phone dialler was found.")
+                    onMessage("Select an offer before dialling.")
+                    return@Button
+                }
+                val compact = customerPhone.trim().replace(Regex("[\\s()\\-]"), "")
+                val recipient = when {
+                    compact.startsWith("+254") -> compact
+                    compact.startsWith("254") -> "+$compact"
+                    compact.startsWith("0") && compact.length == 10 -> "+254" + compact.drop(1)
+                    else -> compact
+                }
+                if (!recipient.matches(Regex("^\\+254[17][0-9]{8}$"))) {
+                    onMessage("Enter a valid Kenyan recipient number.")
+                    return@Button
+                }
+                val code = offer.ussdCode.trim()
+                val inner = if (code.length >= 2) code.substring(1, code.length - 1) else ""
+                val valid = code.length in 3..30 && code.startsWith("*") && code.endsWith("#") &&
+                    inner.all { it.isDigit() || it == '*' || it == '#' }
+                if (!valid) {
+                    onMessage("This offer's saved USSD code is invalid. Edit it in Offers before dialling.")
+                    return@Button
+                }
+                if (busy) return@Button
+                busy = true
+                scope.launch {
+                    try {
+                        var active = secureStore.load()
+                            ?: throw IllegalStateException("Sign in to your BingwaPulse business workspace before using Quick Dial.")
+                        if (secureStore.isLocalWorkspace()) {
+                            throw IllegalStateException("Quick Dial order tracking requires a connected business workspace.")
                         }
+                        if (active.expiresAtEpochSeconds <= System.currentTimeMillis() / 1000L + 60L) {
+                            active = withContext(Dispatchers.IO) { api.refreshSession(active) }
+                            secureStore.save(active)
+                        }
+                        val businessId = active.businessId
+                            ?: withContext(Dispatchers.IO) { api.firstBusinessId(active) }
+                            ?: throw IllegalStateException("No business workspace is connected.")
+                        if (active.businessId == null) {
+                            active = active.copy(businessId = businessId)
+                            secureStore.save(active)
+                        }
+                        withContext(Dispatchers.IO) { api.syncLocalOfferToCloud(active, businessId, offer) }
+                        val cloudOffer = withContext(Dispatchers.IO) {
+                            api.listFulfilmentOffers(active, businessId).firstOrNull {
+                                it.name.equals(offer.name, ignoreCase = true) &&
+                                    (it.entryCode.isNullOrBlank() || it.entryCode == offer.ussdCode)
+                            }
+                        } ?: throw IllegalStateException("This offer could not be matched to the connected business catalogue.")
+                        withContext(Dispatchers.IO) {
+                            api.createQuickDialOrder(active, businessId, cloudOffer.id, recipient, offer.price.toInt())
+                        }
+                        context.startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:" + Uri.encode(code))))
+                        onMessage("Order prepared for $recipient. Choose the SIM and press Dial. Matching Till payment and fulfilment are handled automatically when the business worker is online.")
+                    } catch (error: Exception) {
+                        onMessage(error.message ?: "Quick Dial could not prepare this order.")
+                    } finally {
+                        busy = false
                     }
                 }
             },
-            enabled = selectedOffer != null,
+            enabled = selectedOffer != null && !busy,
             modifier = Modifier.fillMaxWidth().height(58.dp),
             shape = RoundedCornerShape(18.dp)
         ) {
-            Text("☎   Dial", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleLarge)
+            Text(if (busy) "Preparing order…" else "☎   Dial", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleLarge)
         }
         Text(
-            "Offers are loaded from My Offers on this device. Quick Dial does not automatically call, submit USSD menu choices or purchase bundles.",
+            "Enter the recipient and press Dial. BingwaPulse records the intended offer and recipient before opening the phone dialler.",
             color = Muted,
             style = MaterialTheme.typography.bodySmall
         )
