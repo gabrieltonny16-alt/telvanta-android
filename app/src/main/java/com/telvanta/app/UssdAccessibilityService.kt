@@ -1,10 +1,16 @@
 package com.telvanta.app
 
 import android.accessibilityservice.AccessibilityService
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.accessibilityservice.AccessibilityServiceInfo
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import org.json.JSONObject
@@ -14,6 +20,15 @@ import java.util.concurrent.Executors
 class UssdAccessibilityService : AccessibilityService() {
     private val automationExecutor = Executors.newSingleThreadExecutor()
     private var lastManualPinPromptAt = 0L
+    private var dismissReceiverRegistered = false
+    private val dismissReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (intent?.action == ACTION_DISMISS_USSD) {
+                performGlobalAction(GLOBAL_ACTION_BACK)
+                recordState("USSD_SESSION_DISMISSED", "USSD session closed after the worker stopped the attempt.")
+            }
+        }
+    }
 
     override fun onServiceConnected() {
         super.onServiceConnected()
@@ -24,6 +39,15 @@ class UssdAccessibilityService : AccessibilityService() {
             notificationTimeout = 100L
         }
         recordState("SERVICE_CONNECTED", "Accessibility service enabled")
+        if (!dismissReceiverRegistered) {
+            val filter = IntentFilter(ACTION_DISMISS_USSD)
+            if (Build.VERSION.SDK_INT >= 33) registerReceiver(dismissReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
+            else {
+                @Suppress("DEPRECATION")
+                registerReceiver(dismissReceiver, filter)
+            }
+            dismissReceiverRegistered = true
+        }
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
@@ -66,73 +90,171 @@ class UssdAccessibilityService : AccessibilityService() {
         }
         val step = steps.optJSONObject(stepIndex) ?: return
         val matchText = step.optString("match_text").trim()
-        if (matchText.isBlank() || !screenText.contains(matchText, ignoreCase = true)) return
         val action = step.optString("action").lowercase()
-        val value = step.optString("value")
-            .replace("{recipient_phone}", job.optString("recipient_phone"))
-            .replace("{payer_phone}", job.optString("payer_phone"))
-            .replace("{offer_name}", job.optString("offer_name"))
-            .replace("{customer_price_kes}", job.optString("customer_price_kes"))
+        val offerName = job.optString("offer_name").trim()
+        val validityLabel = job.optString("validity_label").trim()
+        val stepTargetsOffer = containsExactPhrase(matchText, offerName) ||
+            containsExactPhrase(matchText, validityLabel)
+        val screenMentionsOffer = containsExactPhrase(screenText, offerName) ||
+            containsExactPhrase(screenText, validityLabel)
+        val targetOfferOption = if (offerName.isNotBlank() && validityLabel.isNotBlank()) {
+            UssdMenuParser.parse(screenText).firstOrNull { option ->
+                containsExactPhrase(option.label, offerName) &&
+                    containsExactPhrase(option.label, validityLabel)
+            }
+        } else null
+        var confirmsOfferIdentity = false
+
+        // Offer name and validity must belong to the same numbered menu option.
+        if (stepTargetsOffer || screenMentionsOffer) {
+            if (offerName.isBlank() || validityLabel.isBlank() || targetOfferOption == null) {
+                recordState("OFFER_IDENTITY_MISMATCH", "The exact offer name and validity were not found together in one provider menu option. No selection was made.")
+                return
+            }
+            val configuredValue = valueForStep(step, job)
+            if (action == "reply" && configuredValue.toIntOrNull() != targetOfferOption.optionNumber) {
+                recordState("OFFER_OPTION_MISMATCH", "Configured reply does not select the numbered option containing the exact offer name and validity. Automation stopped.")
+                return
+            }
+            if (action == "tap_text" &&
+                (!containsExactPhrase(configuredValue, offerName) ||
+                 !containsExactPhrase(configuredValue, validityLabel))) {
+                recordState("OFFER_OPTION_MISMATCH", "Configured tap target does not identify the exact offer name and validity. Automation stopped.")
+                return
+            }
+            confirmsOfferIdentity = true
+        }
+
+        val buyWithAirtimeStep = containsExactPhrase(matchText, "Buy with Airtime")
+        if (buyWithAirtimeStep) {
+            if (!prefs.getBoolean(KEY_OFFER_IDENTITY_CONFIRMED, false)) {
+                recordState("OFFER_IDENTITY_NOT_CONFIRMED", "Buy with Airtime was blocked because the exact offer name and validity were not confirmed first.")
+                return
+            }
+            if (!containsExactPhrase(screenText, "Buy with Airtime")) {
+                recordState("PAYMENT_METHOD_MISMATCH", "The provider screen did not show the exact Buy with Airtime option. Automation stopped.")
+                return
+            }
+        }
+
+        // A manual PIN step is a pause, not a completed automation action.
+        // Advance only after the PIN prompt disappears and the next configured
+        // screen signature is visible; never inspect or capture the entered PIN.
+        if (action == "manual_pin") {
+            if (matchText.isNotBlank() &&
+                containsExactPhrase(screenText, matchText) &&
+                classification.type == UssdScreenType.PURCHASE_CONFIRMATION) {
+                promptManualPin()
+                recordState("WAITING_FOR_MANUAL_PIN", "Enter the SIM PIN directly in the Android USSD prompt. BingwaPulse does not read or store it.")
+                return
+            }
+            val nextStep = steps.optJSONObject(stepIndex + 1) ?: return
+            val nextMatch = nextStep.optString("match_text").trim()
+            if (nextMatch.isNotBlank() &&
+                containsExactPhrase(screenText, nextMatch) &&
+                classification.type in setOf(UssdScreenType.MENU, UssdScreenType.PAYMENT_METHOD, UssdScreenType.PURCHASE_CONFIRMATION)) {
+                prefs.edit().putInt(KEY_ACTIVE_STEP, stepIndex + 1).apply()
+                executeConfiguredStep(screenText, root)
+            }
+            return
+        }
+
+        if (matchText.isBlank() || !containsExactPhrase(screenText, matchText)) return
+        val actionScreenAllowed = when (action) {
+            "reply" -> classification.type in setOf(UssdScreenType.MENU, UssdScreenType.PAYMENT_METHOD, UssdScreenType.PURCHASE_CONFIRMATION)
+            "tap_text" -> classification.type in setOf(UssdScreenType.MENU, UssdScreenType.PAYMENT_METHOD)
+            "manual_pin" -> classification.type == UssdScreenType.PURCHASE_CONFIRMATION
+            else -> false
+        }
+        if (!actionScreenAllowed) {
+            recordState("UNEXPECTED_USSD_SCREEN", "Configured action '$action' was not allowed on screen type '${classification.type}'. No response was sent.")
+            return
+        }
+        val value = valueForStep(step, job)
         val completed = when (action) {
             "reply" -> enterReply(root, value)
             "tap_text" -> tapVisibleText(root, value)
-            "manual_pin" -> {
-                if (job.optBoolean("require_manual_pin", true)) {
-                    promptManualPin()
-                    true
-                } else {
-                    val localPin = SecurePinStore(this).load()
-                    if (localPin.isNullOrBlank()) {
-                        finishJob(job, "UNKNOWN", screenText, "PIN_NOT_CONFIGURED", "Automatic PIN mode is selected but no encrypted local PIN is saved on this device.")
-                        true
-                    } else enterReply(root, localPin)
-                }
-            }
+            "manual_pin" -> false // handled above as a human-only pause
             else -> { recordState("CONFIGURATION_ERROR", "Unsupported configured action at step ${stepIndex + 1}: $action"); false }
         }
         if (completed) {
-            prefs.edit().putInt(KEY_ACTIVE_STEP, stepIndex + 1).apply()
+            prefs.edit().putInt(KEY_ACTIVE_STEP, stepIndex + 1)
+                .also { if (confirmsOfferIdentity) it.putBoolean(KEY_OFFER_IDENTITY_CONFIRMED, true) }
+                .apply()
             recordState(if (action == "manual_pin") "WAITING_FOR_MANUAL_PIN" else "USSD_STEP_SENT",
                 "Configured step ${stepIndex + 1}/${steps.length()} matched '$matchText' and action '$action'.")
         } else recordState("USSD_ACTION_NOT_COMPLETED", "Could not safely perform '$action' for '$matchText'. No fallback tap was attempted.")
     }
 
+    private fun valueForStep(step: JSONObject, job: JSONObject): String =
+        step.optString("value")
+            .replace("{recipient_phone}", job.optString("recipient_phone"))
+            .replace("{payer_phone}", job.optString("payer_phone"))
+            .replace("{offer_name}", job.optString("offer_name"))
+            .replace("{customer_price_kes}", job.optString("customer_price_kes"))
+
+    private fun containsExactPhrase(text: String, phrase: String): Boolean {
+        if (text.isBlank() || phrase.isBlank()) return false
+        val normalizedText = text.replace(Regex("\\s+"), " ").trim()
+        val normalizedPhrase = phrase.replace(Regex("\\s+"), " ").trim()
+        val pattern = Regex(
+            "(?<![\\p{L}\\p{N}])" + Regex.escape(normalizedPhrase) + "(?![\\p{L}\\p{N}])",
+            RegexOption.IGNORE_CASE
+        )
+        return pattern.containsMatchIn(normalizedText)
+    }
+
     private fun enterReply(root: AccessibilityNodeInfo?, value: String): Boolean {
         if (root == null || value.isBlank()) return false
-        val input = findEditable(root) ?: return false
-        val args = android.os.Bundle().apply { putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, value) }
-        if (!input.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, args)) return false
-        val sendButton = findButton(root, listOf("send", "ok", "reply", "submit", "continue"))
-        return sendButton?.performAction(AccessibilityNodeInfo.ACTION_CLICK) == true
+        val inputs = findEditables(root)
+        val buttons = findButtons(root, listOf("send", "ok", "reply", "submit", "continue"))
+        if (inputs.size != 1 || buttons.size != 1) return false
+        val args = android.os.Bundle().apply {
+            putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, value)
+        }
+        if (!inputs.single().performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, args)) return false
+        return buttons.single().performAction(AccessibilityNodeInfo.ACTION_CLICK)
     }
 
     private fun tapVisibleText(root: AccessibilityNodeInfo?, value: String): Boolean {
         if (root == null || value.isBlank()) return false
-        var target: AccessibilityNodeInfo? = findTextNode(root, value) ?: return false
-        while (target != null && !target.isClickable) target = target.parent
-        return target?.performAction(AccessibilityNodeInfo.ACTION_CLICK) == true
+        val targets = findTextTargets(root, value)
+        if (targets.size != 1) return false
+        return targets.single().performAction(AccessibilityNodeInfo.ACTION_CLICK)
     }
 
-    private fun findEditable(node: AccessibilityNodeInfo?): AccessibilityNodeInfo? {
-        if (node == null) return null
-        if (node.isEditable && node.isEnabled) return node
-        for (i in 0 until node.childCount) findEditable(node.getChild(i))?.let { return it }
-        return null
+    private fun findEditables(node: AccessibilityNodeInfo?, result: MutableList<AccessibilityNodeInfo> = mutableListOf()): List<AccessibilityNodeInfo> {
+        if (node == null) return result
+        if (node.isEditable && node.isEnabled) result.add(node)
+        for (i in 0 until node.childCount) findEditables(node.getChild(i), result)
+        return result
     }
-    private fun findButton(node: AccessibilityNodeInfo?, labels: List<String>): AccessibilityNodeInfo? {
-        if (node == null) return null
+
+    private fun findButtons(node: AccessibilityNodeInfo?, labels: List<String>, result: MutableList<AccessibilityNodeInfo> = mutableListOf()): List<AccessibilityNodeInfo> {
+        if (node == null) return result
         val label = (node.text?.toString() ?: node.contentDescription?.toString()).orEmpty().trim().lowercase()
-        if (node.isEnabled && node.isClickable && labels.any { label == it || label.contains(it) }) return node
-        for (i in 0 until node.childCount) findButton(node.getChild(i), labels)?.let { return it }
-        return null
+        if (node.isEnabled && node.isClickable && labels.any { label == it || label.contains(it) }) result.add(node)
+        for (i in 0 until node.childCount) findButtons(node.getChild(i), labels, result)
+        return result.distinctBy { boundsKey(it) }
     }
-    private fun findTextNode(node: AccessibilityNodeInfo?, value: String): AccessibilityNodeInfo? {
-        if (node == null) return null
+
+    private fun findTextTargets(node: AccessibilityNodeInfo?, value: String, result: MutableList<AccessibilityNodeInfo> = mutableListOf()): List<AccessibilityNodeInfo> {
+        if (node == null) return result
         val label = (node.text?.toString() ?: node.contentDescription?.toString()).orEmpty().trim()
-        if (label.equals(value, true) || label.startsWith("$value ") || label.startsWith("$value:")) return node
-        for (i in 0 until node.childCount) findTextNode(node.getChild(i), value)?.let { return it }
-        return null
+        if (label.equals(value, true)) {
+            var target: AccessibilityNodeInfo? = node
+            while (target != null && !target.isClickable) target = target.parent
+            if (target != null) result.add(target)
+        }
+        for (i in 0 until node.childCount) findTextTargets(node.getChild(i), value, result)
+        return result.distinctBy { boundsKey(it) }
     }
+    private fun boundsKey(node: AccessibilityNodeInfo): String {
+        val bounds = android.graphics.Rect()
+        node.getBoundsInScreen(bounds)
+        return bounds.toShortString()
+    }
+
     private fun promptManualPin() {
         val now = System.currentTimeMillis()
         if (now - lastManualPinPromptAt < 5000L) return
@@ -158,10 +280,15 @@ class UssdAccessibilityService : AccessibilityService() {
                     api.refreshSession(saved).also { SecureSessionStore(this).save(it) } else saved
                 api.recordFulfilmentAttemptResult(session, job.getString("business_id"), job.getString("order_id"),
                     job.getString("device_id"), job.getInt("attempt_no"), state, prefs.getInt(KEY_ACTIVE_STEP, 0),
-                    screenText, errorCode = errorCode, errorDetail = errorDetail)
+                    redactSensitiveText(screenText), errorCode = errorCode, errorDetail = errorDetail)
                 SecureFulfilmentJobStore(this).clear()
-                prefs.edit().remove(KEY_ACTIVE_STEP).remove(KEY_JOB_STARTED_AT).apply()
-                recordState(state, screenText)
+                prefs.edit().remove(KEY_ACTIVE_STEP).remove(KEY_JOB_STARTED_AT).remove(KEY_OFFER_IDENTITY_CONFIRMED).apply()
+                // Dismiss the system USSD dialog only after the server accepts a
+                // definitive carrier result. A failed sync leaves the session visible.
+                Handler(Looper.getMainLooper()).post {
+                    performGlobalAction(GLOBAL_ACTION_BACK)
+                    recordState(state, screenText)
+                }
             } catch (error: Exception) {
                 recordState("RESULT_NOT_SYNCED", error.message ?: "Could not save carrier result. Manager reconciliation is required.")
             }
@@ -189,7 +316,11 @@ class UssdAccessibilityService : AccessibilityService() {
         getSharedPreferences(PREFS, MODE_PRIVATE).edit().putString(KEY_STATE, state)
             .putString(KEY_DETAIL, redactSensitiveText(detail).take(2500)).putLong(KEY_UPDATED_AT, System.currentTimeMillis()).apply()
     }
-    override fun onDestroy() { automationExecutor.shutdown(); super.onDestroy() }
+    override fun onDestroy() {
+        if (dismissReceiverRegistered) runCatching { unregisterReceiver(dismissReceiver) }
+        automationExecutor.shutdown()
+        super.onDestroy()
+    }
 
     companion object {
         const val PREFS = "bingwapulse_accessibility"
@@ -198,5 +329,7 @@ class UssdAccessibilityService : AccessibilityService() {
         const val KEY_UPDATED_AT = "updated_at"
         const val KEY_ACTIVE_STEP = "active_fulfilment_step"
         const val KEY_JOB_STARTED_AT = "active_fulfilment_started_at"
+        const val KEY_OFFER_IDENTITY_CONFIRMED = "active_offer_identity_confirmed"
+        const val ACTION_DISMISS_USSD = "com.telvanta.app.ACTION_DISMISS_USSD"
     }
 }

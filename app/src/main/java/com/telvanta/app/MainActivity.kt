@@ -19,7 +19,6 @@ import java.net.HttpURLConnection
 import java.net.URL
 import org.json.JSONObject
 import org.json.JSONArray
-import androidx.compose.ui.text.input.PasswordVisualTransformation
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import androidx.activity.ComponentActivity
@@ -39,6 +38,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalContext
@@ -163,9 +163,9 @@ private fun BingwaPulseApp(db: LocalDatabase) {
                 }
             }
         },topBar={ TopAppBar(
-            navigationIcon = { IconButton(onClick = { scope.launch { drawerState.open() } }) { Text("≡", color = Color(0xFF07351A), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.headlineMedium) } },
-            title={Column(verticalArrangement=Arrangement.spacedBy(2.dp)) { Text("BINGWAPULSE",fontWeight=FontWeight.Black,color=Color(0xFF062B16),letterSpacing=1.3.sp,style=MaterialTheme.typography.titleLarge); Text(selected.uppercase(),style=MaterialTheme.typography.labelSmall,color=Color(0xFF174B2A),letterSpacing=1.5.sp) }},
-            colors=TopAppBarDefaults.topAppBarColors(containerColor=Color(0xFF19C65A))
+            navigationIcon = { IconButton(onClick = { scope.launch { drawerState.open() } }) { Text("≡", color = Cyan, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.headlineMedium) } },
+            title={Column(verticalArrangement=Arrangement.spacedBy(2.dp)) { Text("BINGWAPULSE",fontWeight=FontWeight.Black,color=Navy,letterSpacing=1.3.sp,style=MaterialTheme.typography.titleLarge); Text(selected.uppercase(),style=MaterialTheme.typography.labelSmall,color=Muted,letterSpacing=1.5.sp) }},
+            colors=TopAppBarDefaults.topAppBarColors(containerColor=Color(0xFF0A1025))
         ) }) { padding ->
             LazyColumn(Modifier.fillMaxSize().padding(padding).padding(horizontal=16.dp),verticalArrangement=Arrangement.spacedBy(14.dp),contentPadding=PaddingValues(vertical=16.dp)) {
                 item { Surface(color=Color(0xFF111B38),shape=MaterialTheme.shapes.large) { Row(Modifier.fillMaxWidth().padding(horizontal=13.dp,vertical=11.dp),verticalAlignment=androidx.compose.ui.Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(9.dp)) { Surface(color=Cyan,shape=MaterialTheme.shapes.small) { Text("●",color=Color.White,modifier=Modifier.padding(horizontal=7.dp,vertical=4.dp),style=MaterialTheme.typography.labelSmall) }; Column { Text("OFFLINE-READY WORKSPACE",color=Navy,fontWeight=FontWeight.Bold,style=MaterialTheme.typography.labelMedium); Text("Your records stay on this device",color=Muted,style=MaterialTheme.typography.bodySmall) } } } }
@@ -643,13 +643,14 @@ private fun SignatureOffersScreen(db: LocalDatabase, onMessage: (String) -> Unit
     var downloadCandidate by remember { mutableStateOf<CandidateOffer?>(null) }
     var downloadPrice by remember { mutableStateOf("") }
     val saved = remember(reload) { db.offers().filter { it.source.contains("signature", ignoreCase = true) } }
+    CloudOfferSyncEffect(db, reload, onMessage)
     val categories = listOf("ALL", "DATA", "VOICE", "SMS", "COMBO")
     val visible = candidates.filter {
         (category == "ALL" || it.category.equals(category, true)) &&
             (simProfile == "ALL" || it.simProfile.equals(simProfile, true)) &&
             (search.isBlank() || it.name.contains(search, true) || it.price.toString().contains(search) || it.code.contains(search, true))
     }
-    Text("Signature Offers", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = Navy)
+    Text("Signature Offers", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = Cyan)
     InfoCard("44 extracted Signature Offers", "Any SIM, Normal SIM and Notification SIM offers from your supplied extraction. Entries remain unverified candidates; no USSD action or purchase is triggered.")
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         listOf("Candidates" to false, "Saved offers" to true).forEach { item ->
@@ -671,17 +672,22 @@ private fun SignatureOffersScreen(db: LocalDatabase, onMessage: (String) -> Unit
                 Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = androidx.compose.ui.Alignment.Top) {
                         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                            Text(offer.name, fontWeight = FontWeight.Bold, color = Navy)
-                            Text("${offer.category} · ${offer.duration}", color = Cyan, style = MaterialTheme.typography.labelSmall)
+                            Text(offer.name, fontWeight = FontWeight.Bold, color = Navy, style = MaterialTheme.typography.titleMedium, maxLines = 2)
+                            Text("${offer.category} · ${offer.duration}", color = Muted, style = MaterialTheme.typography.bodySmall)
                             Text(when(offer.simProfile) { "normal" -> "NORMAL SIM"; "notification" -> "NOTIFICATION SIM"; else -> "ANY SIM" }, color = Muted, style = MaterialTheme.typography.labelSmall)
                         }
-                        Text(if (offer.price >= 0) "KES ${offer.price}" else "Price unknown", color = Color(0xFF713BFF), fontWeight = FontWeight.ExtraBold)
+                        Text(if (offer.price >= 0) "KES ${offer.price}" else "Price unknown", color = Cyan, fontWeight = FontWeight.ExtraBold, maxLines = 1)
                     }
-                    Text("Dial: " + if (offer.code.isBlank()) "Not captured" else offer.code, color = Navy)
+                    if (offer.code.isNotBlank()) Surface(color = Color(0xFF0A1025), shape = RoundedCornerShape(8.dp)) { Text(offer.code, color = Muted, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Medium, modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp), maxLines = 1, softWrap = false, style = MaterialTheme.typography.labelMedium) } else Text("USSD code not captured", color = Muted, style = MaterialTheme.typography.bodySmall)
                     if (offer.tags.isNotBlank()) Text("Tags: ${offer.tags}", color = Muted, style = MaterialTheme.typography.bodySmall)
                     Text(offer.note, color = Muted, style = MaterialTheme.typography.bodySmall)
-                    Text("Status: CANDIDATE · NOT VERIFIED", color = Color(0xFFFFC857), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall)
-                    Button(onClick = { downloadCandidate = offer; downloadPrice = if (offer.price >= 0) offer.price.toString() else "" }, modifier = Modifier.fillMaxWidth()) { Text("Download to My Offers") }
+                    Surface(color = Color(0xFF3A2C18), shape = RoundedCornerShape(50)) {
+                        Row(Modifier.padding(horizontal = 9.dp, vertical = 5.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text("●", color = Color(0xFFFFC857), style = MaterialTheme.typography.labelSmall)
+                            Text("CANDIDATE · NOT VERIFIED", color = Color(0xFFFFD58A), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall)
+                        }
+                    }
+                    Button(onClick = { downloadCandidate = offer; downloadPrice = if (offer.price >= 0) offer.price.toString() else "" }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) { Text("Download to My Offers") }
                 }
             }
         }
@@ -691,8 +697,8 @@ private fun SignatureOffersScreen(db: LocalDatabase, onMessage: (String) -> Unit
         saved.forEach { offer ->
             Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF111B38)), modifier = Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                    Text(offer.name, fontWeight = FontWeight.Bold, color = Navy)
-                    Text("KES " + money(offer.price) + " · " + offer.category, color = Muted)
+                    Text(offer.name, fontWeight = FontWeight.Bold, color = Navy, style = MaterialTheme.typography.titleMedium, maxLines = 2)
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) { Text(offer.category + " · " + offer.duration, color = Muted, style = MaterialTheme.typography.bodySmall); Text("KES " + money(offer.price), color = Cyan, fontWeight = FontWeight.ExtraBold) }
                     Text("Source: " + offer.source + " · " + if (offer.verified) "Operator marked verified" else "Unverified", color = Muted, style = MaterialTheme.typography.bodySmall)
                 }
             }
@@ -857,7 +863,41 @@ private fun PlannedFeatureScreen(title: String, details: String) {
 }
 
 @Composable
+private fun CloudOfferSyncEffect(db: LocalDatabase, revision: Int, onMessage: (String) -> Unit) {
+    val context = LocalContext.current
+    val store = remember { SecureSessionStore(context) }
+    val api = remember { BingwaSupabaseApi() }
+    LaunchedEffect(revision) {
+        if (store.isLocalWorkspace()) return@LaunchedEffect
+        val saved = store.load() ?: return@LaunchedEffect
+        try {
+            var active = if (saved.expiresAtEpochSeconds <= System.currentTimeMillis() / 1000L + 60L) {
+                withContext(Dispatchers.IO) { api.refreshSession(saved) }.also(store::save)
+            } else saved
+            val businessId = active.businessId
+                ?: withContext(Dispatchers.IO) { api.firstBusinessId(active) }
+                ?: throw IllegalStateException("No business workspace is connected.")
+            if (active.businessId != businessId) {
+                active = active.copy(businessId = businessId)
+                store.save(active)
+            }
+            val localOffers = db.offers()
+            withContext(Dispatchers.IO) {
+                localOffers.forEach { offer -> api.syncLocalOfferToCloud(active, businessId, offer) }
+            }
+            if (localOffers.isNotEmpty()) onMessage("${localOffers.size} local offer(s) synchronized with the cloud catalogue.")
+        } catch (error: Exception) {
+            onMessage(error.message ?: "Could not synchronize local offers with the cloud catalogue.")
+        }
+    }
+}
+
+@Composable
 private fun OffersScreen(db: LocalDatabase, onMessage: (String) -> Unit) {
+    val context = LocalContext.current
+    val secureStore = remember { SecureSessionStore(context) }
+    val api = remember { BingwaSupabaseApi() }
+    val scope = rememberCoroutineScope()
     var selectedCategory by remember { mutableStateOf("All") }
     var reload by remember { mutableIntStateOf(0) }
     var showEditor by remember { mutableStateOf(false) }
@@ -870,41 +910,79 @@ private fun OffersScreen(db: LocalDatabase, onMessage: (String) -> Unit) {
     var active by remember { mutableStateOf(false) }
     val categories = listOf("All", "Data", "Minutes", "SMS", "Combo")
     val offers = remember(reload) { db.offers() }
+    CloudOfferSyncEffect(db, reload, onMessage)
     val visible = offers.filter { selectedCategory == "All" || it.category.equals(selectedCategory, true) || (selectedCategory == "Minutes" && it.category.equals("VOICE", true)) }
     fun clearEditor() { editId = null; name = ""; category = "Data"; duration = ""; code = ""; price = ""; active = false }
     Text("My Offers", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = Cyan)
+    Text("Manage your catalogue with clear pricing, availability and verification states.", color = Muted, style = MaterialTheme.typography.bodySmall)
     Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         categories.forEach { item -> FilterChip(selected = selectedCategory == item, onClick = { selectedCategory = item }, label = { Text(item) }) }
     }
     if (offers.isEmpty()) InfoCard("No offers yet", "Download offers from Signature Offers or tap + to add one manually.")
     visible.forEach { offer ->
-        Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF151D35)), modifier = Modifier.fillMaxWidth()) {
-            Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 13.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                Text("✥", color = Cyan, fontSize = 25.sp, fontWeight = FontWeight.Bold)
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                    Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text(offer.name, color = Cyan, fontWeight = FontWeight.Bold, maxLines = 1, style = MaterialTheme.typography.titleMedium)
-                        if (offer.verified) Text("✿", color = Color(0xFF4C9FFB), fontWeight = FontWeight.Bold)
+        Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF111B38)),
+            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF263B70)),
+            modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(18.dp)) {
+            Column(Modifier.fillMaxWidth().padding(15.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                        Text(offer.name, color = Color.White, fontWeight = FontWeight.Bold, maxLines = 2, style = MaterialTheme.typography.titleMedium)
+                        Text(listOf(offer.category, offer.duration).filter { it.isNotBlank() }.joinToString(" · "), color = Muted, style = MaterialTheme.typography.bodySmall)
+                        if (offer.ussdCode.isNotBlank()) Surface(color = Color(0xFF0A1025), shape = RoundedCornerShape(8.dp),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF263B70))) {
+                            Text(offer.ussdCode, color = Muted, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Medium,
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp), maxLines = 1, softWrap = false, style = MaterialTheme.typography.labelMedium)
+                        } else Text("USSD code not set", color = Muted, style = MaterialTheme.typography.labelSmall)
                     }
-                    val detail = listOf(offer.duration, offer.ussdCode).filter { it.isNotBlank() }.joinToString(" · ")
-                    Text(if (detail.isNotBlank()) detail else offer.category, color = Muted, style = MaterialTheme.typography.bodySmall)
+                    Column(horizontalAlignment = androidx.compose.ui.Alignment.End, verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                        Text("KES " + money(offer.price), color = Color.White, fontWeight = FontWeight.ExtraBold, maxLines = 1, style = MaterialTheme.typography.titleMedium)
+                        Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                            Text(if (offer.active) "ACTIVE" else "PAUSED", color = if (offer.active) Cyan else Muted, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall)
+                            Switch(checked = offer.active, onCheckedChange = { enabled ->
+                                try { db.setOfferActive(offer.id, enabled); reload++; onMessage(if (enabled) "Offer activated on SiteLink." else "Offer deactivated on SiteLink.") }
+                                catch (e: Exception) { onMessage(e.message ?: "Could not update offer.") }
+                            })
+                        }
+                        TextButton(onClick = {
+                            editId = offer.id; name = offer.name; category = offer.category; duration = offer.duration
+                            code = offer.ussdCode; price = offer.price.toString(); active = offer.active; showEditor = true
+                        }, contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)) {
+                            Text("✎  Edit", color = Cyan, style = MaterialTheme.typography.labelLarge)
+                        }
+                    }
                 }
-                Text("KES ${money(offer.price)}", color = Navy, fontWeight = FontWeight.Bold, maxLines = 1)
-                Switch(checked = offer.active, onCheckedChange = { enabled ->
-                    try { db.setOfferActive(offer.id, enabled); reload++; onMessage(if (enabled) "Offer activated on SiteLink." else "Offer deactivated on SiteLink.") }
-                    catch (e: Exception) { onMessage(e.message ?: "Could not update offer.") }
-                })
-                TextButton(onClick = { db.deleteOffer(offer.id); reload++; onMessage("Offer deleted from My Offers.") }) { Text("▣", color = Color(0xFFFF5B55), fontSize = 20.sp) }
-                TextButton(onClick = {
-                    editId = offer.id; name = offer.name; category = offer.category; duration = offer.duration
-                    code = offer.ussdCode; price = offer.price.toString(); active = offer.active; showEditor = true
-                }) { Text("Edit", color = Cyan) }
+                Row(Modifier.fillMaxWidth(), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                    Surface(color = if (offer.verified) Color(0xFF073B3B) else Color(0xFF3A2C18), shape = RoundedCornerShape(50)) {
+                        Row(Modifier.padding(horizontal = 9.dp, vertical = 5.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text("●", color = if (offer.verified) Cyan else Color(0xFFFFC857), style = MaterialTheme.typography.labelSmall)
+                            Text(if (offer.verified) "VERIFIED" else "NOT VERIFIED", color = if (offer.verified) Color(0xFF9DE8E8) else Color(0xFFFFD58A),
+                                fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall)
+                        }
+                    }
+                    Spacer(Modifier.weight(1f))
+                    TextButton(onClick = {
+                        scope.launch {
+                            try {
+                                if (!secureStore.isLocalWorkspace()) {
+                                    var session = secureStore.load() ?: throw IllegalStateException("Sign in before deleting a cloud-published offer.")
+                                    if (session.expiresAtEpochSeconds <= System.currentTimeMillis() / 1000L + 60L) {
+                                        session = withContext(Dispatchers.IO) { api.refreshSession(session) }
+                                        secureStore.save(session)
+                                    }
+                                    val businessId = session.businessId ?: withContext(Dispatchers.IO) { api.firstBusinessId(session) } ?: throw IllegalStateException("No business workspace is connected.")
+                                    withContext(Dispatchers.IO) { api.syncLocalOfferToCloud(session, businessId, offer.copy(active = false)) }
+                                }
+                                db.deleteOffer(offer.id); reload++; onMessage("Offer unpublished from the cloud catalogue and removed locally.")
+                            } catch (error: Exception) { onMessage(error.message ?: "Could not safely remove the offer.") }
+                        }
+                    }, contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)) {
+                        Text("Delete", color = Color(0xFFFF8D8D), style = MaterialTheme.typography.labelMedium)
+                    }
+                }
             }
         }
     }
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-        Button(onClick = { clearEditor(); showEditor = true }, shape = RoundedCornerShape(18.dp)) { Text("＋", fontSize = 26.sp) }
-    }
+    Button(onClick = { clearEditor(); showEditor = true }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp)) { Text("＋  Add offer", fontWeight = FontWeight.Bold) }
     if (showEditor) AlertDialog(
         onDismissRequest = { showEditor = false; clearEditor() },
         title = { Text(if (editId == null) "Add offer" else "Edit offer") },
@@ -918,9 +996,7 @@ private fun OffersScreen(db: LocalDatabase, onMessage: (String) -> Unit) {
                 OutlinedTextField(duration, { duration = it }, label = { Text("Validity / duration") }, singleLine = true)
                 OutlinedTextField(code, { code = it }, label = { Text("USSD code") }, singleLine = true)
                 OutlinedTextField(price, { price = it }, label = { Text("Selling price (KES)") }, singleLine = true)
-                Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-                    Switch(checked = active, onCheckedChange = { active = it }); Text("Active on SiteLink")
-                }
+                Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) { Switch(checked = active, onCheckedChange = { active = it }); Text("Active on SiteLink") }
             }
         },
         confirmButton = {
@@ -974,6 +1050,95 @@ private fun PaymentInboxScreen() {
     var notice by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
     var pendingVerification by remember { mutableStateOf<MpesaNotificationReviewCandidate?>(null) }
+    var tillNumber by remember { mutableStateOf("1561763") }
+    var tillBusy by remember { mutableStateOf(false) }
+    var tillNotice by remember { mutableStateOf("") }
+    var businessName by remember { mutableStateOf("GABRIEL'S INTERNET SERVICES") }
+    var workspaceExists by remember { mutableStateOf(session?.businessId != null) }
+    var workspaceBusy by remember { mutableStateOf(false) }
+    var workspaceNotice by remember { mutableStateOf("") }
+
+    fun createBusinessWorkspace() {
+        val current = session
+        if (current == null) {
+            workspaceNotice = "Sign in to BingwaPulse before creating a business workspace."
+            return
+        }
+        val name = businessName.trim()
+        if (name.length !in 2..120) {
+            workspaceNotice = "Business name must contain 2–120 characters."
+            return
+        }
+        scope.launch {
+            workspaceBusy = true
+            try {
+                var active = current
+                if (active.expiresAtEpochSeconds <= System.currentTimeMillis() / 1000L + 60L) {
+                    active = withContext(Dispatchers.IO) { api.refreshSession(active) }
+                    store.save(active)
+                }
+                val existingId = active.businessId
+                    ?: withContext(Dispatchers.IO) { api.firstBusinessId(active) }
+                val businessId = existingId ?: run {
+                    val baseSlug = name.lowercase()
+                        .replace(Regex("[^a-z0-9]+"), "-")
+                        .trim('-')
+                        .take(40)
+                        .ifBlank { "bingwapulse-business" }
+                    val slug = "$baseSlug-${active.userId.takeLast(6).lowercase()}"
+                    withContext(Dispatchers.IO) { api.createBusiness(active, name, slug) }
+                }
+                active = active.copy(businessId = businessId)
+                store.save(active)
+                session = active
+                workspaceExists = true
+                workspaceNotice = if (existingId == null) {
+                    "Business workspace created. Next, save the Till and sync your Signature offers."
+                } else {
+                    "Your existing business workspace is connected."
+                }
+                candidates = withContext(Dispatchers.IO) {
+                    api.listMpesaNotificationCandidates(active, businessId)
+                }
+            } catch (error: Exception) {
+                workspaceNotice = error.message ?: "Could not create the business workspace."
+            } finally {
+                workspaceBusy = false
+            }
+        }
+    }
+
+    fun saveTillConfiguration() {
+        val current = session
+        if (current == null) {
+            tillNotice = "Sign in to a business workspace first."
+            return
+        }
+        if (!tillNumber.trim().matches(Regex("^[0-9]{5,8}$"))) {
+            tillNotice = "Enter the exact 5–8 digit M-PESA Till number."
+            return
+        }
+        scope.launch {
+            tillBusy = true
+            try {
+                var active = current
+                if (active.expiresAtEpochSeconds <= System.currentTimeMillis() / 1000L + 60L) {
+                    active = withContext(Dispatchers.IO) { api.refreshSession(active) }
+                    store.save(active)
+                    session = active
+                }
+                val businessId = active.businessId
+                    ?: withContext(Dispatchers.IO) { api.firstBusinessId(active) }
+                    ?: throw IllegalStateException("Create your business workspace first.")
+                withContext(Dispatchers.IO) { api.savePaymentIngressTill(active, businessId, tillNumber) }
+                tillNotice = "Till saved. Safaricom C2B URL registration and the callback token are the remaining payment-verification setup."
+            } catch (error: Exception) {
+                tillNotice = error.message ?: "Could not save the Till configuration."
+            } finally {
+                tillBusy = false
+            }
+        }
+    }
 
     fun refreshCandidates() {
         if (store.isLocalWorkspace()) {
@@ -1083,17 +1248,83 @@ private fun PaymentInboxScreen() {
         }
     }
 
-    LaunchedEffect(Unit) { refreshCandidates() }
+    LaunchedEffect(Unit) {
+        refreshCandidates()
+        val current = session
+        if (current != null && !store.isLocalWorkspace()) {
+            runCatching {
+                var active = current
+                val businessId = active.businessId ?: withContext(Dispatchers.IO) { api.firstBusinessId(active) }
+                if (businessId != null) {
+                    active = active.copy(businessId = businessId)
+                    store.save(active)
+                    session = active
+                    workspaceExists = true
+                    val savedTill = withContext(Dispatchers.IO) { api.getPaymentIngressTill(active, businessId) }
+                    if (!savedTill.isNullOrBlank()) tillNumber = savedTill
+                } else {
+                    workspaceExists = false
+                }
+            }
+        }
+    }
 
     Text("M-PESA Payment Inbox", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.ExtraBold, color = Navy)
     InfoCard(
         "Payment evidence and order staging",
-        "BingwaPulse reads M-PESA notifications and stages exact offer matches for review. Before verifying, compare the receipt and amount with the actual Till transaction record. Notification text alone is not payment verification."
+        "Trusted Safaricom C2B callbacks can verify Till receipts and match them to a pending SiteLink order once the Till and callback URLs are configured. Phone notifications remain supporting evidence only; notification text alone never verifies payment."
     )
     if (store.isLocalWorkspace()) {
         InfoCard("Account connection required", "Payment review is unavailable in local preview mode. Sign in and connect a business workspace to load its candidates.")
         return
     }
+    if (session == null) {
+        InfoCard("Sign in required", "Sign in to your BingwaPulse account before creating the business workspace and connecting its Till.")
+        return
+    }
+    if (!workspaceExists) {
+        Text("BUSINESS WORKSPACE", color = Navy, fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.titleMedium)
+        InfoCard(
+            "Create your business workspace",
+            "This creates the owner workspace for your offers, agent phone, Till payments and customer orders. It does not initiate a payment."
+        )
+        OutlinedTextField(
+            value = businessName,
+            onValueChange = { businessName = it.take(120) },
+            label = { Text("Business name") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth()
+        )
+        Button(
+            onClick = { createBusinessWorkspace() },
+            enabled = !workspaceBusy && businessName.trim().length in 2..120,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text(if (workspaceBusy) "Creating workspace…" else "Create business workspace")
+        }
+        if (workspaceNotice.isNotBlank()) Text(workspaceNotice, color = Cyan, fontWeight = FontWeight.SemiBold)
+        return
+    }
+    Text("TRUSTED TILL PAYMENT SETUP", color = Navy, fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.titleMedium)
+    InfoCard(
+        "Automatic Till verification",
+        "Save the receiving Till here. The deployed C2B callback verifies real Safaricom receipts and matches them to a single pending SiteLink order. If the callback cannot identify one order safely, it leaves the payment for reconciliation."
+    )
+    OutlinedTextField(
+        value = tillNumber,
+        onValueChange = { tillNumber = it.filter(Char::isDigit).take(8) },
+        label = { Text("M-PESA Buy Goods Till number") },
+        singleLine = true,
+        modifier = Modifier.fillMaxWidth()
+    )
+    Button(onClick = { saveTillConfiguration() }, enabled = !tillBusy && tillNumber.length in 5..8, modifier = Modifier.fillMaxWidth()) {
+        Text(if (tillBusy) "Saving Till…" else "Save Till for automatic verification")
+    }
+    if (tillNotice.isNotBlank()) Text(tillNotice, color = Cyan, style = MaterialTheme.typography.bodySmall)
+    InfoCard(
+        "Safaricom C2B registration URLs",
+        "Validation: https://tuuhucisljlaaovtnbeu.supabase.co/functions/v1/mpesa-c2b-callback?mode=validate&token=YOUR_SECRET_TOKEN\n\nConfirmation: https://tuuhucisljlaaovtnbeu.supabase.co/functions/v1/mpesa-c2b-callback?mode=confirm&token=YOUR_SECRET_TOKEN\n\nSet the same strong token as the Supabase Edge Function secret MPESA_C2B_CALLBACK_TOKEN, then register both URLs for this Till in Safaricom Daraja. This is C2B confirmation only; it does not send STK prompts."
+    )
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
         Button(onClick = { refreshCandidates() }, enabled = !busy, modifier = Modifier.weight(1f)) {
             Text(if (busy) "Loading…" else "Refresh inbox")
@@ -1456,10 +1687,6 @@ private fun UssdAutomationSettingsScreen() {
     val scope = rememberCoroutineScope()
     var fulfilmentEnabled by remember { mutableStateOf(false) }
     var fulfilmentPaused by remember { mutableStateOf(true) }
-    var requireManualPin by remember { mutableStateOf(true) }
-    val pinStore = remember { SecurePinStore(context) }
-    var localPinText by remember { mutableStateOf("") }
-    var localPinSaved by remember { mutableStateOf(pinStore.hasPin()) }
     var fulfilmentBusy by remember { mutableStateOf(false) }
     var fulfilmentNotice by remember { mutableStateOf("") }
     var workerDevices by remember { mutableStateOf<List<BingwaDevice>>(emptyList()) }
@@ -1475,11 +1702,12 @@ private fun UssdAutomationSettingsScreen() {
     var amountKesText by remember { mutableStateOf("") }
     var ussdEntryCode by remember { mutableStateOf("") }
     var menuStepsJson by remember { mutableStateOf("""[
-  {"match_text":"Buy bundle","action":"reply","value":"1"},
-  {"match_text":"Enter recipient phone","action":"reply","value":"{recipient_phone}"},
-  {"match_text":"Enter PIN","action":"manual_pin"}
+  {"match_text":"[EXACT OFFER NAME] [EXACT VALIDITY]","action":"tap_text","value":"[EXACT OFFER NAME] [EXACT VALIDITY]"},
+  {"match_text":"Buy with Airtime","action":"tap_text","value":"Buy with Airtime"},
+  {"match_text":"Enter recipient phone","action":"reply","value":"{recipient_phone}"}
 ]""") }
     var confirmMenuVerified by remember { mutableStateOf(false) }
+    var menuVerificationNote by remember { mutableStateOf("") }
     var ruleBusy by remember { mutableStateOf(false) }
     val accountSession = remember { secureStore.load() }
 
@@ -1518,7 +1746,6 @@ private fun UssdAutomationSettingsScreen() {
                     val settings = withContext(Dispatchers.IO) { api.getFulfilmentControls(active, businessId) }
                     fulfilmentEnabled = settings.optBoolean("fulfilment_enabled", false)
                     fulfilmentPaused = settings.optBoolean("fulfilment_paused", true)
-                    requireManualPin = settings.optBoolean("fulfilment_require_manual_pin", true)
                     workerDevices = withContext(Dispatchers.IO) { api.listDevices(active, businessId) }
                         .filter { it.status == "online" && it.assignedUserId == active.userId }
                     fulfilmentOffers = withContext(Dispatchers.IO) { api.listFulfilmentOffers(active, businessId) }
@@ -1526,6 +1753,7 @@ private fun UssdAutomationSettingsScreen() {
                     fulfilmentOrders = withContext(Dispatchers.IO) { api.listFulfilmentOrders(active, businessId) }
                     if (selectedWorkerDevice.isBlank()) selectedWorkerDevice = workerDevices.firstOrNull()?.id.orEmpty()
                     if (selectedOfferId.isBlank()) selectedOfferId = fulfilmentOffers.firstOrNull()?.id.orEmpty()
+                    if (ussdEntryCode.isBlank()) ussdEntryCode = fulfilmentOffers.firstOrNull()?.entryCode.orEmpty()
                 }
             } catch (error: Exception) {
                 fulfilmentNotice = error.message ?: "Could not load fulfilment controls."
@@ -1676,60 +1904,27 @@ private fun UssdAutomationSettingsScreen() {
             }
             Switch(checked = fulfilmentPaused, onCheckedChange = { fulfilmentPaused = it })
         }
-        Row(Modifier.fillMaxWidth(), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text("Require manual PIN entry", color = Navy, fontWeight = FontWeight.Bold)
-                Text("When off, the worker uses the encrypted PIN stored only on this Android device.", color = Muted, style = MaterialTheme.typography.bodySmall)
-            }
-            Switch(checked = requireManualPin, onCheckedChange = { requireManualPin = it })
-        }
-        if (!requireManualPin) {
-            OutlinedTextField(
-                value = localPinText,
-                onValueChange = { localPinText = it.filter(Char::isDigit).take(8) },
-                label = { Text("Safaricom USSD PIN (4–8 digits)") },
-                visualTransformation = PasswordVisualTransformation(),
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth()
-            )
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(
-                    onClick = {
-                        try {
-                            pinStore.save(localPinText)
-                            localPinText = ""
-                            localPinSaved = true
-                            fulfilmentNotice = "PIN encrypted and saved on this device only. It was not uploaded."
-                        } catch (error: Exception) {
-                            fulfilmentNotice = error.message ?: "Could not save the local PIN."
-                        }
-                    },
-                    enabled = localPinText.length in 4..8,
-                    modifier = Modifier.weight(1f)
-                ) { Text("Save encrypted PIN") }
-                OutlinedButton(onClick = { pinStore.clear(); localPinSaved = false; localPinText = "" }) {
-                    Text("Clear PIN")
-                }
-            }
-            Text(if (localPinSaved) "An encrypted local PIN is saved on this device." else "No local PIN saved. Automatic PIN mode cannot complete PIN-protected offers yet.", color = Muted, style = MaterialTheme.typography.bodySmall)
-        }
+        InfoCard(
+            "PIN safety",
+            "BingwaPulse never stores, reads or automatically enters the SIM PIN. If a provider unexpectedly requests a PIN, the session pauses for you to handle it on the phone."
+        )
 
         HorizontalDivider(color = Color(0xFF263B70))
         Text("OFFER-TO-USSD MENU RULES", color = Navy, fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.titleMedium)
         InfoCard(
             "Configure the actual provider menu here",
-            "Choose an active offer, enter the exact amount paid by the customer, the provider USSD code, and the screen-by-screen actions. The worker follows only these configured screen matches; it does not guess menu numbers."
+            "Choose the exact Signature offer and validity, enter its saved USSD entry code, then configure the provider screens. The recipe must match the offer name and validity and explicitly choose Buy with Airtime."
         )
         val selectedOffer = fulfilmentOffers.firstOrNull { it.id == selectedOfferId }
         Box {
             OutlinedButton(onClick = { offerMenuExpanded = true }, modifier = Modifier.fillMaxWidth()) {
-                Text(selectedOffer?.let { "${it.name} · ${it.category}" } ?: "Choose an active offer")
+                Text(selectedOffer?.let { "${it.name} · ${it.validityLabel ?: "validity not set"}" } ?: "Choose an active offer")
             }
             DropdownMenu(expanded = offerMenuExpanded, onDismissRequest = { offerMenuExpanded = false }) {
                 fulfilmentOffers.forEach { offer ->
                     DropdownMenuItem(
-                        text = { Text("${offer.name} · ${offer.category}") },
-                        onClick = { selectedOfferId = offer.id; offerMenuExpanded = false }
+                        text = { Text("${offer.name} · ${offer.validityLabel ?: "validity not set"}") },
+                        onClick = { selectedOfferId = offer.id; ussdEntryCode = offer.entryCode.orEmpty(); offerMenuExpanded = false }
                     )
                 }
             }
@@ -1749,12 +1944,22 @@ private fun UssdAutomationSettingsScreen() {
             modifier = Modifier.fillMaxWidth()
         )
         Text(
-            "Each step uses match_text plus action: reply, tap_text or manual_pin. Use {recipient_phone} for the customer's delivery number. The PIN itself is never saved in this menu script.",
+            "The first offer-selection step must match the exact offer name and validity shown by the provider. A separate step must select Buy with Airtime. Use {recipient_phone} for the delivery number. PINs are never stored or entered by BingwaPulse.",
             color = Muted, style = MaterialTheme.typography.bodySmall
         )
         Row(Modifier.fillMaxWidth(), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
             Checkbox(checked = confirmMenuVerified, onCheckedChange = { confirmMenuVerified = it })
             Text("I tested this exact menu flow on the target SIM and verified every step.", color = Navy, style = MaterialTheme.typography.bodySmall)
+        }
+        if (confirmMenuVerified) {
+            OutlinedTextField(
+                value = menuVerificationNote,
+                onValueChange = { menuVerificationNote = it.take(500) },
+                label = { Text("Verification note (what you tested and confirmed)") },
+                minLines = 2,
+                maxLines = 4,
+                modifier = Modifier.fillMaxWidth()
+            )
         }
         Button(
             onClick = {
@@ -1767,8 +1972,31 @@ private fun UssdAutomationSettingsScreen() {
                         step?.optString("action") == "reply" && step.optString("value").matches(Regex("^[0-9]{4,8}$"))
                     }
                 } == true
-                if (selected == null || amount == null || amount <= 0L || !ussdEntryCode.matches(Regex("^\\\\*[0-9*]+#$")) || steps == null || steps.length() == 0 || rawPinInScript) {
-                    fulfilmentNotice = if (rawPinInScript) "Do not put the SIM PIN in menu steps. Use the manual_pin action; automatic PINs are stored only in the encrypted local vault." else "Choose an offer and enter a valid amount, USSD code and non-empty JSON menu steps."
+                val exactOfferValidityStep = selected?.validityLabel?.takeIf { it.isNotBlank() }?.let { validity ->
+                    steps?.let { array ->
+                        (0 until array.length()).any { index ->
+                            val match = array.optJSONObject(index)?.optString("match_text").orEmpty()
+                            match.contains(selected?.name.orEmpty(), ignoreCase = true) && match.contains(validity, ignoreCase = true)
+                        }
+                    } == true
+                } == true
+                val buyWithAirtimeStep = steps?.let { array ->
+                    (0 until array.length()).any { index ->
+                        val step = array.optJSONObject(index)
+                        step?.optString("match_text").orEmpty().contains("Buy with Airtime", ignoreCase = true) &&
+                            step?.optString("action") in setOf("reply", "tap_text")
+                    }
+                } == true
+                if (selected == null || selected.validityLabel.isNullOrBlank() || amount == null || amount <= 0L ||
+                    !ussdEntryCode.matches(Regex("^\\\\*[0-9*]+#$")) || steps == null || steps.length() == 0 ||
+                    rawPinInScript || !exactOfferValidityStep || !buyWithAirtimeStep || (confirmMenuVerified && menuVerificationNote.trim().length < 12)) {
+                    fulfilmentNotice = when {
+                        rawPinInScript -> "A SIM PIN must never be placed in menu steps."
+                        !exactOfferValidityStep -> "Add a screen step that matches the exact offer name and validity."
+                        !buyWithAirtimeStep -> "Add a separate screen-matched step that selects Buy with Airtime."
+                        confirmMenuVerified && menuVerificationNote.trim().length < 12 -> "Describe the successful test in a verification note (at least 12 characters)."
+                        else -> "Choose an offer with a validity label and enter a valid amount, USSD code and menu steps."
+                    }
                 } else {
                     ruleBusy = true
                     scope.launch {
@@ -1781,7 +2009,7 @@ private fun UssdAutomationSettingsScreen() {
                             val businessId = active.businessId ?: withContext(Dispatchers.IO) { api.firstBusinessId(active) }
                                 ?: throw IllegalStateException("No business workspace is connected.")
                             withContext(Dispatchers.IO) {
-                                api.saveFulfilmentRule(active, businessId, amount, selected.id, ussdEntryCode.trim(), steps, confirmMenuVerified)
+                                api.saveFulfilmentRule(active, businessId, amount, selected.id, ussdEntryCode.trim(), steps, confirmMenuVerified, menuVerificationNote)
                             }
                             fulfilmentRules = withContext(Dispatchers.IO) { api.listFulfilmentRules(active, businessId) }
                             fulfilmentNotice = if (confirmMenuVerified) "Menu rule saved and enabled after your verification." else "Menu rule saved disabled. Verify the exact provider flow before enabling it."
@@ -1842,7 +2070,8 @@ private fun UssdAutomationSettingsScreen() {
             val offerName = fulfilmentOffers.firstOrNull { it.id == rule.offerId }?.name ?: "Offer"
             InfoCard(
                 "KES ${rule.amountMinor / 100} · $offerName",
-                "${rule.menuEntryCode} · ${if (rule.isEnabled && rule.verifiedAt != null) "VERIFIED / ENABLED" else "DISABLED / NOT VERIFIED"}"
+                "${rule.menuEntryCode} · ${if (rule.isEnabled && rule.verifiedAt != null && rule.verifiedBy != null) "VERIFIED / ENABLED" else "DISABLED / NOT VERIFIED"} · v${rule.version}" +
+                    (rule.verificationNote?.let { "\\nManager test: $it" } ?: "")
             )
         }
 
@@ -1915,11 +2144,8 @@ private fun UssdAutomationSettingsScreen() {
                             withContext(Dispatchers.IO) { api.refreshSession(active) } else active
                         val businessId = refreshed.businessId ?: withContext(Dispatchers.IO) { api.firstBusinessId(refreshed) }
                             ?: throw IllegalStateException("No business workspace is connected.")
-                        if (!requireManualPin && !pinStore.hasPin()) {
-                            throw IllegalStateException("Save the encrypted local USSD PIN before disabling manual PIN entry.")
-                        }
                         withContext(Dispatchers.IO) {
-                            api.setFulfilmentControls(refreshed, businessId, fulfilmentEnabled, fulfilmentPaused, requireManualPin)
+                            api.setFulfilmentControls(refreshed, businessId, fulfilmentEnabled, fulfilmentPaused, true)
                         }
                         fulfilmentNotice = "Fulfilment controls saved. New worker claims follow these settings."
                     } catch (error: Exception) {

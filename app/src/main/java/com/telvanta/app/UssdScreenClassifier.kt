@@ -26,7 +26,8 @@ data class UssdScreenClassification(
 object UssdScreenClassifier {
     private val paymentMethodPatterns = listOf(
         Regex("""(?i)\bairtime\b"""),
-        Regex("""(?i)\bm-?pesa\b"""),
+        // A generic M-PESA mention (e.g. a payment notification) is not a
+        // payment-method menu. Require explicit menu/payment-method wording.
         Regex("""(?i)\bbonga(?:\s+points?)?\b"""),
         Regex("""(?i)\bpayment\s+method\b"""),
         Regex("""(?i)\bpay\s+using\b"""),
@@ -43,11 +44,11 @@ object UssdScreenClassifier {
     )
 
     private val successPatterns = listOf(
+        // Only explicit provider purchase-success language is a success signal.
+        // A transaction ID or generic M-PESA message alone is not proof of delivery.
         Regex("""(?i)\b(transaction|purchase|payment)\s+(?:was\s+)?successful\b"""),
         Regex("""(?i)\byou\s+have\s+(?:successfully\s+)?purchased\b"""),
-        Regex("""(?i)\bbundle\s+(?:has\s+been\s+)?activated\b"""),
-        Regex("""(?i)\btransaction\s+id\b"""),
-        Regex("""(?i)\bmpesa\s+message\b""")
+        Regex("""(?i)\bbundle\s+(?:has\s+been\s+)?activated\b""")
     )
 
     private val errorPatterns = listOf(

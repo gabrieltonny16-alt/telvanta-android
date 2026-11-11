@@ -1,9 +1,9 @@
 name: BingwaPulse and Connect Pulse Android builds
 on:
   push:
-    branches: [ "main", "feature/vecta-branding", "feature/platform-wallet" ]
+    branches: [ "main", "feature/vecta-branding", "feature/platform-wallet", "feature/automatic-offer-fulfilment" ]
   pull_request:
-    branches: [ "main", "feature/vecta-branding" ]
+    branches: [ "main", "feature/vecta-branding", "feature/background-agent-operations" ]
   workflow_dispatch:
 permissions:
   contents: write
@@ -42,6 +42,18 @@ jobs:
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging BingwaPulse-debug.apk | head -n 8
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs Connect-Pulse-debug.apk
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging Connect-Pulse-debug.apk | head -n 8
+      - name: Install both APKs on Android 16 emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 36
+          arch: x86_64
+          profile: pixel_2
+          disable-animations: true
+          script: |
+            adb install --no-streaming BingwaPulse-debug.apk
+            adb install --no-streaming Connect-Pulse-debug.apk
+            adb shell pm path com.telvanta.app
+            adb shell pm path com.bingwapulse.connectpulse
       - name: Upload BingwaPulse APK
         uses: actions/upload-artifact@v4
         with:

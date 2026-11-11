@@ -116,7 +116,9 @@ data class FulfilmentOffer(
     val name: String,
     val category: String,
     val providerId: String,
-    val isActive: Boolean
+    val isActive: Boolean,
+    val validityLabel: String?,
+    val entryCode: String?
 )
 
 data class FulfilmentOrderSummary(
@@ -134,7 +136,10 @@ data class FulfilmentRuleSummary(
     val offerId: String,
     val menuEntryCode: String,
     val isEnabled: Boolean,
-    val verifiedAt: String?
+    val verifiedAt: String?,
+    val verifiedBy: String?,
+    val verificationNote: String?,
+    val version: Int
 )
 
 data class MpesaNotificationReviewCandidate(
@@ -338,6 +343,42 @@ class BingwaSupabaseApi {
         )
     }
 
+    fun getPaymentIngressTill(session: BingwaSession, businessId: String): String? {
+        val rows = JSONArray(request(
+            "GET",
+            "/rest/v1/payment_ingress_channels?select=shortcode&business_id=eq.$businessId&channel_type=eq.till&is_active=eq.true&limit=1",
+            token = session.accessToken
+        ))
+        return if (rows.length() == 0) null else rows.getJSONObject(0).optString("shortcode").takeIf { it.isNotBlank() }
+    }
+
+    fun savePaymentIngressTill(session: BingwaSession, businessId: String, shortcode: String) {
+        val till = shortcode.trim()
+        require(businessId.isNotBlank() && till.matches(Regex("^[0-9]{5,8}$"))) {
+            "Enter the exact 5–8 digit M-PESA Till number."
+        }
+        val existing = JSONArray(request(
+            "GET",
+            "/rest/v1/payment_ingress_channels?select=id,business_id&shortcode=eq.$till&limit=1",
+            token = session.accessToken
+        ))
+        if (existing.length() > 0 && existing.getJSONObject(0).optString("business_id") != businessId) {
+            throw IOException("This Till number is already assigned to another business workspace.")
+        }
+        val body = JSONObject()
+            .put("business_id", businessId)
+            .put("shortcode", till)
+            .put("channel_type", "till")
+            .put("is_active", true)
+        request(
+            "POST",
+            "/rest/v1/payment_ingress_channels?on_conflict=shortcode",
+            body,
+            session.accessToken,
+            "resolution=merge-duplicates,return=minimal"
+        )
+    }
+
     fun listMpesaNotificationCandidates(
         session: BingwaSession,
         businessId: String
@@ -449,8 +490,76 @@ class BingwaSupabaseApi {
 
 
 
+    fun syncLocalOfferToCloud(session: BingwaSession, businessId: String, offer: OfferRow) {
+        require(businessId.isNotBlank())
+        val roundedSellingPrice = offer.price.toInt()
+        require(offer.price > 0.0 && kotlin.math.abs(offer.price - roundedSellingPrice.toDouble()) < 0.0001) {
+            "Cloud offers require a whole-KES selling price. Update this offer before syncing."
+        }
+
+        val providerName = if (offer.source.contains("signature", ignoreCase = true)) "Safaricom Signature" else "Safaricom"
+        val providerBody = JSONObject()
+            .put("business_id", businessId)
+            .put("name", providerName)
+            .put("adapter_key", "ussd_assisted")
+            .put("status", "active")
+        val providerRows = JSONArray(request(
+            "POST",
+            "/rest/v1/providers?on_conflict=business_id,name",
+            providerBody,
+            session.accessToken,
+            "resolution=merge-duplicates,return=representation"
+        ))
+        if (providerRows.length() == 0) throw IOException("Safaricom provider could not be synchronized.")
+        val providerId = providerRows.getJSONObject(0).getString("id")
+
+        val category = when (offer.category.trim().lowercase()) {
+            "data" -> "data"
+            "voice", "minutes" -> "minutes"
+            "sms" -> "sms"
+            "combo" -> "combo"
+            else -> throw IllegalArgumentException("Unsupported offer category: ${offer.category}")
+        }
+        val externalRef = offer.sourceId.takeIf { it.isNotBlank() } ?: "local-${offer.id}"
+        val offerBody = JSONObject()
+            .put("business_id", businessId)
+            .put("provider_id", providerId)
+            .put("external_offer_ref", externalRef)
+            .put("code", offer.ussdCode.takeIf { it.isNotBlank() } ?: JSONObject.NULL)
+            .put("name", offer.name)
+            .put("category", category)
+            .put("description", listOf(offer.source, offer.simProfile, offer.tags).filter { it.isNotBlank() }.joinToString(" · "))
+            .put("provider_cost_kes", (offer.originalPrice ?: 0.0).toInt().coerceAtLeast(0))
+            .put("validity_label", offer.duration.takeIf { it.isNotBlank() } ?: JSONObject.NULL)
+            .put("is_active", offer.active)
+            .put("source_observed_at", java.time.Instant.now().toString())
+        val offerRows = JSONArray(request(
+            "POST",
+            "/rest/v1/offers?on_conflict=business_id,provider_id,external_offer_ref",
+            offerBody,
+            session.accessToken,
+            "resolution=merge-duplicates,return=representation"
+        ))
+        if (offerRows.length() == 0) throw IOException("Offer could not be synchronized to the business catalogue.")
+        val cloudOfferId = offerRows.getJSONObject(0).getString("id")
+
+        val agentOfferBody = JSONObject()
+            .put("business_id", businessId)
+            .put("offer_id", cloudOfferId)
+            .put("agent_user_id", session.userId)
+            .put("selling_price_kes", roundedSellingPrice)
+            .put("is_published", offer.active)
+        request(
+            "POST",
+            "/rest/v1/agent_offers?on_conflict=offer_id,agent_user_id",
+            agentOfferBody,
+            session.accessToken,
+            "resolution=merge-duplicates,return=minimal"
+        )
+    }
+
     fun listFulfilmentOffers(session: BingwaSession, businessId: String): List<FulfilmentOffer> {
-        val query = "/rest/v1/offers?select=id,name,category,provider_id,is_active&business_id=eq.$businessId&is_active=eq.true&order=name.asc"
+        val query = "/rest/v1/offers?select=id,name,category,provider_id,is_active,validity_label,code&business_id=eq.$businessId&is_active=eq.true&order=name.asc"
         val rows = JSONArray(request("GET", query, token = session.accessToken))
         return buildList {
             for (i in 0 until rows.length()) {
@@ -460,14 +569,16 @@ class BingwaSupabaseApi {
                     name = row.optString("name"),
                     category = row.optString("category"),
                     providerId = row.optString("provider_id"),
-                    isActive = row.optBoolean("is_active", false)
+                    isActive = row.optBoolean("is_active", false),
+                    validityLabel = row.optString("validity_label").takeIf { it.isNotBlank() && it != "null" },
+                    entryCode = row.optString("code").takeIf { it.isNotBlank() && it != "null" }
                 ))
             }
         }
     }
 
     fun listFulfilmentRules(session: BingwaSession, businessId: String): List<FulfilmentRuleSummary> {
-        val query = "/rest/v1/payment_offer_rules?select=id,amount_minor,offer_id,menu_entry_code,is_enabled,menu_flow_verified_at&business_id=eq.$businessId&order=amount_minor.asc"
+        val query = "/rest/v1/payment_offer_rules?select=id,amount_minor,offer_id,menu_entry_code,is_enabled,menu_flow_verified_at,menu_flow_verified_by,menu_flow_verified_note,menu_flow_version&business_id=eq.$businessId&order=amount_minor.asc"
         val rows = JSONArray(request("GET", query, token = session.accessToken))
         return buildList {
             for (i in 0 until rows.length()) {
@@ -478,7 +589,10 @@ class BingwaSupabaseApi {
                     offerId = row.optString("offer_id"),
                     menuEntryCode = row.optString("menu_entry_code"),
                     isEnabled = row.optBoolean("is_enabled", false),
-                    verifiedAt = row.optString("menu_flow_verified_at").takeIf { it.isNotBlank() && it != "null" }
+                    verifiedAt = row.optString("menu_flow_verified_at").takeIf { it.isNotBlank() && it != "null" },
+                    verifiedBy = row.optString("menu_flow_verified_by").takeIf { it.isNotBlank() && it != "null" },
+                    verificationNote = row.optString("menu_flow_verified_note").takeIf { it.isNotBlank() && it != "null" },
+                    version = row.optInt("menu_flow_version", 1)
                 ))
             }
         }
@@ -491,11 +605,15 @@ class BingwaSupabaseApi {
         offerId: String,
         ussdCode: String,
         menuSteps: org.json.JSONArray,
-        enableAfterManagerVerification: Boolean
+        enableAfterManagerVerification: Boolean,
+        verificationNote: String = ""
     ) {
         require(amountKes > 0L && offerId.isNotBlank())
         require(ussdCode.matches(Regex("^\\\\*[0-9*]+#$")))
         require(menuSteps.length() > 0)
+        if (enableAfterManagerVerification) {
+            require(verificationNote.trim().length >= 12) { "Add a short note describing the successful recipe test." }
+        }
         val now = java.time.Instant.now().toString()
         val body = JSONObject()
             .put("business_id", businessId)
@@ -505,6 +623,8 @@ class BingwaSupabaseApi {
             .put("menu_steps", menuSteps)
             .put("is_enabled", enableAfterManagerVerification)
             .put("menu_flow_verified_at", if (enableAfterManagerVerification) now else JSONObject.NULL)
+            .put("menu_flow_verified_by", if (enableAfterManagerVerification) session.userId else JSONObject.NULL)
+            .put("menu_flow_verified_note", if (enableAfterManagerVerification) verificationNote.trim().take(500) else JSONObject.NULL)
         request(
             "POST",
             "/rest/v1/payment_offer_rules?on_conflict=business_id,amount_minor",
