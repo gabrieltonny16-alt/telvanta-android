@@ -649,7 +649,7 @@ private fun SignatureOffersScreen(db: LocalDatabase, onMessage: (String) -> Unit
             (simProfile == "ALL" || it.simProfile.equals(simProfile, true)) &&
             (search.isBlank() || it.name.contains(search, true) || it.price.toString().contains(search) || it.code.contains(search, true))
     }
-    Text("Signature Offers", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = Navy)
+    Text("Signature Offers", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = Cyan)
     InfoCard("44 extracted Signature Offers", "Any SIM, Normal SIM and Notification SIM offers from your supplied extraction. Entries remain unverified candidates; no USSD action or purchase is triggered.")
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         listOf("Candidates" to false, "Saved offers" to true).forEach { item ->
@@ -671,17 +671,17 @@ private fun SignatureOffersScreen(db: LocalDatabase, onMessage: (String) -> Unit
                 Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = androidx.compose.ui.Alignment.Top) {
                         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                            Text(offer.name, fontWeight = FontWeight.Bold, color = Navy)
-                            Text("${offer.category} · ${offer.duration}", color = Cyan, style = MaterialTheme.typography.labelSmall)
+                            Text(offer.name, fontWeight = FontWeight.Bold, color = Navy, style = MaterialTheme.typography.titleMedium, maxLines = 2)
+                            Text("${offer.category} · ${offer.duration}", color = Muted, style = MaterialTheme.typography.bodySmall)
                             Text(when(offer.simProfile) { "normal" -> "NORMAL SIM"; "notification" -> "NOTIFICATION SIM"; else -> "ANY SIM" }, color = Muted, style = MaterialTheme.typography.labelSmall)
                         }
-                        Text(if (offer.price >= 0) "KES ${offer.price}" else "Price unknown", color = Color(0xFF713BFF), fontWeight = FontWeight.ExtraBold)
+                        Text(if (offer.price >= 0) "KES ${offer.price}" else "Price unknown", color = Cyan, fontWeight = FontWeight.ExtraBold, maxLines = 1)
                     }
-                    Text("Dial: " + if (offer.code.isBlank()) "Not captured" else offer.code, color = Navy)
+                    if (offer.code.isNotBlank()) Surface(color = Color(0xFF0A1025), shape = RoundedCornerShape(8.dp)) { Text(offer.code, color = Cyan, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp), maxLines = 1, softWrap = false, style = MaterialTheme.typography.bodyMedium) } else Text("USSD code not captured", color = Muted, style = MaterialTheme.typography.bodySmall)
                     if (offer.tags.isNotBlank()) Text("Tags: ${offer.tags}", color = Muted, style = MaterialTheme.typography.bodySmall)
                     Text(offer.note, color = Muted, style = MaterialTheme.typography.bodySmall)
                     Text("Status: CANDIDATE · NOT VERIFIED", color = Color(0xFFFFC857), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall)
-                    Button(onClick = { downloadCandidate = offer; downloadPrice = if (offer.price >= 0) offer.price.toString() else "" }, modifier = Modifier.fillMaxWidth()) { Text("Download to My Offers") }
+                    Button(onClick = { downloadCandidate = offer; downloadPrice = if (offer.price >= 0) offer.price.toString() else "" }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) { Text("Download to My Offers") }
                 }
             }
         }
@@ -691,8 +691,8 @@ private fun SignatureOffersScreen(db: LocalDatabase, onMessage: (String) -> Unit
         saved.forEach { offer ->
             Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF111B38)), modifier = Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                    Text(offer.name, fontWeight = FontWeight.Bold, color = Navy)
-                    Text("KES " + money(offer.price) + " · " + offer.category, color = Muted)
+                    Text(offer.name, fontWeight = FontWeight.Bold, color = Navy, style = MaterialTheme.typography.titleMedium, maxLines = 2)
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) { Text(offer.category + " · " + offer.duration, color = Muted, style = MaterialTheme.typography.bodySmall); Text("KES " + money(offer.price), color = Cyan, fontWeight = FontWeight.ExtraBold) }
                     Text("Source: " + offer.source + " · " + if (offer.verified) "Operator marked verified" else "Unverified", color = Muted, style = MaterialTheme.typography.bodySmall)
                 }
             }
