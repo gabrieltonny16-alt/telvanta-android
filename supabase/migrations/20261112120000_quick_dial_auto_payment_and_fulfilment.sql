@@ -229,5 +229,5 @@ revoke all on function private.auto_match_mpesa_notification_to_quick_dial_order
 drop trigger if exists zz_payment_notification_quick_dial_auto_match
   on public.payment_notification_candidates;
 create trigger zz_payment_notification_quick_dial_auto_match
-after insert on public.payment_notification_candidates
+after insert or update of staging_status on public.payment_notification_candidates
 for each row execute function private.auto_match_mpesa_notification_to_quick_dial_order();
