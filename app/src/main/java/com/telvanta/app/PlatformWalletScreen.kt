@@ -94,9 +94,11 @@ data class PlatformWalletSnapshot(
         }
 }
 
-private val WalletAccent = Color(0xFF36B3EB)
-private val WalletPanel = Color(0xFF111B38)
-private val WalletMuted = Color(0xFF91A4C7)
+private val WalletAccent = Color(0xFF00F2FE)
+private val WalletBlue = Color(0xFF0072FF)
+private val WalletPanel = Color(0xFF0B0F19)
+private val WalletMuted = Color(0xFF94A3B8)
+private val WalletBorder = Color(0xFF1E3A5F)
 
 @Composable
 internal fun WalletScreen() {
@@ -248,7 +250,7 @@ internal fun WalletScreen() {
 
     LazyColumn(
         modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
+        verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         item {
             Text(
@@ -257,11 +259,7 @@ internal fun WalletScreen() {
                 fontWeight = FontWeight.ExtraBold,
                 style = MaterialTheme.typography.headlineMedium
             )
-            Text(
-                "Subscriptions and USSD tokens for your BingwaPulse workspace",
-                color = WalletMuted,
-                style = MaterialTheme.typography.bodySmall
-            )
+            Text("BALANCE · PLANS · ACTIVITY", color = WalletMuted, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
         }
 
         if (localPreview) {
@@ -295,10 +293,11 @@ internal fun WalletScreen() {
                 item {
                     Card(
                         modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(containerColor = Color(0xFF14234A))
+                        colors = CardDefaults.cardColors(containerColor = WalletPanel),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, WalletAccent.copy(alpha = 0.35f))
                     ) {
-                        Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Text("YOUR PLATFORM WALLET", color = WalletAccent, fontWeight = FontWeight.ExtraBold)
+                        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                            Text("WALLET BALANCE", color = WalletAccent, fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.labelSmall)
                             Text(
                                 wallet.activeSubscription?.let { planName(wallet.plans, it.planCode) } ?: "No active subscription",
                                 color = Color.White,
@@ -314,7 +313,7 @@ internal fun WalletScreen() {
                             Spacer(Modifier.height(4.dp))
                             Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
                                 Column {
-                                    Text("AVAILABLE TOKENS", color = WalletMuted, style = MaterialTheme.typography.labelSmall)
+                                    Text("AVAILABLE", color = WalletMuted, style = MaterialTheme.typography.labelSmall)
                                     Text(wallet.availableTokens.toString(), color = WalletAccent, fontWeight = FontWeight.Black, style = MaterialTheme.typography.headlineMedium)
                                 }
                                 Column {
@@ -332,9 +331,10 @@ internal fun WalletScreen() {
                 items(wallet.plans, key = { "plan_${it.code}" }) { plan ->
                     Card(
                         modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(containerColor = WalletPanel)
+                        colors = CardDefaults.cardColors(containerColor = WalletPanel),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, WalletBorder)
                     ) {
-                        Column(Modifier.padding(15.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                        Column(Modifier.padding(horizontal = 14.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
                             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                                 Text(plan.name, color = Color.White, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
                                 Text("KES ${plan.priceKes}", color = WalletAccent, fontWeight = FontWeight.ExtraBold)
@@ -410,7 +410,7 @@ internal fun WalletScreen() {
         item {
             WalletInfoCard(
                 "Airtime payment verification",
-                "BingwaPulse starts the Sambaza transfer from your default voice SIM. Your subscription activates immediately when the sender-side Safaricom response confirms the exact selected amount and intended recipient. Receiver SMS is not required."
+                "Your subscription activates only after Safaricom confirms the exact amount and intended recipient. An unconfirmed transfer does not activate a plan."
             )
         }
         if (notice.isNotBlank() && !localPreview) {
@@ -428,9 +428,9 @@ internal fun WalletScreen() {
 
 @Composable
 private fun WalletSectionTitle(title: String, subtitle: String) {
-    Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
         Text(title, color = WalletAccent, fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.labelLarge)
-        Text(subtitle, color = WalletMuted, style = MaterialTheme.typography.bodySmall)
+        Text(subtitle, color = WalletMuted, style = MaterialTheme.typography.labelSmall, maxLines = 2)
     }
 }
 
@@ -438,7 +438,8 @@ private fun WalletSectionTitle(title: String, subtitle: String) {
 private fun WalletInfoCard(title: String, body: String) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = WalletPanel)
+        colors = CardDefaults.cardColors(containerColor = WalletPanel),
+        border = androidx.compose.foundation.BorderStroke(1.dp, WalletBorder)
     ) {
         Column(Modifier.padding(15.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
             Text(title, color = Color.White, fontWeight = FontWeight.Bold)
