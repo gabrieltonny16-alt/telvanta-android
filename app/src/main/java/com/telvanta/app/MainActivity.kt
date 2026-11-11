@@ -38,6 +38,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalContext
@@ -677,10 +678,15 @@ private fun SignatureOffersScreen(db: LocalDatabase, onMessage: (String) -> Unit
                         }
                         Text(if (offer.price >= 0) "KES ${offer.price}" else "Price unknown", color = Cyan, fontWeight = FontWeight.ExtraBold, maxLines = 1)
                     }
-                    if (offer.code.isNotBlank()) Surface(color = Color(0xFF0A1025), shape = RoundedCornerShape(8.dp)) { Text(offer.code, color = Cyan, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp), maxLines = 1, softWrap = false, style = MaterialTheme.typography.bodyMedium) } else Text("USSD code not captured", color = Muted, style = MaterialTheme.typography.bodySmall)
+                    if (offer.code.isNotBlank()) Surface(color = Color(0xFF0A1025), shape = RoundedCornerShape(8.dp)) { Text(offer.code, color = Muted, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Medium, modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp), maxLines = 1, softWrap = false, style = MaterialTheme.typography.labelMedium) } else Text("USSD code not captured", color = Muted, style = MaterialTheme.typography.bodySmall)
                     if (offer.tags.isNotBlank()) Text("Tags: ${offer.tags}", color = Muted, style = MaterialTheme.typography.bodySmall)
                     Text(offer.note, color = Muted, style = MaterialTheme.typography.bodySmall)
-                    Text("Status: CANDIDATE · NOT VERIFIED", color = Color(0xFFFFC857), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall)
+                    Surface(color = Color(0xFF3A2C18), shape = RoundedCornerShape(50)) {
+                        Row(Modifier.padding(horizontal = 9.dp, vertical = 5.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text("●", color = Color(0xFFFFC857), style = MaterialTheme.typography.labelSmall)
+                            Text("CANDIDATE · NOT VERIFIED", color = Color(0xFFFFD58A), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall)
+                        }
+                    }
                     Button(onClick = { downloadCandidate = offer; downloadPrice = if (offer.price >= 0) offer.price.toString() else "" }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) { Text("Download to My Offers") }
                 }
             }
@@ -881,13 +887,7 @@ private fun CloudOfferSyncEffect(db: LocalDatabase, revision: Int, onMessage: (S
             }
             if (localOffers.isNotEmpty()) onMessage("${localOffers.size} local offer(s) synchronized with the cloud catalogue.")
         } catch (error: Exception) {
-            onMessage(error.message ?: "Could not synchronize local offers with the cloud catalogue.")
-        }
-    }
-}
-
-@Composable
-private fun OffersScreen(db: LocalDatabase, onMessage: (String) -> Unit) {
+            onMessage(error.message ?: "Could not synchronize local offers with the clprivate fun OffersScreen(db: LocalDatabase, onMessage: (String) -> Unit) {
     val context = LocalContext.current
     val secureStore = remember { SecureSessionStore(context) }
     val api = remember { BingwaSupabaseApi() }
@@ -908,31 +908,52 @@ private fun OffersScreen(db: LocalDatabase, onMessage: (String) -> Unit) {
     val visible = offers.filter { selectedCategory == "All" || it.category.equals(selectedCategory, true) || (selectedCategory == "Minutes" && it.category.equals("VOICE", true)) }
     fun clearEditor() { editId = null; name = ""; category = "Data"; duration = ""; code = ""; price = ""; active = false }
     Text("My Offers", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = Cyan)
+    Text("Manage your catalogue with clear pricing, availability and verification states.", color = Muted, style = MaterialTheme.typography.bodySmall)
     Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         categories.forEach { item -> FilterChip(selected = selectedCategory == item, onClick = { selectedCategory = item }, label = { Text(item) }) }
     }
     if (offers.isEmpty()) InfoCard("No offers yet", "Download offers from Signature Offers or tap + to add one manually.")
     visible.forEach { offer ->
-        Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF111B38)), modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp)) {
-            Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(11.dp)) {
-                Row(Modifier.fillMaxWidth(), verticalAlignment = androidx.compose.ui.Alignment.Top, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text(offer.name, color = Navy, fontWeight = FontWeight.Bold, maxLines = 2, style = MaterialTheme.typography.titleMedium)
+        Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF111B38)),
+            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF263B70)),
+            modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(18.dp)) {
+            Column(Modifier.fillMaxWidth().padding(15.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                        Text(offer.name, color = Color.White, fontWeight = FontWeight.Bold, maxLines = 2, style = MaterialTheme.typography.titleMedium)
                         Text(listOf(offer.category, offer.duration).filter { it.isNotBlank() }.joinToString(" · "), color = Muted, style = MaterialTheme.typography.bodySmall)
-                        if (offer.ussdCode.isNotBlank()) Surface(color = Color(0xFF0A1025), shape = RoundedCornerShape(8.dp)) {
-                            Text(offer.ussdCode, color = Cyan, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp), maxLines = 1, softWrap = false, style = MaterialTheme.typography.bodyMedium)
+                        if (offer.ussdCode.isNotBlank()) Surface(color = Color(0xFF0A1025), shape = RoundedCornerShape(8.dp),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF263B70))) {
+                            Text(offer.ussdCode, color = Muted, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Medium,
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp), maxLines = 1, softWrap = false, style = MaterialTheme.typography.labelMedium)
+                        } else Text("USSD code not set", color = Muted, style = MaterialTheme.typography.labelSmall)
+                    }
+                    Column(horizontalAlignment = androidx.compose.ui.Alignment.End, verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                        Text("KES " + money(offer.price), color = Color.White, fontWeight = FontWeight.ExtraBold, maxLines = 1, style = MaterialTheme.typography.titleMedium)
+                        Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                            Text(if (offer.active) "ACTIVE" else "PAUSED", color = if (offer.active) Cyan else Muted, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall)
+                            Switch(checked = offer.active, onCheckedChange = { enabled ->
+                                try { db.setOfferActive(offer.id, enabled); reload++; onMessage(if (enabled) "Offer activated on SiteLink." else "Offer deactivated on SiteLink.") }
+                                catch (e: Exception) { onMessage(e.message ?: "Could not update offer.") }
+                            })
+                        }
+                        TextButton(onClick = {
+                            editId = offer.id; name = offer.name; category = offer.category; duration = offer.duration
+                            code = offer.ussdCode; price = offer.price.toString(); active = offer.active; showEditor = true
+                        }, contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)) {
+                            Text("✎  Edit", color = Cyan, style = MaterialTheme.typography.labelLarge)
                         }
                     }
-                    Column(horizontalAlignment = androidx.compose.ui.Alignment.End, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text("KES " + money(offer.price), color = Cyan, fontWeight = FontWeight.ExtraBold, maxLines = 1, style = MaterialTheme.typography.titleMedium)
-                        Switch(checked = offer.active, onCheckedChange = { enabled ->
-                            try { db.setOfferActive(offer.id, enabled); reload++; onMessage(if (enabled) "Offer activated on SiteLink." else "Offer deactivated on SiteLink.") }
-                            catch (e: Exception) { onMessage(e.message ?: "Could not update offer.") }
-                        })
-                    }
                 }
-                HorizontalDivider(color = Color(0xFF263B70))
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End, verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                    Surface(color = if (offer.verified) Color(0xFF073B3B) else Color(0xFF3A2C18), shape = RoundedCornerShape(50)) {
+                        Row(Modifier.padding(horizontal = 9.dp, vertical = 5.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text("●", color = if (offer.verified) Cyan else Color(0xFFFFC857), style = MaterialTheme.typography.labelSmall)
+                            Text(if (offer.verified) "VERIFIED" else "NOT VERIFIED", color = if (offer.verified) Color(0xFF9DE8E8) else Color(0xFFFFD58A),
+                                fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall)
+                        }
+                    }
+                    Spacer(Modifier.weight(1f))
                     TextButton(onClick = {
                         scope.launch {
                             try {
@@ -948,18 +969,14 @@ private fun OffersScreen(db: LocalDatabase, onMessage: (String) -> Unit) {
                                 db.deleteOffer(offer.id); reload++; onMessage("Offer unpublished from the cloud catalogue and removed locally.")
                             } catch (error: Exception) { onMessage(error.message ?: "Could not safely remove the offer.") }
                         }
-                    }) { Text("Delete", color = Color(0xFFFF7777)) }
-                    TextButton(onClick = {
-                        editId = offer.id; name = offer.name; category = offer.category; duration = offer.duration
-                        code = offer.ussdCode; price = offer.price.toString(); active = offer.active; showEditor = true
-                    }) { Text("Edit", color = Cyan) }
+                    }, contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)) {
+                        Text("Delete", color = Color(0xFFFF8D8D), style = MaterialTheme.typography.labelMedium)
+                    }
                 }
             }
         }
     }
-    Button(onClick = { clearEditor(); showEditor = true }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp)) {
-        Text("＋  Add offer", fontWeight = FontWeight.Bold)
-    }
+    Button(onClick = { clearEditor(); showEditor = true }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp)) { Text("＋  Add offer", fontWeight = FontWeight.Bold) }
     if (showEditor) AlertDialog(
         onDismissRequest = { showEditor = false; clearEditor() },
         title = { Text(if (editId == null) "Add offer" else "Edit offer") },
@@ -973,9 +990,7 @@ private fun OffersScreen(db: LocalDatabase, onMessage: (String) -> Unit) {
                 OutlinedTextField(duration, { duration = it }, label = { Text("Validity / duration") }, singleLine = true)
                 OutlinedTextField(code, { code = it }, label = { Text("USSD code") }, singleLine = true)
                 OutlinedTextField(price, { price = it }, label = { Text("Selling price (KES)") }, singleLine = true)
-                Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-                    Switch(checked = active, onCheckedChange = { active = it }); Text("Active on SiteLink")
-                }
+                Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) { Switch(checked = active, onCheckedChange = { active = it }); Text("Active on SiteLink") }
             }
         },
         confirmButton = {
@@ -990,6 +1005,9 @@ private fun OffersScreen(db: LocalDatabase, onMessage: (String) -> Unit) {
             }) { Text("Save") }
         },
         dismissButton = { TextButton(onClick = { showEditor = false; clearEditor() }) { Text("Cancel") } }
+    )
+}
+; clearEditor() }) { Text("Cancel") } }
     )
 }
 
