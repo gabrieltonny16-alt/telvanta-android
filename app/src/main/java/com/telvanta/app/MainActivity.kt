@@ -913,53 +913,52 @@ private fun OffersScreen(db: LocalDatabase, onMessage: (String) -> Unit) {
     }
     if (offers.isEmpty()) InfoCard("No offers yet", "Download offers from Signature Offers or tap + to add one manually.")
     visible.forEach { offer ->
-        Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF151D35)), modifier = Modifier.fillMaxWidth()) {
-            Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 13.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                Text("✥", color = Cyan, fontSize = 25.sp, fontWeight = FontWeight.Bold)
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                    Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text(offer.name, color = Cyan, fontWeight = FontWeight.Bold, maxLines = 1, style = MaterialTheme.typography.titleMedium)
-                        if (offer.verified) Text("✿", color = Color(0xFF4C9FFB), fontWeight = FontWeight.Bold)
-                    }
-                    val detail = listOf(offer.duration, offer.ussdCode).filter { it.isNotBlank() }.joinToString(" · ")
-                    Text(if (detail.isNotBlank()) detail else offer.category, color = Muted, style = MaterialTheme.typography.bodySmall)
-                }
-                Text("KES ${money(offer.price)}", color = Navy, fontWeight = FontWeight.Bold, maxLines = 1)
-                Switch(checked = offer.active, onCheckedChange = { enabled ->
-                    try { db.setOfferActive(offer.id, enabled); reload++; onMessage(if (enabled) "Offer activated on SiteLink." else "Offer deactivated on SiteLink.") }
-                    catch (e: Exception) { onMessage(e.message ?: "Could not update offer.") }
-                })
-                TextButton(onClick = {
-                    scope.launch {
-                        try {
-                            if (!secureStore.isLocalWorkspace()) {
-                                var session = secureStore.load() ?: throw IllegalStateException("Sign in before deleting a cloud-published offer.")
-                                if (session.expiresAtEpochSeconds <= System.currentTimeMillis() / 1000L + 60L) {
-                                    session = withContext(Dispatchers.IO) { api.refreshSession(session) }
-                                    secureStore.save(session)
-                                }
-                                val businessId = session.businessId
-                                    ?: withContext(Dispatchers.IO) { api.firstBusinessId(session) }
-                                    ?: throw IllegalStateException("No business workspace is connected.")
-                                withContext(Dispatchers.IO) { api.syncLocalOfferToCloud(session, businessId, offer.copy(active = false)) }
-                            }
-                            db.deleteOffer(offer.id)
-                            reload++
-                            onMessage("Offer unpublished from the cloud catalogue and removed locally.")
-                        } catch (error: Exception) {
-                            onMessage(error.message ?: "Could not safely remove the offer.")
+        Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF111B38)), modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp)) {
+            Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(11.dp)) {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = androidx.compose.ui.Alignment.Top, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text(offer.name, color = Navy, fontWeight = FontWeight.Bold, maxLines = 2, style = MaterialTheme.typography.titleMedium)
+                        Text(listOf(offer.category, offer.duration).filter { it.isNotBlank() }.joinToString(" · "), color = Muted, style = MaterialTheme.typography.bodySmall)
+                        if (offer.ussdCode.isNotBlank()) Surface(color = Color(0xFF0A1025), shape = RoundedCornerShape(8.dp)) {
+                            Text(offer.ussdCode, color = Cyan, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp), maxLines = 1, softWrap = false, style = MaterialTheme.typography.bodyMedium)
                         }
                     }
-                }) { Text("▣", color = Color(0xFFFF5B55), fontSize = 20.sp) }
-                TextButton(onClick = {
-                    editId = offer.id; name = offer.name; category = offer.category; duration = offer.duration
-                    code = offer.ussdCode; price = offer.price.toString(); active = offer.active; showEditor = true
-                }) { Text("Edit", color = Cyan) }
+                    Column(horizontalAlignment = androidx.compose.ui.Alignment.End, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text("KES " + money(offer.price), color = Cyan, fontWeight = FontWeight.ExtraBold, maxLines = 1, style = MaterialTheme.typography.titleMedium)
+                        Switch(checked = offer.active, onCheckedChange = { enabled ->
+                            try { db.setOfferActive(offer.id, enabled); reload++; onMessage(if (enabled) "Offer activated on SiteLink." else "Offer deactivated on SiteLink.") }
+                            catch (e: Exception) { onMessage(e.message ?: "Could not update offer.") }
+                        })
+                    }
+                }
+                HorizontalDivider(color = Color(0xFF263B70))
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End, verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                    TextButton(onClick = {
+                        scope.launch {
+                            try {
+                                if (!secureStore.isLocalWorkspace()) {
+                                    var session = secureStore.load() ?: throw IllegalStateException("Sign in before deleting a cloud-published offer.")
+                                    if (session.expiresAtEpochSeconds <= System.currentTimeMillis() / 1000L + 60L) {
+                                        session = withContext(Dispatchers.IO) { api.refreshSession(session) }
+                                        secureStore.save(session)
+                                    }
+                                    val businessId = session.businessId ?: withContext(Dispatchers.IO) { api.firstBusinessId(session) } ?: throw IllegalStateException("No business workspace is connected.")
+                                    withContext(Dispatchers.IO) { api.syncLocalOfferToCloud(session, businessId, offer.copy(active = false)) }
+                                }
+                                db.deleteOffer(offer.id); reload++; onMessage("Offer unpublished from the cloud catalogue and removed locally.")
+                            } catch (error: Exception) { onMessage(error.message ?: "Could not safely remove the offer.") }
+                        }
+                    }) { Text("Delete", color = Color(0xFFFF7777)) }
+                    TextButton(onClick = {
+                        editId = offer.id; name = offer.name; category = offer.category; duration = offer.duration
+                        code = offer.ussdCode; price = offer.price.toString(); active = offer.active; showEditor = true
+                    }) { Text("Edit", color = Cyan) }
+                }
             }
         }
     }
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-        Button(onClick = { clearEditor(); showEditor = true }, shape = RoundedCornerShape(18.dp)) { Text("＋", fontSize = 26.sp) }
+    Button(onClick = { clearEditor(); showEditor = true }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp)) {
+        Text("＋  Add offer", fontWeight = FontWeight.Bold)
     }
     if (showEditor) AlertDialog(
         onDismissRequest = { showEditor = false; clearEditor() },
