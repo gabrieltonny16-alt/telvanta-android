@@ -15,7 +15,7 @@ function constantTimeEqual(a: string, b: string): boolean {
 
 function parseSafaricomTimestamp(value: unknown): string | null {
   const raw = String(value ?? "").trim();
-  if (!/^\\d{14}$/.test(raw)) return null;
+  if (!/^\d{14}$/.test(raw)) return null;
   const year = Number(raw.slice(0, 4));
   const month = Number(raw.slice(4, 6));
   const day = Number(raw.slice(6, 8));
