@@ -235,7 +235,7 @@ class UssdAccessibilityService : AccessibilityService() {
         val label = (node.text?.toString() ?: node.contentDescription?.toString()).orEmpty().trim().lowercase()
         if (node.isEnabled && node.isClickable && labels.any { label == it || label.contains(it) }) result.add(node)
         for (i in 0 until node.childCount) findButtons(node.getChild(i), labels, result)
-        return result.distinctBy { it.boundsInScreen.toShortString() }
+        return result.distinctBy { boundsKey(it) }
     }
 
     private fun findTextTargets(node: AccessibilityNodeInfo?, value: String, result: MutableList<AccessibilityNodeInfo> = mutableListOf()): List<AccessibilityNodeInfo> {
@@ -247,8 +247,14 @@ class UssdAccessibilityService : AccessibilityService() {
             if (target != null) result.add(target)
         }
         for (i in 0 until node.childCount) findTextTargets(node.getChild(i), value, result)
-        return result.distinctBy { it.boundsInScreen.toShortString() }
+        return result.distinctBy { boundsKey(it) }
     }
+    private fun boundsKey(node: AccessibilityNodeInfo): String {
+        val bounds = android.graphics.Rect()
+        node.getBoundsInScreen(bounds)
+        return bounds.toShortString()
+    }
+
     private fun promptManualPin() {
         val now = System.currentTimeMillis()
         if (now - lastManualPinPromptAt < 5000L) return
