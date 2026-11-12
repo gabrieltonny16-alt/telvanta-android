@@ -3,7 +3,7 @@ on:
   push:
     branches: [ "main", "feature/vecta-branding", "feature/platform-wallet", "feature/automatic-offer-fulfilment", "feature/app-wide-ui-ux-cleanup" ]
   pull_request:
-    branches: [ "main", "feature/vecta-branding", "feature/background-agent-operations" ]
+    branches: [ "main", "feature/vecta-branding", "feature/background-agent-operations", "feature/app-wide-ui-ux-cleanup" ]
   workflow_dispatch:
 permissions:
   contents: write
