@@ -28,6 +28,17 @@ class MpesaReceiptParserTest {
         assertEquals("254712345678", parsed.senderPhone)
         assertEquals("JANE DOE", parsed.senderName)
         assertTrue(parsed.mentionsConfirmation)
+        assertTrue(parsed.isTillConfirmation)
+    }
+
+    @Test
+    fun doesNotClassifyGenericIncomingWalletMessageAsTillConfirmation() {
+        val message = "UFAL477KQJ Confirmed. You have received Ksh500.00 from 254712345678 JANE DOE."
+
+        val parsed = MpesaReceiptParser.parse("M-PESA", message)
+
+        assertTrue(parsed.mentionsConfirmation)
+        org.junit.Assert.assertEquals(false, parsed.isTillConfirmation)
     }
 
 }
