@@ -13,7 +13,8 @@ data class MpesaReceiptCandidate(
     val amountKes: Long?,
     val senderPhone: String?,
     val senderName: String?,
-    val mentionsConfirmation: Boolean
+    val mentionsConfirmation: Boolean,
+    val isTillConfirmation: Boolean
 )
 
 object MpesaReceiptParser {
@@ -53,6 +54,20 @@ object MpesaReceiptParser {
             ?.takeIf { name -> name.isNotBlank() && name.any(Char::isLetter) }
         val confirmation = normalized.contains("CONFIRMED") || normalized.contains("RECEIVED") ||
             normalized.contains("YOU HAVE SENT")
-        return MpesaReceiptCandidate(receipt, amount, phone, senderName, confirmation)
+        val titleIsMpesaSender = title.trim().equals("M-PESA", ignoreCase = true) ||
+            title.trim().equals("MPESA", ignoreCase = true)
+        val hasReceiptTimestamp = Regex(
+            """(?i)\\bon\\s+\\d{1,2}/\\d{1,2}/\\d{2,4}\\s+at\\s+\\d{1,2}:\\d{2}\\s*(?:AM|PM)\\b"""
+        ).containsMatchIn(text)
+        val hasIncomingTillAmount = Regex(
+            """(?i)\\bKSH\\.?\\s*[\\d,]+(?:\\.\\d{1,2})?\\s+received\\s+from\\s+(?:\\+?254|0)[17]\\d{8}\\s+[A-Z]"""
+        ).containsMatchIn(text)
+        val hasTillBalance = Regex(
+            """(?i)\\bnew\\s+account\\s+balance\\s+is\\s+KSH\\.?\\s*[\\d,]+(?:\\.\\d{1,2})?"""
+        ).containsMatchIn(text)
+        val isTillConfirmation = titleIsMpesaSender && receipt != null && amount != null &&
+            phone != null && senderName != null && hasReceiptTimestamp &&
+            hasIncomingTillAmount && hasTillBalance
+        return MpesaReceiptCandidate(receipt, amount, phone, senderName, confirmation, isTillConfirmation)
     }
 }
