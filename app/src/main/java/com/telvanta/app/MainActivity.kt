@@ -42,6 +42,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalConfiguration
 import kotlinx.coroutines.launch
 import androidx.compose.foundation.shape.RoundedCornerShape
 import java.text.SimpleDateFormat
@@ -426,13 +427,14 @@ private fun QuickDialScreen(db: LocalDatabase, onMessage: (String) -> Unit) {
     val offers = remember(refresh) { db.offers() }
     val selectedOffer = offers.firstOrNull { it.id == selectedOfferId }
     val dialableOffers = offers.filter { it.active && it.ussdCode.isNotBlank() }
-    val rows = dialableOffers.chunked(3)
-    val compactPhone = customerPhone.trim().replace(Regex("[\\s()\\-]"), "")
+    val gridColumns = if (LocalConfiguration.current.screenWidthDp < 380) 2 else 3
+    val rows = dialableOffers.chunked(gridColumns)
+    val phoneDigits = customerPhone.filter { it.isDigit() }
     val normalizedRecipient = when {
-        compactPhone.startsWith("+254") -> compactPhone
-        compactPhone.startsWith("254") -> "+$compactPhone"
-        compactPhone.startsWith("0") && compactPhone.length == 10 -> "+254" + compactPhone.drop(1)
-        else -> compactPhone
+        phoneDigits.startsWith("254") && phoneDigits.length == 12 -> "+$phoneDigits"
+        phoneDigits.startsWith("0") && phoneDigits.length == 10 -> "+254" + phoneDigits.drop(1)
+        (phoneDigits.startsWith("7") || phoneDigits.startsWith("1")) && phoneDigits.length == 9 -> "+254" + phoneDigits
+        else -> ""
     }
     val phoneValid = normalizedRecipient.matches(Regex("^\\+254[17][0-9]{8}$"))
 
@@ -445,11 +447,21 @@ private fun QuickDialScreen(db: LocalDatabase, onMessage: (String) -> Unit) {
         }
         OutlinedTextField(
             value = customerPhone,
-            onValueChange = { customerPhone = it.filter { ch -> ch.isDigit() || ch == '+' }.take(13) },
+            onValueChange = { input ->
+                val digits = input.filter { it.isDigit() }.take(12)
+                customerPhone = if (input.trimStart().startsWith("+")) "+$digits" else digits
+            },
             label = { Text("Recipient phone") },
             placeholder = { Text("07XXXXXXXX or +2547XXXXXXXX") },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
+            trailingIcon = {
+                if (customerPhone.isNotBlank()) {
+                    IconButton(onClick = { customerPhone = "" }) {
+                        Text("×", color = Muted, fontSize = 22.sp)
+                    }
+                }
+            },
             isError = customerPhone.isNotBlank() && !phoneValid,
             supportingText = {
                 Text(
@@ -483,7 +495,7 @@ private fun QuickDialScreen(db: LocalDatabase, onMessage: (String) -> Unit) {
                             else -> "▣"
                         }
                         Card(
-                            modifier = Modifier.weight(1f).heightIn(min = 124.dp)
+                            modifier = Modifier.weight(1f).heightIn(min = if (gridColumns == 2) 112.dp else 124.dp)
                                 .clickable { selectedOfferId = if (chosen) null else offer.id },
                             shape = RoundedCornerShape(18.dp),
                             border = androidx.compose.foundation.BorderStroke(if (chosen) 2.dp else 1.dp,
@@ -496,7 +508,7 @@ private fun QuickDialScreen(db: LocalDatabase, onMessage: (String) -> Unit) {
                                 verticalArrangement = Arrangement.spacedBy(7.dp)) {
                                 Text(symbol, color = Cyan, fontSize = 24.sp, fontWeight = FontWeight.Bold)
                                 Text(offer.name, color = Color(0xFFF8FAFC), fontWeight = FontWeight.SemiBold,
-                                    style = MaterialTheme.typography.bodySmall, maxLines = 2, minLines = 2,
+                                    style = MaterialTheme.typography.bodySmall, maxLines = 3, minLines = 2,
                                     overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
                                 Text("KES ${money(offer.price)}", color = Cyan, fontWeight = FontWeight.ExtraBold,
                                     style = MaterialTheme.typography.bodyMedium, maxLines = 1)
@@ -505,7 +517,7 @@ private fun QuickDialScreen(db: LocalDatabase, onMessage: (String) -> Unit) {
                             }
                         }
                     }
-                    repeat(3 - rowOffers.size) { Spacer(Modifier.weight(1f)) }
+                    repeat(gridColumns - rowOffers.size) { Spacer(Modifier.weight(1f)) }
                 }
             }
         }
