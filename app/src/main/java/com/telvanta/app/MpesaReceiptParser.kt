@@ -57,13 +57,13 @@ object MpesaReceiptParser {
         val titleIsMpesaSender = title.trim().equals("M-PESA", ignoreCase = true) ||
             title.trim().equals("MPESA", ignoreCase = true)
         val hasReceiptTimestamp = Regex(
-            """(?i)\\bon\\s+\\d{1,2}/\\d{1,2}/\\d{2,4}\\s+at\\s+\\d{1,2}:\\d{2}\\s*(?:AM|PM)\\b"""
+            """(?i)\bon\s+\d{1,2}/\d{1,2}/\d{2,4}\s+at\s+\d{1,2}:\d{2}\s*(?:AM|PM)\b"""
         ).containsMatchIn(text)
         val hasIncomingTillAmount = Regex(
-            """(?i)\\bKSH\\.?\\s*[\\d,]+(?:\\.\\d{1,2})?\\s+received\\s+from\\s+(?:\\+?254|0)[17]\\d{8}\\s+[A-Z]"""
+            """(?i)\bKSH\.?\s*[\d,]+(?:\.\d{1,2})?\s+received\s+from\s+(?:\+?254|0)[17]\d{8}\s+[A-Z]"""
         ).containsMatchIn(text)
         val hasTillBalance = Regex(
-            """(?i)\\bnew\\s+account\\s+balance\\s+is\\s+KSH\\.?\\s*[\\d,]+(?:\\.\\d{1,2})?"""
+            """(?i)\bnew\s+account\s+balance\s+is\s+KSH\.?\s*[\d,]+(?:\.\d{1,2})?"""
         ).containsMatchIn(text)
         val isTillConfirmation = titleIsMpesaSender && receipt != null && amount != null &&
             phone != null && senderName != null && hasReceiptTimestamp &&
