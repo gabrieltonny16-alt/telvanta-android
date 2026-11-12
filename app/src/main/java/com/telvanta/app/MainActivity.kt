@@ -388,51 +388,50 @@ private fun QuickDialScreen(db: LocalDatabase, onMessage: (String) -> Unit) {
     val scope = rememberCoroutineScope()
     val secureStore = remember { SecureSessionStore(context) }
     val api = remember { BingwaSupabaseApi() }
-    var pendingDialCode by remember { mutableStateOf<String?>(null) }
-    var pendingWorkerBusinessId by remember { mutableStateOf<String?>(null) }
-    var pendingWorkerDeviceId by remember { mutableStateOf<String?>(null) }
-    val callPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        val code = pendingDialCode
-        val businessId = pendingWorkerBusinessId
-        val deviceId = pendingWorkerDeviceId
-        if (granted && !businessId.isNullOrBlank() && !deviceId.isNullOrBlank()) {
-            try {
-                val workerIntent = Intent(context, FulfilmentWorkerService::class.java)
-                    .putExtra(FulfilmentWorkerService.EXTRA_BUSINESS_ID, businessId)
-                    .putExtra(FulfilmentWorkerService.EXTRA_DEVICE_ID, deviceId)
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) context.startForegroundService(workerIntent)
-                else context.startService(workerIntent)
-            } catch (error: Exception) {
-                onMessage("Order saved, but the automatic worker could not start: ${error.message ?: "unknown error"}.")
-            }
-        } else if (!granted) {
-            onMessage("Order saved. Allow Phone permission to let BingwaPulse run automatic USSD fulfilment.")
-        }
-        if (!code.isNullOrBlank()) {
-            runCatching {
-                context.startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:" + Uri.encode(code))))
-            }.onFailure { onMessage("Order saved, but the phone dialler could not be opened.") }
-        }
-        pendingDialCode = null
-        pendingWorkerBusinessId = null
-        pendingWorkerDeviceId = null
-    }
-    val offers = remember(refresh) { db.offers() }
-    val selectedOffer = offers.firstOrNull { it.id == selectedOfferId }
-    val dialableOffers = offers.filter { it.ussdCode.isNotBlank() }
-    val rows = dialableOffers.chunked(3)
 
-    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+    // Only active offers are available for a new Quick Dial order.
+    val offers = remember(refresh) { db.offers().filter { it.active && it.ussdCode.isNotBlank() } }
+    val selectedOffer = offers.firstOrNull { it.id == selectedOfferId }
+    val rows = offers.chunked(3)
+    val compactPhone = customerPhone.trim().replace(Regex("[\\s()\\-]"), "")
+    val recipient = when {
+        compactPhone.startsWith("+254") -> compactPhone
+        compactPhone.startsWith("254") -> "+$compactPhone"
+        compactPhone.startsWith("0") && compactPhone.length == 10 -> "+254" + compactPhone.drop(1)
+        else -> compactPhone
+    }
+    val phoneIsValid = recipient.matches(Regex("^\\+254[17][0-9]{8}$"))
+
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text("QUICK DIAL", color = Cyan, fontWeight = FontWeight.ExtraBold, letterSpacing = 1.4.sp)
+                Text("${offers.size} active dialable offers", color = Muted, style = MaterialTheme.typography.labelSmall)
+            }
+            TextButton(onClick = { refresh++ }) { Text("Refresh offers", color = Cyan) }
+        }
         OutlinedTextField(
             value = customerPhone,
-            onValueChange = { customerPhone = it.filter { ch -> ch.isDigit() || ch == '+' }.take(16) },
-            label = { Text("Recipient Phone") },
-            placeholder = { Text("Enter recipient number") },
+            onValueChange = { customerPhone = it.filter { ch -> ch.isDigit() || ch == '+' || ch == ' ' || ch == '-' || ch == '(' || ch == ')' }.take(18) },
+            label = { Text("Recipient phone") },
+            placeholder = { Text("0712345678 or +254712345678") },
             modifier = Modifier.fillMaxWidth(),
-            singleLine = true
+            singleLine = true,
+            supportingText = {
+                if (customerPhone.isNotBlank() && !phoneIsValid) {
+                    Text("Enter a valid Kenyan mobile number.", color = Color(0xFFFF8A80))
+                } else {
+                    Text("Kenyan mobile numbers only.", color = Muted)
+                }
+            }
         )
-        if (dialableOffers.isEmpty()) {
-            InfoCard("No dialable offers yet", "Quick Dial reads saved offers from My Offers. Add an offer with a USSD code in Offers, then return here.")
+
+        if (offers.isEmpty()) {
+            InfoCard("No active dialable offers", "Quick Dial only shows active offers with a saved USSD code. Open My Offers, activate an offer and confirm its USSD code.")
         } else {
             rows.forEach { rowOffers ->
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(9.dp)) {
@@ -441,23 +440,43 @@ private fun QuickDialScreen(db: LocalDatabase, onMessage: (String) -> Unit) {
                         val symbol = when (offer.category.uppercase(Locale.ROOT)) {
                             "SMS" -> "▤"
                             "MINUTES", "VOICE" -> "☎"
-                            "DATA" -> "⌁"
+                            "DATA" -> "ϟ"
                             else -> "▣"
                         }
                         Card(
-                            modifier = Modifier.weight(1f).heightIn(min = 132.dp).clickable { selectedOfferId = offer.id },
-                            shape = RoundedCornerShape(20.dp),
-                            border = if (chosen) androidx.compose.foundation.BorderStroke(2.dp, Cyan) else null,
-                            colors = CardDefaults.cardColors(containerColor = if (chosen) Color(0xFF14234A) else Color(0xFF0B0F19))
+                            modifier = Modifier.weight(1f).heightIn(min = 112.dp).clickable {
+                                selectedOfferId = if (chosen) null else offer.id
+                            },
+                            shape = RoundedCornerShape(18.dp),
+                            border = androidx.compose.foundation.BorderStroke(
+                                if (chosen) 2.dp else 1.dp,
+                                if (chosen) Cyan else Color(0xFF1E293B)
+                            ),
+                            colors = CardDefaults.cardColors(
+                                containerColor = if (chosen) Color(0xFF102532) else Color(0xFF101622)
+                            )
                         ) {
                             Column(
-                                Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 13.dp),
+                                Modifier.fillMaxWidth().padding(horizontal = 7.dp, vertical = 11.dp),
                                 horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally,
                                 verticalArrangement = Arrangement.spacedBy(7.dp)
                             ) {
-                                Text(symbol, color = Cyan, fontSize = 26.sp, fontWeight = FontWeight.Bold)
-                                Text(offer.name, color = Navy, fontWeight = FontWeight.Medium, style = MaterialTheme.typography.bodySmall, maxLines = 3)
-                                Text("KES ${money(offer.price)}", color = Cyan, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
+                                Text(symbol, color = Cyan, fontSize = 23.sp, fontWeight = FontWeight.Bold)
+                                Text(
+                                    offer.name,
+                                    color = Color.White,
+                                    fontWeight = FontWeight.SemiBold,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    maxLines = 2,
+                                    minLines = 2
+                                )
+                                Text(
+                                    "KES ${money(offer.price)}",
+                                    color = Cyan,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    maxLines = 1
+                                )
                             }
                         }
                     }
@@ -465,6 +484,7 @@ private fun QuickDialScreen(db: LocalDatabase, onMessage: (String) -> Unit) {
                 }
             }
         }
+
         Button(
             onClick = {
                 val offer = selectedOffer
@@ -472,14 +492,7 @@ private fun QuickDialScreen(db: LocalDatabase, onMessage: (String) -> Unit) {
                     onMessage("Select an offer before dialling.")
                     return@Button
                 }
-                val compact = customerPhone.trim().replace(Regex("[\\s()\\-]"), "")
-                val recipient = when {
-                    compact.startsWith("+254") -> compact
-                    compact.startsWith("254") -> "+$compact"
-                    compact.startsWith("0") && compact.length == 10 -> "+254" + compact.drop(1)
-                    else -> compact
-                }
-                if (!recipient.matches(Regex("^\\+254[17][0-9]{8}$"))) {
+                if (!phoneIsValid) {
                     onMessage("Enter a valid Kenyan recipient number.")
                     return@Button
                 }
@@ -511,19 +524,9 @@ private fun QuickDialScreen(db: LocalDatabase, onMessage: (String) -> Unit) {
                             active = active.copy(businessId = businessId)
                             secureStore.save(active)
                         }
-                        withContext(Dispatchers.IO) {
-                            val controls = api.getFulfilmentControls(active, businessId)
-                            if (!controls.optBoolean("fulfilment_enabled", false) ||
-                                controls.optBoolean("fulfilment_paused", true)) {
-                                api.setFulfilmentControls(
-                                    active,
-                                    businessId,
-                                    enabled = true,
-                                    paused = false,
-                                    requireManualPin = controls.optBoolean("fulfilment_require_manual_pin", true)
-                                )
-                            }
-                        }
+
+                        // Save the order against the existing cloud catalogue. Do not change
+                        // fulfilment switches or start the background worker from this screen.
                         withContext(Dispatchers.IO) { api.syncLocalOfferToCloud(active, businessId, offer) }
                         val cloudOffer = withContext(Dispatchers.IO) {
                             api.listFulfilmentOffers(active, businessId).firstOrNull {
@@ -534,36 +537,13 @@ private fun QuickDialScreen(db: LocalDatabase, onMessage: (String) -> Unit) {
                         withContext(Dispatchers.IO) {
                             api.createQuickDialOrder(active, businessId, cloudOffer.id, recipient, offer.price.toInt())
                         }
-                        val device = withContext(Dispatchers.IO) {
-                            api.listDevices(active, businessId).firstOrNull {
-                                it.assignedUserId == active.userId && it.status == "online"
-                            } ?: api.registerCurrentWorkerDevice(
-                                active,
-                                businessId,
-                                listOf(Build.MANUFACTURER, Build.MODEL).filter { it.isNotBlank() }
-                                    .joinToString(" ").ifBlank { "BingwaPulse Android worker" }.take(100)
-                            )
-                        }
-                        pendingDialCode = code
-                        pendingWorkerBusinessId = businessId
-                        pendingWorkerDeviceId = device.id
-                        val phonePermissionGranted = androidx.core.content.ContextCompat.checkSelfPermission(
-                            context, android.Manifest.permission.CALL_PHONE
-                        ) == PackageManager.PERMISSION_GRANTED
-                        if (phonePermissionGranted) {
-                            val workerIntent = Intent(context, FulfilmentWorkerService::class.java)
-                                .putExtra(FulfilmentWorkerService.EXTRA_BUSINESS_ID, businessId)
-                                .putExtra(FulfilmentWorkerService.EXTRA_DEVICE_ID, device.id)
-                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) context.startForegroundService(workerIntent)
-                            else context.startService(workerIntent)
-                            context.startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:" + Uri.encode(code))))
-                            pendingDialCode = null
-                            pendingWorkerBusinessId = null
-                            pendingWorkerDeviceId = null
-                            onMessage("Order prepared for $recipient. Automatic worker started. Choose your SIM and press Dial.")
-                        } else {
-                            callPermissionLauncher.launch(android.Manifest.permission.CALL_PHONE)
-                        }
+
+                        // ACTION_DIAL opens the system dialler for user review. The user
+                        // chooses the SIM and confirms the call; BingwaPulse does not place it.
+                        context.startActivity(
+                            Intent(Intent.ACTION_DIAL, Uri.fromParts("tel", code, null))
+                        )
+                        onMessage("Order recorded for $recipient. Review the USSD code, choose your SIM and press Call yourself.")
                     } catch (error: Exception) {
                         onMessage(error.message ?: "Quick Dial could not prepare this order.")
                     } finally {
@@ -571,14 +551,14 @@ private fun QuickDialScreen(db: LocalDatabase, onMessage: (String) -> Unit) {
                     }
                 }
             },
-            enabled = selectedOffer != null && !busy,
+            enabled = selectedOffer != null && phoneIsValid && !busy,
             modifier = Modifier.fillMaxWidth().height(58.dp),
             shape = RoundedCornerShape(18.dp)
         ) {
             Text(if (busy) "Preparing order…" else "☎   Dial", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleLarge)
         }
         Text(
-            "Enter the recipient and press Dial. BingwaPulse records the intended offer and recipient before opening the phone dialler.",
+            "Your order is recorded before the phone dialler opens. Review the code and confirm the call on your phone. Quick Dial will not enable background fulfilment or change your SIM settings.",
             color = Muted,
             style = MaterialTheme.typography.bodySmall
         )
