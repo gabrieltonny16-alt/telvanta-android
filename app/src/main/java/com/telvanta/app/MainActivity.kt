@@ -1958,38 +1958,184 @@ private fun BulkMessengerScreen(db: LocalDatabase) {
 }
 
 @Composable
-private fun AutoReplyScreen() {
+private private data class AutoReplyDraft(
+    val id: String,
+    val title: String,
+    val message: String,
+    val enabled: Boolean,
+    val isDefault: Boolean
+)
+
+@Composable
+fun AutoReplyScreen() {
     val context = LocalContext.current
-    val prefs = remember { context.getSharedPreferences("vecta_auto_reply_drafts", android.content.Context.MODE_PRIVATE) }
-    val types = listOf(
-        "Successful response" to "Hi <firstName>, thank you for purchasing from BingwaPulse.",
-        "Failed request" to "Hello <firstName>, your request could not be completed. Please contact support.",
-        "Unavailable offer" to "Hi <firstName>, we could not find an offer matching your payment. Please contact support.",
-        "Offer already recommended" to "Hello <firstName>, this offer has already been recommended today.",
-        "App paused" to "Hi <firstName>, processing is temporarily paused. We will update you when service resumes.",
-        "Customer blacklisted" to "Hi <firstName>, please contact support about your account."
-    )
-    var refresh by remember { mutableIntStateOf(0) }
-    Text("Auto-Reply Messages",style=MaterialTheme.typography.headlineMedium,fontWeight=FontWeight.Bold,color=Navy)
-    InfoCard("Template workspace only","Edit and save message drafts on this phone. SMS sending and automatic replies are NOT connected or enabled in this build.")
-    types.forEachIndexed { index, item ->
-        var body by remember(refresh) { mutableStateOf(prefs.getString("body_$index", item.second) ?: item.second) }
-        var enabled by remember(refresh) { mutableStateOf(prefs.getBoolean("enabled_$index", false)) }
-        Card(colors=CardDefaults.cardColors(containerColor=Color(0xFF0B0F19)),modifier=Modifier.fillMaxWidth()) {
-            Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(9.dp)) {
-                Text(item.first,fontWeight=FontWeight.Bold,color=Navy,style=MaterialTheme.typography.titleMedium)
-                Row(Modifier.fillMaxWidth(),verticalAlignment=androidx.compose.ui.Alignment.CenterVertically) {
-                    Text("Draft enabled",color=Muted,modifier=Modifier.weight(1f))
-                    Switch(checked=enabled,onCheckedChange={enabled=it;prefs.edit().putBoolean("enabled_$index",it).apply()})
+    val prefs = remember { context.getSharedPreferences("bingwapulse_auto_reply_templates_v3", Context.MODE_PRIVATE) }
+    val defaults = remember {
+        listOf(
+            AutoReplyDraft("offer-recommended", "Offer Already Recommended", "Hello <firstName>, you have already purchased this offer today. Please try again tomorrow.", true, true),
+            AutoReplyDraft("app-paused", "App Paused", "Hi <firstName>, there is an issue affecting our systems. We will update you as soon as service resumes.", true, true),
+            AutoReplyDraft("customer-blacklisted", "Customer Blacklisted", "Hi <firstName>, there is an issue affecting your account. Please contact support for assistance.", true, true),
+            AutoReplyDraft("failed-request", "Failed Request", "Hello <firstName>, your request failed. Please contact support while we investigate.", false, true),
+            AutoReplyDraft("unavailable-offer", "Unavailable Offer", "Hi <firstName>, there is no offer matching the amount received. Please check the offer amount and contact support.", true, true),
+            AutoReplyDraft("successful-response", "Successful Response", "Hi <firstName>, thank you for purchasing from BingwaPulse.", true, true)
+        )
+    }
+    fun readDrafts(): List<AutoReplyDraft> {
+        val raw = prefs.getString("templates", null) ?: return defaults
+        return try {
+            val array = JSONArray(raw)
+            buildList {
+                for (i in 0 until array.length()) {
+                    val item = array.getJSONObject(i)
+                    add(AutoReplyDraft(
+                        item.optString("id", "custom-$i"),
+                        item.optString("title", "Untitled reply"),
+                        item.optString("message", ""),
+                        item.optBoolean("enabled", false),
+                        item.optBoolean("isDefault", false)
+                    ))
                 }
-                OutlinedTextField(value=body,onValueChange={body=it},label={Text("Message template")},modifier=Modifier.fillMaxWidth(),minLines=2)
-                Button(onClick={prefs.edit().putString("body_$index",body.trim()).putBoolean("enabled_$index",enabled).apply();refresh++},modifier=Modifier.fillMaxWidth()) { Text("Save template") }
+            }.ifEmpty { defaults }
+        } catch (_: Exception) { defaults }
+    }
+    val drafts = remember { mutableStateListOf<AutoReplyDraft>().apply { addAll(readDrafts()) } }
+    var editorOpen by remember { mutableStateOf(false) }
+    var editingId by remember { mutableStateOf<String?>(null) }
+    var title by remember { mutableStateOf("") }
+    var message by remember { mutableStateOf("") }
+    var enabled by remember { mutableStateOf(true) }
+    var sampleName by remember { mutableStateOf("John") }
+    var notice by remember { mutableStateOf("") }
+
+    fun persist() {
+        val array = JSONArray()
+        drafts.forEach { draft ->
+            array.put(JSONObject().put("id", draft.id).put("title", draft.title)
+                .put("message", draft.message).put("enabled", draft.enabled).put("isDefault", draft.isDefault))
+        }
+        prefs.edit().putString("templates", array.toString()).apply()
+    }
+    fun openDraft(draft: AutoReplyDraft?) {
+        editingId = draft?.id
+        title = draft?.title ?: ""
+        message = draft?.message ?: "Hi <firstName>, "
+        enabled = draft?.enabled ?: true
+        editorOpen = true
+    }
+    fun saveDraft() {
+        val cleanTitle = title.trim()
+        val cleanMessage = message.trim()
+        if (cleanTitle.isBlank() || cleanMessage.isBlank()) {
+            notice = "Add a title and message before saving."
+            return
+        }
+        val index = drafts.indexOfFirst { it.id == editingId }
+        val updated = AutoReplyDraft(
+            editingId ?: "custom-${System.currentTimeMillis()}",
+            cleanTitle, cleanMessage, enabled,
+            drafts.getOrNull(index)?.isDefault ?: false
+        )
+        if (index >= 0) drafts[index] = updated else drafts.add(0, updated)
+        persist()
+        editorOpen = false
+        notice = "Template saved on this phone."
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(13.dp), modifier = Modifier.fillMaxWidth()) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text("Auto-Reply Messages", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = Navy)
+                Text("Manage the messages your customers may receive.", color = Muted, style = MaterialTheme.typography.bodySmall)
+            }
+            Button(onClick = { openDraft(null) }, shape = RoundedCornerShape(16.dp), contentPadding = PaddingValues(horizontal = 15.dp, vertical = 10.dp)) {
+                Text("+ Add", fontWeight = FontWeight.Bold)
             }
         }
+        Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF102333)), modifier = Modifier.fillMaxWidth()) {
+            Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text("DRAFT WORKSPACE", color = Cyan, fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.labelSmall)
+                Text("Templates are saved locally on this phone. This screen does not send SMS or activate automatic replies.", color = Muted, style = MaterialTheme.typography.bodySmall)
+            }
+        }
+        drafts.forEach { draft ->
+            Card(
+                onClick = { openDraft(draft) },
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF131B26)),
+                border = androidx.compose.foundation.BorderStroke(1.dp, if (draft.enabled) Color(0xFF1E3547) else Color(0xFF202A36)),
+                shape = RoundedCornerShape(22.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                        Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                            Text(draft.title, color = if (draft.enabled) Navy else Muted, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                            if (!draft.isDefault) Surface(color = Color(0xFF123B4B), shape = RoundedCornerShape(30.dp)) {
+                                Text("CUSTOM", color = Cyan, style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp))
+                            }
+                        }
+                        Text(draft.message, color = Muted, style = MaterialTheme.typography.bodyMedium, maxLines = 2)
+                        Text(if (draft.enabled) "ENABLED DRAFT" else "PAUSED DRAFT", color = if (draft.enabled) Cyan else Muted, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                    }
+                    Switch(
+                        checked = draft.enabled,
+                        onCheckedChange = { value ->
+                            val index = drafts.indexOfFirst { it.id == draft.id }
+                            if (index >= 0) { drafts[index] = draft.copy(enabled = value); persist() }
+                        }
+                    )
+                }
+            }
+        }
+        Text("Placeholder supported: <firstName> · Tap a card to edit its message.", color = Muted, style = MaterialTheme.typography.bodySmall)
+        if (notice.isNotBlank()) Text(notice, color = Cyan, style = MaterialTheme.typography.bodySmall)
     }
-    Text("Placeholder available in drafts: <firstName>. Templates are stored locally; the app does not send them.",color=Muted,style=MaterialTheme.typography.bodySmall)
-}
 
+    if (editorOpen) {
+        AlertDialog(
+            onDismissRequest = { editorOpen = false },
+            containerColor = Color(0xFF101923),
+            titleContentColor = Navy,
+            textContentColor = Muted,
+            title = { Text(if (editingId == null) "Create auto-reply" else "Edit auto-reply", fontWeight = FontWeight.Bold) },
+            text = {
+                Column(Modifier.fillMaxWidth().heightIn(max = 560.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    OutlinedTextField(value = title, onValueChange = { title = it }, label = { Text("Trigger title") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text("Draft enabled", color = Navy, fontWeight = FontWeight.SemiBold)
+                            Text("Enable or pause this template draft", color = Muted, style = MaterialTheme.typography.bodySmall)
+                        }
+                        Switch(checked = enabled, onCheckedChange = { enabled = it })
+                    }
+                    OutlinedTextField(value = message, onValueChange = { message = it }, label = { Text("Message template") }, minLines = 3, modifier = Modifier.fillMaxWidth())
+                    OutlinedButton(onClick = {
+                        val tag = "<firstName>"
+                        val cursor = message.length
+                        message = message + tag
+                    }, modifier = Modifier.fillMaxWidth()) { Text("+ Insert <firstName>") }
+                    OutlinedTextField(value = sampleName, onValueChange = { sampleName = it }, label = { Text("Sample customer name") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                    Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF080C12)), modifier = Modifier.fillMaxWidth()) {
+                        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text("LIVE MESSAGE PREVIEW · ${message.length} characters", color = Cyan, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall)
+                            Text(message.replace(Regex("<firstName>", RegexOption.IGNORE_CASE), sampleName.ifBlank { "John" }).ifBlank { "Your message preview will appear here." }, color = Navy, style = MaterialTheme.typography.bodyMedium)
+                        }
+                    }
+                    if (editingId != null && drafts.firstOrNull { it.id == editingId }?.isDefault == false) {
+                        TextButton(onClick = {
+                            drafts.removeAll { it.id == editingId }
+                            persist()
+                            editorOpen = false
+                            notice = "Custom template deleted."
+                        }) { Text("Delete custom template", color = Color(0xFFFF7185)) }
+                    }
+                }
+            },
+            confirmButton = { Button(onClick = { saveDraft() }) { Text("Save template") } },
+            dismissButton = { TextButton(onClick = { editorOpen = false }) { Text("Cancel") } }
+        )
+    }
+}
+ 
 @Composable
 private fun StatisticsScreen(db:LocalDatabase) {
     val orders = remember { db.orders() }
