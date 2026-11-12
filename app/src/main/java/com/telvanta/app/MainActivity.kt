@@ -1805,7 +1805,7 @@ private fun TransactionsScreen(db: LocalDatabase, onMessage: (String) -> Unit) {
         if (uri != null) try {
             context.contentResolver.openOutputStream(uri)?.bufferedWriter()?.use { it.write(csv()) }
             onMessage("Transaction history exported.")
-        } catch (e: Exception) { onMessage("Could not export transaction history: §{e.message ?: "file error"}") }
+        } catch (e: Exception) { onMessage("Could not export transaction history: ${e.message ?: "file error"}") }
     }
     val volume = visible.sumOf { it.amount }
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(9.dp)) {
@@ -1844,13 +1844,13 @@ private fun TransactionsScreen(db: LocalDatabase, onMessage: (String) -> Unit) {
         Row(Modifier.fillMaxWidth().background(Color(0xFF0C111D), RoundedCornerShape(10.dp)).padding(horizontal = 11.dp, vertical = 10.dp),
             horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
             Row(horizontalArrangement = Arrangement.spacedBy(5.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-                Text("§{visible.size}", color = Color.White, fontWeight = FontWeight.ExtraBold, fontSize = 13.sp)
+                Text("${visible.size}", color = Color.White, fontWeight = FontWeight.ExtraBold, fontSize = 13.sp)
                 Text("transactions", color = Muted, fontSize = 12.sp)
                 Text("($selectedStatus • $selectedDate)", color = Color(0xFF64748B), fontSize = 9.sp, maxLines = 1)
             }
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
                 Text("Volume:", color = Muted, fontSize = 10.sp)
-                Text("Ksh §{money(volume)}", color = Color(0xFF34D399), fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, fontSize = 12.sp)
+                Text("Ksh ${money(volume)}", color = Color(0xFF34D399), fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, fontSize = 12.sp)
             }
         }
         if (visible.isEmpty()) {
@@ -1885,7 +1885,7 @@ private fun TransactionsScreen(db: LocalDatabase, onMessage: (String) -> Unit) {
                             }
                             Column(horizontalAlignment = androidx.compose.ui.Alignment.End, verticalArrangement = Arrangement.spacedBy(5.dp)) {
                                 Text(dateFormat.format(Date(row.createdAt)), color = Muted, fontSize = 9.sp, maxLines = 1)
-                                Text("Ksh §{money(row.amount)}", color = tint, fontWeight = FontWeight.ExtraBold, fontFamily = FontFamily.Monospace, fontSize = 12.sp)
+                                Text("Ksh ${money(row.amount)}", color = tint, fontWeight = FontWeight.ExtraBold, fontFamily = FontFamily.Monospace, fontSize = 12.sp)
                             }
                         }
                         if (index < visible.lastIndex) HorizontalDivider(color = Color(0xFF202B3C).copy(alpha = .7f), thickness = .7.dp)
@@ -1902,12 +1902,12 @@ private fun TransactionsScreen(db: LocalDatabase, onMessage: (String) -> Unit) {
             } },
             text = { Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(row.offer, color = Cyan, fontWeight = FontWeight.SemiBold)
-                Text("Amount  ·  Ksh §{money(row.amount)}", color = Color.White)
-                Text("Date  ·  §{dateFormat.format(Date(row.createdAt))}", color = Muted)
-                Text("Source  ·  §{row.source}", color = Muted)
-                Text("Reference  ·  §{row.reference.ifBlank { "Not available" }}", color = Muted)
-                Text("Order status  ·  §{row.orderStatus}", color = Muted)
-                Text("Transaction status  ·  §{row.transactionStatus}", color = Muted)
+                Text("Amount  ·  Ksh ${money(row.amount)}", color = Color.White)
+                Text("Date  ·  ${dateFormat.format(Date(row.createdAt))}", color = Muted)
+                Text("Source  ·  ${row.source}", color = Muted)
+                Text("Reference  ·  ${row.reference.ifBlank { "Not available" }}", color = Muted)
+                Text("Order status  ·  ${row.orderStatus}", color = Muted)
+                Text("Transaction status  ·  ${row.transactionStatus}", color = Muted)
             } },
             confirmButton = { TextButton(onClick = { detail = null }) { Text("Close", color = Cyan) } }
         )
