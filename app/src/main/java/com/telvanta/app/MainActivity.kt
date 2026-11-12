@@ -2162,27 +2162,131 @@ fun AutoReplyScreen() {
     }
 }
  
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun StatisticsScreen(db:LocalDatabase) {
-    val orders = remember { db.orders() }
-    val transactions = remember { db.transactions() }
-    val totalSales = orders.filter { it.status == "DELIVERED_MANUALLY_RECORDED" }.sumOf { it.price }
-    val pending = orders.count { it.status == "PENDING" }
-    val failed = orders.count { it.status == "FAILED" }
-    val cancelled = orders.count { it.status == "CANCELLED" }
-    val unverified = transactions.count { it.status == "UNVERIFIED" }
-    Text("Business statistics",style=MaterialTheme.typography.headlineMedium,fontWeight=FontWeight.Bold,color=Navy)
-    InfoCard("Local records only","Figures are calculated from records on this phone. They are not live provider data, verified revenue, or proof of bundle delivery.")
-    Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp)) {
-        StatCard("ALL ORDERS",orders.size,Modifier.weight(1f))
-        StatCard("PENDING",pending,Modifier.weight(1f))
+private fun StatisticsScreen(db: LocalDatabase) {
+    var section by remember { mutableStateOf("Commission") }
+    var period by remember { mutableStateOf("7 days") }
+    val allOrders = remember { db.orders() }
+    val allOffers = remember { db.offers() }
+    val customers = remember { db.customers() }
+    val now = System.currentTimeMillis()
+    val windowMs = when (period) {
+        "30 days" -> 30L * 24 * 60 * 60 * 1000
+        "This month" -> {
+            val cal = java.util.Calendar.getInstance()
+            cal.set(java.util.Calendar.DAY_OF_MONTH, 1)
+            cal.set(java.util.Calendar.HOUR_OF_DAY, 0)
+            cal.set(java.util.Calendar.MINUTE, 0)
+            cal.set(java.util.Calendar.SECOND, 0)
+            cal.set(java.util.Calendar.MILLISECOND, 0)
+            now - cal.timeInMillis
+        }
+        else -> 7L * 24 * 60 * 60 * 1000
     }
-    Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp)) {
-        StatCard("FAILED",failed,Modifier.weight(1f))
-        StatCard("CANCELLED",cancelled,Modifier.weight(1f))
+    val since = now - windowMs
+    val orders = allOrders.filter { it.createdAt >= since }
+    val delivered = orders.filter { it.status == "DELIVERED_MANUALLY_RECORDED" }
+    val salesByOffer = delivered.groupBy { it.offer }.entries.sortedByDescending { it.value.size }
+    val uniquePhones = orders.map { it.customer }.distinct().size
+    val dateFormat = remember { SimpleDateFormat("dd MMM", Locale.getDefault()) }
+    val dailySales = delivered.groupBy { dateFormat.format(Date(it.createdAt)) }
+        .entries.sortedBy { it.value.minOfOrNull { row -> row.createdAt } ?: 0L }
+    val cardColor = Color(0xFF0B0F19)
+    val accent = Color(0xFF00E5FF)
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+            Column(Modifier.weight(1f)) {
+                Text("Statistics", color = Navy, fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.headlineMedium)
+                Text("Business performance · local records", color = Muted, style = MaterialTheme.typography.bodySmall)
+            }
+            var periodMenu by remember { mutableStateOf(false) }
+            Box {
+                TextButton(onClick = { periodMenu = true }) { Text(period, color = accent) }
+                DropdownMenu(expanded = periodMenu, onDismissRequest = { periodMenu = false }) {
+                    listOf("7 days", "30 days", "This month").forEach { choice ->
+                        DropdownMenuItem(text = { Text("Last".let { if (choice == "This month") choice else "$it $choice" }) }, onClick = { period = choice; periodMenu = false })
+                    }
+                }
+            }
+        }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            listOf("Commission", "Offers", "Customers", "SIM cards").forEach { item ->
+                TextButton(onClick = { section = item }, modifier = Modifier.weight(1f)) {
+                    Text(item, color = if (section == item) accent else Muted, fontWeight = if (section == item) FontWeight.Bold else FontWeight.Normal, style = MaterialTheme.typography.labelSmall, maxLines = 1)
+                }
+            }
+        }
+        when (section) {
+            "Commission" -> {
+                val recordedValue = delivered.sumOf { it.price }
+                StatCard("DELIVERED ORDERS", delivered.size, Modifier.fillMaxWidth())
+                Card(colors = CardDefaults.cardColors(containerColor = cardColor), modifier = Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("Recorded delivered value", color = Muted)
+                        Text("KES " + money(recordedValue), color = accent, fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.headlineMedium)
+                        Text("Commission rates have not been configured in the current offer records. No commission estimate is invented.", color = Muted, style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+                Card(colors = CardDefaults.cardColors(containerColor = cardColor), modifier = Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("Daily delivered value", color = Navy, fontWeight = FontWeight.Bold)
+                        if (dailySales.isEmpty()) Text("No delivered orders recorded in this period.", color = Muted)
+                        dailySales.forEach { (day, rows) ->
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                Text(day, color = Navy)
+                                Text("KES " + money(rows.sumOf { it.price }), color = accent, fontWeight = FontWeight.SemiBold)
+                            }
+                        }
+                    }
+                }
+            }
+            "Offers" -> {
+                val verifiedActive = allOffers.count { it.verified && it.active }
+                StatCard("RECORDED OFFER TYPES SOLD", salesByOffer.size, Modifier.fillMaxWidth())
+                Card(colors = CardDefaults.cardColors(containerColor = cardColor), modifier = Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Text("Best sellers", color = Navy, fontWeight = FontWeight.Bold)
+                        if (salesByOffer.isEmpty()) Text("No delivered offer sales recorded in this period.", color = Muted)
+                        salesByOffer.forEach { entry ->
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                Text(entry.key, color = Navy, modifier = Modifier.weight(1f))
+                                Text(entry.value.size.toString() + " sales", color = accent, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+                }
+                InfoCard("Signature catalogue", "${allOffers.size} imported offers · $verifiedActive verified and active. Imported offers remain unverified until checked.")
+            }
+            "Customers" -> {
+                StatCard("CUSTOMERS IN PERIOD", uniquePhones, Modifier.fillMaxWidth())
+                StatCard("CUSTOMER CONTACTS SAVED", customers.size, Modifier.fillMaxWidth())
+                Card(colors = CardDefaults.cardColors(containerColor = cardColor), modifier = Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("Recent customer activity", color = Navy, fontWeight = FontWeight.Bold)
+                        val customerRows = orders.groupBy { it.customer }.entries.sortedByDescending { it.value.maxOfOrNull { row -> row.createdAt } ?: 0L }.take(8)
+                        if (customerRows.isEmpty()) Text("No customer activity recorded in this period.", color = Muted)
+                        customerRows.forEach { entry ->
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                Text(entry.key, color = Navy, modifier = Modifier.weight(1f))
+                                Text("${entry.value.size} orders", color = accent)
+                            }
+                        }
+                    }
+                }
+                Text("First-time versus returning status needs complete historical purchase records; this view does not guess.", color = Muted, style = MaterialTheme.typography.bodySmall)
+            }
+            else -> {
+                Card(colors = CardDefaults.cardColors(containerColor = cardColor), modifier = Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("SIM performance", color = Navy, fontWeight = FontWeight.Bold)
+                        Text("SIM assignment is not currently stored on each order. SIM 1 / SIM 2 sales and percentages cannot be calculated reliably yet.", color = Muted)
+                    }
+                }
+            }
+        }
+        Text("Figures use this device's saved records only. Pending, failed and unverified records are not counted as delivered sales or confirmed payments.", color = Muted, style = MaterialTheme.typography.labelSmall)
     }
-    InfoCard("Manually recorded delivery value","KES ${money(totalSales)}")
-    InfoCard("Unverified transaction notes","\$unverified entries — not counted as confirmed payments.")
 }
 
 @Composable
