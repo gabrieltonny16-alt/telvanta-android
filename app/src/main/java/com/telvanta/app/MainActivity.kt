@@ -26,6 +26,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -1983,8 +1984,7 @@ private fun BulkMessengerScreen(db: LocalDatabase) {
     InfoCard("Sending safety", "Before live sending is enabled, the app needs verified channel setup, consent-aware recipients, duplicate prevention, rate limits, delivery/error reporting, and a stop control. This screen currently sends nothing.")
 }
 
-@Composable
-private private data class AutoReplyDraft(
+private data class AutoReplyDraft(
     val id: String,
     val title: String,
     val message: String,
