@@ -64,3 +64,12 @@ jobs:
             adb shell pidof com.bingwapulse.connectpulse
             adb logcat -d -s AndroidRuntime:E > android-crashes.log
             ! grep -q "FATAL EXCEPTION" android-crashes.log
+      - name: Upload APKs
+        uses: actions/upload-artifact@v4
+        with:
+          name: bingwapulse-connect-pulse-apks
+          path: |
+            BingwaPulse-debug.apk
+            Connect-Pulse-debug.apk
+          if-no-files-found: error
+          retention-days: 14
