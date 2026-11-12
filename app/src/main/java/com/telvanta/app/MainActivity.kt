@@ -431,14 +431,8 @@ private fun QuickDialScreen(db: LocalDatabase, onMessage: (String) -> Unit) {
     val dialableOffers = offers.filter { it.active && it.ussdCode.isNotBlank() }
     val gridColumns = if (LocalConfiguration.current.screenWidthDp < 380) 2 else 3
     val rows = dialableOffers.chunked(gridColumns)
-    val phoneDigits = customerPhone.filter { it.isDigit() }
-    val normalizedRecipient = when {
-        phoneDigits.startsWith("254") && phoneDigits.length == 12 -> "+$phoneDigits"
-        phoneDigits.startsWith("0") && phoneDigits.length == 10 -> "+254" + phoneDigits.drop(1)
-        (phoneDigits.startsWith("7") || phoneDigits.startsWith("1")) && phoneDigits.length == 9 -> "+254" + phoneDigits
-        else -> ""
-    }
-    val phoneValid = normalizedRecipient.matches(Regex("^\\+254[17][0-9]{8}$"))
+    val normalizedRecipient = normalizeKenyanMobileNumber(customerPhone).orEmpty()
+    val phoneValid = normalizedRecipient.isNotBlank()
 
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
