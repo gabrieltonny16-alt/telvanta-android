@@ -42,6 +42,26 @@ jobs:
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging BingwaPulse-debug.apk | head -n 8
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs Connect-Pulse-debug.apk
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging Connect-Pulse-debug.apk | head -n 8
+      - name: Upload APKs
+        uses: actions/upload-artifact@v4
+        with:
+          name: bingwapulse-connect-pulse-apks
+          path: |
+            BingwaPulse-debug.apk
+            Connect-Pulse-debug.apk
+          if-no-files-found: error
+          retention-days: 14
+
+  emulator-test:
+    if: github.event_name == 'workflow_dispatch'
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Download APKs from build job
+        uses: actions/download-artifact@v4
+        with:
+          name: bingwapulse-connect-pulse-apks
       - name: Install and launch both APKs on Android 16 emulator
         uses: reactivecircus/android-emulator-runner@v2
         with:
@@ -64,12 +84,3 @@ jobs:
             adb shell pidof com.bingwapulse.connectpulse
             adb logcat -d -s AndroidRuntime:E > android-crashes.log
             ! grep -q "FATAL EXCEPTION" android-crashes.log
-      - name: Upload APKs
-        uses: actions/upload-artifact@v4
-        with:
-          name: bingwapulse-connect-pulse-apks
-          path: |
-            BingwaPulse-debug.apk
-            Connect-Pulse-debug.apk
-          if-no-files-found: error
-          retention-days: 14
