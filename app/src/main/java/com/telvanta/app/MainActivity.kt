@@ -1393,7 +1393,7 @@ private fun PaymentInboxScreen() {
     Text("M-PESA Payment Inbox", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.ExtraBold, color = Navy)
     InfoCard(
         "Payment evidence and order staging",
-        "Trusted Safaricom C2B callbacks can verify Till receipts and match them to a pending SiteLink order once the Till and callback URLs are configured. Phone notifications remain supporting evidence only; notification text alone never verifies payment."
+        "Only strict incoming M-PESA Till confirmations qualify for automatic matching: the M-PESA sender title, receipt, date/time, amount, payer and new account balance must all be present. The business must have exactly one active Till configured. Generic wallet, outgoing, incomplete or ambiguous messages remain held. Trusted Safaricom C2B callbacks are also supported."
     )
     if (store.isLocalWorkspace()) {
         InfoCard("Account connection required", "Payment review is unavailable in local preview mode. Sign in and connect a business workspace to load its candidates.")
@@ -1429,7 +1429,7 @@ private fun PaymentInboxScreen() {
     Text("TRUSTED TILL PAYMENT SETUP", color = Navy, fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.titleMedium)
     InfoCard(
         "Automatic Till verification",
-        "Save the receiving Till here. The deployed C2B callback verifies real Safaricom receipts and matches them to a single pending SiteLink order. If the callback cannot identify one order safely, it leaves the payment for reconciliation."
+        "Save the receiving Till here. Notification matching requires exactly one active Till and the strict incoming confirmation format described above. Trusted C2B callbacks can also verify receipts; anything incomplete or ambiguous remains held for reconciliation."
     )
     OutlinedTextField(
         value = tillNumber,
