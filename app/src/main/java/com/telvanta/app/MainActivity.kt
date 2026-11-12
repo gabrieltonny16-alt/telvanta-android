@@ -826,7 +826,33 @@ private fun SignatureOffersScreen(db: LocalDatabase, onMessage: (String) -> Unit
             (search.isBlank() || it.name.contains(search, true) || it.price.toString().contains(search) || it.code.contains(search, true))
     }
     Text("Signature Offers", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = Cyan)
-    InfoCard("44 extracted Signature Offers", "Any SIM, Normal SIM and Notification SIM offers from your supplied extraction. Entries remain unverified candidates; no USSD action or purchase is triggered.")
+    Surface(
+        color = Color(0xFF08232B),
+        shape = RoundedCornerShape(20.dp),
+        border = BorderStroke(1.dp, Color(0xFF00B8D4).copy(alpha = 0.32f)),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(Modifier.padding(16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+            Surface(color = Color(0xFF00B8D4).copy(alpha = 0.16f), shape = RoundedCornerShape(14.dp)) {
+                Text("✦", color = Cyan, fontWeight = FontWeight.ExtraBold, modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp))
+            }
+            Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                Text("Original Signature catalogue", color = Navy, fontWeight = FontWeight.Bold)
+                Text("44 extracted offer records · Any SIM, Normal SIM and Notification SIM", color = Cyan, style = MaterialTheme.typography.bodySmall)
+            }
+        }
+    }
+    Surface(
+        color = Color(0xFF0A1B22),
+        shape = RoundedCornerShape(18.dp),
+        border = BorderStroke(1.dp, Color(0xFF00B8D4).copy(alpha = 0.24f)),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(Modifier.padding(15.dp), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+            Text("ⓘ", color = Cyan, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleLarge)
+            Text("These are your previously supplied offer records. Prices and USSD codes remain candidate details until checked against the live Safaricom menu. No purchase or USSD action is triggered here.", color = Muted, style = MaterialTheme.typography.bodySmall)
+        }
+    }
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         listOf("Candidates" to false, "Saved offers" to true).forEach { item ->
             FilterChip(selected = showSaved == item.second, onClick = { showSaved = item.second }, label = { Text(item.first) })
