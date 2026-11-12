@@ -412,13 +412,15 @@ private fun QuickDialScreen(db: LocalDatabase, onMessage: (String) -> Unit) {
                     .putExtra(FulfilmentWorkerService.EXTRA_DEVICE_ID, deviceId)
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) context.startForegroundService(workerIntent)
                 else context.startService(workerIntent)
+                onMessage("Order recorded. Automatic USSD fulfilment has been started. Wait for a carrier-confirmed result; a started call is not proof of delivery.")
             } catch (error: Exception) {
                 onMessage("Order saved, but the automatic worker could not start: ${error.message ?: "unknown error"}.")
+                if (!code.isNullOrBlank()) openDialler(code)
             }
         } else if (!granted) {
-            onMessage("Phone permission was not granted. The order remains recorded; you can still review and dial the USSD code manually.")
+            onMessage("Phone permission was not granted. The order remains recorded. Review the USSD code in the dialler and press Call yourself.")
+            if (!code.isNullOrBlank()) openDialler(code)
         }
-        if (!code.isNullOrBlank()) openDialler(code)
         pendingDialCode = null
         pendingWorkerBusinessId = null
         pendingWorkerDeviceId = null
@@ -611,8 +613,7 @@ private fun QuickDialScreen(db: LocalDatabase, onMessage: (String) -> Unit) {
                             } catch (error: Exception) {
                                 onMessage("Order recorded. The automatic worker could not start: ${error.message ?: "unknown error"}. You can still review the USSD dialler.")
                             }
-                            openDialler(code)
-                            onMessage("Order recorded for $recipient. Review the USSD code, choose the correct SIM and press Call yourself. Delivery is not confirmed yet.")
+                            onMessage("Order recorded for $recipient. Automatic USSD fulfilment has started. Keep the phone available and wait for a carrier-confirmed result; the call starting does not confirm delivery.")
                         } else {
                             pendingDialCode = code
                             pendingWorkerBusinessId = businessId
@@ -640,7 +641,7 @@ private fun QuickDialScreen(db: LocalDatabase, onMessage: (String) -> Unit) {
                 else -> "☎   Dial • KES ${money(selectedOffer.price)}"
             }, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
         }
-        Text("BingwaPulse records the order before opening the Android dialler. Check the displayed code and SIM, then press Call. A dial attempt is not proof of bundle delivery.",
+        Text("With Phone permission, the fulfilment worker starts the saved USSD code. Without permission, BingwaPulse opens the Android dialler for you to review the code, choose a SIM and press Call. A call attempt is never proof of bundle delivery.",
             color = Muted, style = MaterialTheme.typography.bodySmall)
     }
 }
