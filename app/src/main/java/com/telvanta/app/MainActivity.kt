@@ -1700,140 +1700,172 @@ private fun TransactionsScreen(db: LocalDatabase, onMessage: (String) -> Unit) {
     var selectedStatus by remember { mutableStateOf("Live") }
     var selectedDate by remember { mutableStateOf("All") }
     var search by remember { mutableStateOf("") }
+    var searchOpen by remember { mutableStateOf(false) }
     var reload by remember { mutableIntStateOf(0) }
+    var detail by remember { mutableStateOf<TransactionHistoryRow?>(null) }
     val context = LocalContext.current
     val history = remember(reload) { db.transactionHistory() }
     val dateFormat = remember { SimpleDateFormat("dd/MM/yyyy, hh:mm a", Locale.getDefault()) }
     val statuses = listOf("Live", "All", "Successful", "Awaiting Commission", "Failed", "Pending", "Unmatched", "Scheduled", "SiteLink", "EngageBot")
     val dates = listOf("All", "Today", "Yesterday", "Last 7 days", "Last 30 days")
 
-    fun statusMatches(row: TransactionHistoryRow): Boolean {
+    fun label(row: TransactionHistoryRow): String {
         val tx = row.transactionStatus.uppercase(Locale.ROOT)
         val order = row.orderStatus.uppercase(Locale.ROOT)
-        return when (selectedStatus) {
-            "Live", "All" -> true
-            "Successful" -> tx in setOf("SUCCESS", "SUCCESSFUL", "DELIVERED", "COMPLETED") || order == "DELIVERED_MANUALLY_RECORDED"
-            "Awaiting Commission" -> tx == "AWAITING_COMMISSION" || order == "AWAITING_COMMISSION"
-            "Failed" -> tx == "FAILED" || order == "FAILED"
-            "Pending" -> tx in setOf("PENDING", "PROCESSING", "QUEUED", "CLAIMED", "USSD_SENT") || order in setOf("PENDING", "PROCESSING", "QUEUED", "CLAIMED", "USSD_SENT")
-            "Unmatched" -> tx in setOf("UNMATCHED", "UNVERIFIED") || order == "PAYMENT_UNVERIFIED"
-            "Scheduled" -> tx == "SCHEDULED" || order == "SCHEDULED"
-            "SiteLink", "EngageBot" -> row.source.equals(selectedStatus, ignoreCase = true)
-            else -> true
+        return when {
+            tx in setOf("SUCCESS", "SUCCESSFUL", "DELIVERED", "COMPLETED") || order == "DELIVERED_MANUALLY_RECORDED" -> "Successful"
+            tx == "AWAITING_COMMISSION" || order == "AWAITING_COMMISSION" -> "Awaiting Commission"
+            tx == "FAILED" || order == "FAILED" -> "Failed"
+            tx == "SCHEDULED" || order == "SCHEDULED" -> "Scheduled"
+            tx in setOf("UNMATCHED", "UNVERIFIED") || order == "PAYMENT_UNVERIFIED" -> "Unmatched"
+            else -> "Pending"
         }
     }
-
-    val now = System.currentTimeMillis()
-    val calendar = java.util.Calendar.getInstance().apply { timeInMillis = now; set(java.util.Calendar.HOUR_OF_DAY, 0); set(java.util.Calendar.MINUTE, 0); set(java.util.Calendar.SECOND, 0); set(java.util.Calendar.MILLISECOND, 0) }
-    val todayStart = calendar.timeInMillis
-    val yesterdayStart = todayStart - 24L * 60L * 60L * 1000L
-    val weekStart = todayStart - 6L * 24L * 60L * 60L * 1000L
-    val monthStart = todayStart - 29L * 24L * 60L * 60L * 1000L
+    fun matchesStatus(row: TransactionHistoryRow): Boolean = when (selectedStatus) {
+        "Live", "All" -> true
+        "SiteLink", "EngageBot" -> row.source.equals(selectedStatus, true)
+        else -> label(row) == selectedStatus
+    }
+    val cal = java.util.Calendar.getInstance().apply {
+        set(java.util.Calendar.HOUR_OF_DAY, 0); set(java.util.Calendar.MINUTE, 0)
+        set(java.util.Calendar.SECOND, 0); set(java.util.Calendar.MILLISECOND, 0)
+    }
+    val today = cal.timeInMillis
+    val yesterday = today - 86400000L
+    val week = today - 6L * 86400000L
+    val month = today - 29L * 86400000L
     val visible = history.filter { row ->
         val dateOk = when (selectedDate) {
-            "Today" -> row.createdAt >= todayStart
-            "Yesterday" -> row.createdAt >= yesterdayStart && row.createdAt < todayStart
-            "Last 7 days" -> row.createdAt >= weekStart
-            "Last 30 days" -> row.createdAt >= monthStart
+            "Today" -> row.createdAt >= today
+            "Yesterday" -> row.createdAt in yesterday until today
+            "Last 7 days" -> row.createdAt >= week
+            "Last 30 days" -> row.createdAt >= month
             else -> true
         }
-        val query = search.trim()
-        dateOk && statusMatches(row) && (query.isBlank() ||
-            row.customer.contains(query, true) || row.offer.contains(query, true) ||
-            row.reference.contains(query, true) || row.amount.toString().contains(query))
+        val q = search.trim()
+        dateOk && matchesStatus(row) && (q.isBlank() || row.customer.contains(q, true) ||
+            row.offer.contains(q, true) || row.reference.contains(q, true) || row.amount.toString().contains(q))
     }
-
-    val createCsv = {
+    val csv = {
         val header = "Customer,Offer,Amount KES,Status,Date and time,Source,Reference"
-        val lines = visible.map { row ->
-            val status = when {
-                row.transactionStatus.equals("UNVERIFIED", true) -> "Unmatched"
-                row.transactionStatus.equals("AWAITING_COMMISSION", true) -> "Awaiting Commission"
-                else -> row.transactionStatus
+        val rows = visible.map { row ->
+            listOf(row.customer, row.offer, row.amount.toString(), label(row), dateFormat.format(Date(row.createdAt)), row.source, row.reference)
+                .joinToString(",") { "\"" + it.replace("\"", "\"\"") + "\"" }
+        }
+        (listOf(header) + rows).joinToString("\n")
+    }
+    val export = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/csv")) { uri ->
+        if (uri != null) try {
+            context.contentResolver.openOutputStream(uri)?.bufferedWriter()?.use { it.write(csv()) }
+            onMessage("Transaction history exported.")
+        } catch (e: Exception) { onMessage("Could not export transaction history: §{e.message ?: "file error"}") }
+    }
+    val volume = visible.sumOf { it.amount }
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(9.dp)) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                Text("BINGWAPULSE", color = Color.White, fontSize = 19.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 1.sp)
+                Text("TRANSACTION HISTORY  •  TILL 1561763", color = Muted, fontSize = 9.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.1.sp, maxLines = 1)
             }
-            listOf(row.customer, row.offer, row.amount.toString(), status, dateFormat.format(Date(row.createdAt)), row.source, row.reference)
-                .joinToString(",") { "\""+it.replace("\"", "\"\"")+"\"" }
+            IconButton(onClick = { searchOpen = !searchOpen; if (!searchOpen) search = "" }) { Text("⌕", color = Cyan, fontSize = 25.sp) }
+            IconButton(onClick = { reload++ }) { Text("↻", color = Cyan, fontSize = 24.sp) }
+            IconButton(onClick = { export.launch("bingwapulse-transactions.csv") }) { Text("⇩", color = Color(0xFF34D399), fontSize = 23.sp) }
         }
-        (listOf(header) + lines).joinToString("\n")
-    }
-    val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/csv")) { uri ->
-        if (uri != null) {
-            try {
-                context.contentResolver.openOutputStream(uri)?.bufferedWriter()?.use { it.write(createCsv()) }
-                onMessage("Transaction history exported.")
-            } catch (e: Exception) { onMessage("Could not export transaction history: ${e.message ?: "file error"}") }
-        }
-    }
-
-    Text("Transaction History", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.ExtraBold, color = Navy)
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-        OutlinedTextField(
-            value = search, onValueChange = { search = it }, modifier = Modifier.weight(1f),
-            singleLine = true, label = { Text("Search customer, phone or offer") },
-            leadingIcon = { Text("⌕", color = Cyan, fontSize = 22.sp) }
+        if (searchOpen) OutlinedTextField(
+            value = search, onValueChange = { search = it }, modifier = Modifier.fillMaxWidth(),
+            singleLine = true, placeholder = { Text("Search phone, name, offer or receipt") },
+            colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Cyan, unfocusedBorderColor = Color(0xFF263244),
+                focusedContainerColor = Color(0xFF111622), unfocusedContainerColor = Color(0xFF111622))
         )
-        IconButton(onClick = { reload++ }) { Text("↻", color = Cyan, fontSize = 25.sp) }
-        IconButton(onClick = { exportLauncher.launch("bingwapulse-transactions.csv") }) { Text("⇩", color = Cyan, fontSize = 25.sp) }
-    }
-    Text("TRANSACTION FILTERS", color = Muted, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall)
-    Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        statuses.forEach { item ->
-            FilterChip(selected = selectedStatus == item, onClick = { selectedStatus = item }, label = { Text(item) })
-        }
-    }
-    Text("DATE", color = Muted, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall)
-    Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        dates.forEach { item ->
-            FilterChip(selected = selectedDate == item, onClick = { selectedDate = item }, label = { Text(item) })
-        }
-    }
-    Text("${visible.size} transactions", color = Muted, style = MaterialTheme.typography.bodySmall)
-    if (visible.isEmpty()) {
-        InfoCard(
-            "No transactions found",
-            if (history.isEmpty()) "Customer purchases will appear here when real transaction records are created. No sample customers or demo transactions are shown."
-            else "No recorded transactions match these filters. Try All or change the date range."
-        )
-    } else {
-        visible.forEach { row ->
-            val tx = row.transactionStatus.uppercase(Locale.ROOT)
-            val order = row.orderStatus.uppercase(Locale.ROOT)
-            val label = when {
-                tx in setOf("SUCCESS", "SUCCESSFUL", "DELIVERED", "COMPLETED") || order == "DELIVERED_MANUALLY_RECORDED" -> "Successful"
-                tx == "AWAITING_COMMISSION" || order == "AWAITING_COMMISSION" -> "Awaiting Commission"
-                tx == "FAILED" || order == "FAILED" -> "Failed"
-                tx == "SCHEDULED" || order == "SCHEDULED" -> "Scheduled"
-                tx in setOf("UNMATCHED", "UNVERIFIED") || order == "PAYMENT_UNVERIFIED" -> "Unmatched"
-                else -> "Pending"
+        Column(Modifier.fillMaxWidth().background(Color(0xFF0A0E17), RoundedCornerShape(17.dp)).padding(vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 9.dp), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                statuses.forEach { item ->
+                    FilterChip(selected = selectedStatus == item, onClick = { selectedStatus = item }, label = { Text(item, maxLines = 1) },
+                        colors = FilterChipDefaults.filterChipColors(selectedContainerColor = Cyan, selectedLabelColor = Color(0xFF061018),
+                            containerColor = Color(0xFF111622), labelColor = Color(0xFFCBD5E1)))
+                }
             }
-            val statusColor = when (label) {
-                "Successful" -> Color(0xFF36BFEF)
-                "Failed" -> Color(0xFFFF5B55)
-                "Unmatched" -> Muted
-                "Scheduled", "Pending" -> Color(0xFF36A8F5)
-                else -> Color(0xFFFFC857)
+            Row(Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 9.dp), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                dates.forEach { item ->
+                    FilterChip(selected = selectedDate == item, onClick = { selectedDate = item }, label = { Text(item, maxLines = 1) },
+                        colors = FilterChipDefaults.filterChipColors(selectedContainerColor = Color(0xFF34D399), selectedLabelColor = Color(0xFF052017),
+                            containerColor = Color(0xFF111622), labelColor = Muted))
+                }
             }
-            Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF0B1022)), modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(15.dp)) {
-                Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 14.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text(
-                        when (label) { "Successful" -> "✓"; "Failed" -> "✕"; "Unmatched" -> "?"; "Scheduled" -> "◷"; else -> "⌛" },
-                        color = statusColor, fontWeight = FontWeight.Black, fontSize = 25.sp
-                    )
-                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text(row.customer, color = Color.White, fontWeight = FontWeight.Bold, maxLines = 1)
-                        Text(row.offer, color = Cyan, fontWeight = FontWeight.SemiBold, maxLines = 1)
-                        Text(label + " · " + row.source, color = statusColor, style = MaterialTheme.typography.labelSmall)
-                    }
-                    Column(horizontalAlignment = androidx.compose.ui.Alignment.End, verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                        Text(dateFormat.format(Date(row.createdAt)), color = Muted, style = MaterialTheme.typography.labelSmall, maxLines = 1)
-                        Text("Ksh ${money(row.amount)}", color = statusColor, fontWeight = FontWeight.Bold)
+        }
+        Row(Modifier.fillMaxWidth().background(Color(0xFF0C111D), RoundedCornerShape(10.dp)).padding(horizontal = 11.dp, vertical = 10.dp),
+            horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+            Row(horizontalArrangement = Arrangement.spacedBy(5.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                Text("§{visible.size}", color = Color.White, fontWeight = FontWeight.ExtraBold, fontSize = 13.sp)
+                Text("transactions", color = Muted, fontSize = 12.sp)
+                Text("($selectedStatus • $selectedDate)", color = Color(0xFF64748B), fontSize = 9.sp, maxLines = 1)
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                Text("Volume:", color = Muted, fontSize = 10.sp)
+                Text("Ksh §{money(volume)}", color = Color(0xFF34D399), fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, fontSize = 12.sp)
+            }
+        }
+        if (visible.isEmpty()) {
+            InfoCard("No transactions found", if (history.isEmpty())
+                "Customer purchases appear here when real transaction records are created. No sample transactions are inserted."
+                else "No recorded transactions match these filters. Try All or change the date range.")
+        } else {
+            Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF101521)), shape = RoundedCornerShape(19.dp),
+                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF202B3C)), modifier = Modifier.fillMaxWidth()) {
+                Column {
+                    visible.forEachIndexed { index, row ->
+                        val status = label(row)
+                        val tint = when (status) {
+                            "Successful" -> Color(0xFF34D399)
+                            "Failed" -> Color(0xFFFB7185)
+                            "Unmatched" -> Color(0xFFCBD5E1)
+                            "Pending", "Scheduled" -> Color(0xFF38BDF8)
+                            else -> Color(0xFFFBBF24)
+                        }
+                        Row(Modifier.fillMaxWidth().clickable { detail = row }.padding(horizontal = 12.dp, vertical = 12.dp),
+                            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(11.dp)) {
+                            Surface(shape = RoundedCornerShape(50), color = tint.copy(alpha = .14f),
+                                border = androidx.compose.foundation.BorderStroke(1.dp, tint.copy(alpha = .35f)), modifier = Modifier.size(38.dp)) {
+                                Box(contentAlignment = androidx.compose.ui.Alignment.Center) {
+                                    Text(when (status) { "Successful" -> "✓"; "Failed" -> "×"; "Unmatched" -> "?"; else -> "◷" },
+                                        color = tint, fontWeight = FontWeight.ExtraBold, fontSize = 19.sp)
+                                }
+                            }
+                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                                Text(row.customer, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp, maxLines = 1)
+                                Text(row.offer, color = Cyan, fontWeight = FontWeight.SemiBold, fontSize = 12.sp, maxLines = 1)
+                            }
+                            Column(horizontalAlignment = androidx.compose.ui.Alignment.End, verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                                Text(dateFormat.format(Date(row.createdAt)), color = Muted, fontSize = 9.sp, maxLines = 1)
+                                Text("Ksh §{money(row.amount)}", color = tint, fontWeight = FontWeight.ExtraBold, fontFamily = FontFamily.Monospace, fontSize = 12.sp)
+                            }
+                        }
+                        if (index < visible.lastIndex) HorizontalDivider(color = Color(0xFF202B3C).copy(alpha = .7f), thickness = .7.dp)
                     }
                 }
             }
         }
     }
+    detail?.let { row ->
+        AlertDialog(onDismissRequest = { detail = null }, containerColor = Color(0xFF111622),
+            title = { Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(row.customer, color = Color.White, fontWeight = FontWeight.Bold)
+                Text(label(row).uppercase(Locale.ROOT), color = Cyan, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+            } },
+            text = { Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(row.offer, color = Cyan, fontWeight = FontWeight.SemiBold)
+                Text("Amount  ·  Ksh §{money(row.amount)}", color = Color.White)
+                Text("Date  ·  §{dateFormat.format(Date(row.createdAt))}", color = Muted)
+                Text("Source  ·  §{row.source}", color = Muted)
+                Text("Reference  ·  §{row.reference.ifBlank { "Not available" }}", color = Muted)
+                Text("Order status  ·  §{row.orderStatus}", color = Muted)
+                Text("Transaction status  ·  §{row.transactionStatus}", color = Muted)
+            } },
+            confirmButton = { TextButton(onClick = { detail = null }) { Text("Close", color = Cyan) } }
+        )
+    }
 }
-
 @Composable
 private fun BulkMessengerScreen(db: LocalDatabase) {
     val context = LocalContext.current
