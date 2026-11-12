@@ -63,7 +63,4 @@ jobs:
             sleep 8
             adb shell pidof com.bingwapulse.connectpulse
             adb logcat -d -s AndroidRuntime:E > android-crashes.log
-            if grep -q "FATAL EXCEPTION" android-crashes.log; then
-              cat android-crashes.log
-              exit 1
-            fi
+            ! grep -q "FATAL EXCEPTION" android-crashes.log
