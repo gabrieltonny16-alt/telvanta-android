@@ -17,4 +17,17 @@ class MpesaReceiptParserTest {
         assertEquals("Gabriel Ngui Tonny", parsed.senderName)
         assertTrue(parsed.mentionsConfirmation)
     }
+    @Test
+    fun extractsExactTillConfirmationFormatSharedByUser() {
+        val message = "UFAL477KQJ Confirmed. on 12/11/26 at 8:25 AM. Ksh500.00 received from 254712345678 JANE DOE. New Account balance is Ksh15,450.00."
+
+        val parsed = MpesaReceiptParser.parse("M-PESA", message)
+
+        assertEquals("UFAL477KQJ", parsed.receiptCode)
+        assertEquals(500L, parsed.amountKes)
+        assertEquals("254712345678", parsed.senderPhone)
+        assertEquals("JANE DOE", parsed.senderName)
+        assertTrue(parsed.mentionsConfirmation)
+    }
+
 }
