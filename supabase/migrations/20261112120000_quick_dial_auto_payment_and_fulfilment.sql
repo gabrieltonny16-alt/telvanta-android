@@ -32,7 +32,7 @@ begin
   ) then
     raise exception 'Not authorised for this business' using errcode='42501';
   end if;
-  if p_recipient_phone !~ '^\+254[17][0-9]{8}
+  if p_recipient_phone !~ '^\+254[17][0-9]{8}$' then
     raise exception 'Enter a valid Kenyan recipient number' using errcode='22023';
   end if;
   if p_amount_kes < 1 then
