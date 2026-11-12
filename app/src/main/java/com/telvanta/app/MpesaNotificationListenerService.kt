@@ -85,7 +85,7 @@ class MpesaNotificationListenerService : NotificationListenerService() {
         val sender = parsed.senderPhone ?: extractSenderPhone(text)
         val senderName = parsed.senderName
         val completeness = when {
-            receipt != null && amount != null && sender != null -> "REVIEW_READY"
+            parsed.isTillConfirmation && receipt != null && amount != null && sender != null -> "REVIEW_READY"
             receipt != null || amount != null || sender != null || senderName != null -> "PARTIAL_CANDIDATE"
             else -> "RAW_NOTIFICATION_ONLY"
         }
