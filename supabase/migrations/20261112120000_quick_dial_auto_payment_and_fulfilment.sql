@@ -118,6 +118,10 @@ begin
      or v_candidate.staged_payment_id is null
      or v_candidate.staged_order_id is null
      or v_candidate.candidate_status <> 'REVIEW_READY'
+     or lower(btrim(v_candidate.notification_title)) not in ('mpesa','m-pesa')
+     or v_candidate.raw_notification_text !~* 'on[[:space:]]+[0-9]{1,2}/[0-9]{1,2}/[0-9]{2,4}[[:space:]]+at[[:space:]]+[0-9]{1,2}:[0-9]{2}[[:space:]]*(AM|PM)'
+     or v_candidate.raw_notification_text !~* 'KSH[.]?[[:space:]]*[0-9][0-9,]*([.][0-9]{1,2})?[[:space:]]+received[[:space:]]+from[[:space:]]+(254|0)[17][0-9]{8}[[:space:]]+[[:alpha:]]'
+     or v_candidate.raw_notification_text !~* 'new[[:space:]]+account[[:space:]]+balance[[:space:]]+is[[:space:]]+KSH[.]?[[:space:]]*[0-9][0-9,]*([.][0-9]{1,2})?'
      or v_candidate.match_status = 'mismatch'
      or v_candidate.receipt_candidate is null
      or v_candidate.amount_minor is null
