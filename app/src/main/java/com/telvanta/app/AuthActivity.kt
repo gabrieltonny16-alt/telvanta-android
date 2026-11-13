@@ -55,6 +55,7 @@ private fun BingwaAuthScreen(store: SecureSessionStore, api: BingwaSupabaseApi, 
     var busy by remember { mutableStateOf(false) }
     var createAccount by remember { mutableStateOf(false) }
     var awaitingPhoneOtp by remember { mutableStateOf(false) }
+    var awaitingEmailOtp by remember { mutableStateOf(false) }
     var session by remember { mutableStateOf<BingwaSession?>(null) }
     val scope = rememberCoroutineScope()
 
@@ -88,10 +89,10 @@ private fun BingwaAuthScreen(store: SecureSessionStore, api: BingwaSupabaseApi, 
         Spacer(Modifier.height(28.dp))
 
         if (session == null) {
-            Text(if (awaitingPhoneOtp) "Verify your phone" else if (createAccount) "Create your account" else "Welcome back",
+            Text(if (awaitingPhoneOtp) "Verify your phone" else if (awaitingEmailOtp) "Verify your email" else if (createAccount) "Create your account" else "Welcome back",
                 color = Color.White, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(14.dp))
-            if (!awaitingPhoneOtp) {
+            if (!awaitingPhoneOtp && !awaitingEmailOtp) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     FilterChip(selected = method == AuthMethod.EMAIL, onClick = { method = AuthMethod.EMAIL; identifier = ""; message = "Use your email address." }, label = { Text("Email") })
                     FilterChip(selected = method == AuthMethod.PHONE, onClick = { method = AuthMethod.PHONE; identifier = ""; message = "Use your phone number. Kenya format: +2547XXXXXXXX." }, label = { Text("Phone number") })
@@ -105,15 +106,29 @@ private fun BingwaAuthScreen(store: SecureSessionStore, api: BingwaSupabaseApi, 
                 OutlinedTextField(value = password, onValueChange = { password = it }, label = { Text("Password") },
                     singleLine = true, visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth())
             } else {
-                OutlinedTextField(value = code, onValueChange = { code = it.filter(Char::isDigit).take(8) },
-                    label = { Text("SMS verification code") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(value = code, onValueChange = { code = it.filter(Char::isDigit).take(if (awaitingEmailOtp) 6 else 8) },
+                    label = { Text(if (awaitingEmailOtp) "Six-digit email code" else "SMS verification code") },
+                    singleLine = true, modifier = Modifier.fillMaxWidth())
             }
             Spacer(Modifier.height(14.dp))
             Button(onClick = {
                 busy = true
                 scope.launch {
                     try {
-                        if (awaitingPhoneOtp) {
+                        if (awaitingPhoneOtp || awaitingEmailOtp) {
+                            if (awaitingEmailOtp) {
+                                if (code.length != 6) throw IllegalArgumentException("Enter the six-digit code sent to your email.")
+                                val verified = withContext(Dispatchers.IO) { api.verifyEmailSignupOtp(identifier, code) }
+                                store.save(verified)
+                                val businessId = withContext(Dispatchers.IO) { api.firstBusinessId(verified) }
+                                if (businessId != null) {
+                                    store.save(verified.copy(businessId = businessId))
+                                    onComplete()
+                                } else {
+                                    session = verified
+                                    message = "Email verified. Set up your business workspace."
+                                }
+                            } else {
                             if (code.length !in 6..8) throw IllegalArgumentException("Enter the verification code sent to your phone.")
                             val verified = withContext(Dispatchers.IO) { api.verifyPhoneOtp(identifier, code) }
                             store.save(verified)
@@ -124,6 +139,7 @@ private fun BingwaAuthScreen(store: SecureSessionStore, api: BingwaSupabaseApi, 
                             } else {
                                 session = verified
                                 message = "Phone verified. Set up your business workspace."
+                            }
                             }
                         } else {
                             if (identifier.isBlank() || password.length < 8) {
@@ -139,8 +155,11 @@ private fun BingwaAuthScreen(store: SecureSessionStore, api: BingwaSupabaseApi, 
                             if (method == AuthMethod.PHONE && createAccount) {
                                 awaitingPhoneOtp = true
                                 message = "A verification code was requested. Enter it below to verify your phone."
+                            } else if (result == null && method == AuthMethod.EMAIL && createAccount) {
+                                awaitingEmailOtp = true
+                                message = "We sent a six-digit verification code to $identifier. Enter it here to activate your account."
                             } else if (result == null) {
-                                message = "Account request submitted. Check your email inbox and spam folder, then confirm before signing in. You can request another confirmation email below."
+                                message = "Account request submitted. Check your email inbox and spam folder, then confirm before signing in."
                             } else {
                                 store.save(result)
                                 val businessId = withContext(Dispatchers.IO) { api.firstBusinessId(result) }
@@ -158,10 +177,22 @@ private fun BingwaAuthScreen(store: SecureSessionStore, api: BingwaSupabaseApi, 
                     } finally { busy = false }
                 }
             }, enabled = !busy, modifier = Modifier.fillMaxWidth()) {
-                if (busy) CircularProgressIndicator() else Text(if (awaitingPhoneOtp) "Verify phone number" else if (createAccount) "Create account" else "Sign in")
+                if (busy) CircularProgressIndicator() else Text(if (awaitingPhoneOtp) "Verify phone number" else if (awaitingEmailOtp) "Verify email address" else if (createAccount) "Create account" else "Sign in")
             }
-            if (awaitingPhoneOtp) {
-                TextButton(onClick = { awaitingPhoneOtp = false; code = ""; message = "You can change the phone number or try again." }, enabled = !busy) { Text("Change phone number") }
+            if (awaitingPhoneOtp || awaitingEmailOtp) {
+                TextButton(onClick = { awaitingPhoneOtp = false; awaitingEmailOtp = false; code = ""; message = "You can review your details and try again." }, enabled = !busy) { Text("Back") }
+                if (awaitingEmailOtp) {
+                    TextButton(onClick = {
+                        busy = true
+                        scope.launch {
+                            try {
+                                withContext(Dispatchers.IO) { api.resendEmailConfirmation(identifier) }
+                                message = "A new six-digit code was requested. Check your inbox and spam folder."
+                            } catch (error: Exception) { message = error.message ?: "Could not resend the code." }
+                            finally { busy = false }
+                        }
+                    }, enabled = !busy) { Text("Resend code") }
+                }
             } else {
                 if (method == AuthMethod.EMAIL) {
                     TextButton(onClick = {
@@ -171,7 +202,7 @@ private fun BingwaAuthScreen(store: SecureSessionStore, api: BingwaSupabaseApi, 
                             scope.launch {
                                 try {
                                     withContext(Dispatchers.IO) { api.resendEmailConfirmation(identifier) }
-                                    message = "A new confirmation email was requested. Check your inbox and spam folder."
+                                    message = "A new six-digit verification code was requested. Check your inbox and spam folder."
                                 } catch (error: Exception) { message = error.message ?: "Could not resend the email." }
                                 finally { busy = false }
                             }
