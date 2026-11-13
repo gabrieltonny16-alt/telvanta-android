@@ -164,7 +164,7 @@ function renderSiteLinks() {
     const payout = link.payout_type === "paybill"
       ? "PayBill " + (link.paybill_number || "—") + (link.paybill_account_number ? " · Account " + link.paybill_account_number : "")
       : "Till " + (link.till_number || "—");
-    return "<tr><td><strong>" + escapeHtml(link.display_name || state.business.name) + "</strong><small class='muted-cell'>@" + escapeHtml(link.slug) + " · " + escapeHtml(payout) + "</small></td><td>" + statusPill(link.is_active ? "active" : "paused") + "</td><td><button class='button outline small' data-action='copy-sitelink' data-url='" + escapeHtml(target.toString()) + "'>Copy link</button> <button class='button outline small' data-action='edit-sitelink' data-id='" + escapeHtml(link.id) + "'>Edit</button> <button class='button subtle small' data-action='toggle-sitelink' data-id='" + escapeHtml(link.id) + "'>" + (link.is_active ? "Pause" : "Activate") + "</button></td></tr>";
+    return "<tr><td><strong>" + escapeHtml(link.display_name || state.business.name) + "</strong><small class='muted-cell'>@" + escapeHtml(link.slug) + " · " + escapeHtml(payout) + "</small></td><td>" + statusPill(link.is_active ? "active" : "paused") + "</td><td><button class='button outline small' data-action='copy-sitelink' data-url='" + escapeHtml(target.toString()) + "'>Copy link</button> <button class='button outline small' data-action='edit-sitelink' data-id='" + escapeHtml(link.id) + "'>Edit</button> <button class='button subtle small' data-action='delete-sitelink' data-id='" + escapeHtml(link.id) + "'>Delete</button> <button class='button subtle small' data-action='toggle-sitelink' data-id='" + escapeHtml(link.id) + "'>" + (link.is_active ? "Pause" : "Activate") + "</button></td></tr>";
   });
   const agentRows = state.agentOffers.filter(row => row.agent_user_id === currentUser).map(row =>
     "<tr><td><strong>" + escapeHtml(row.offers?.name || "Offer") + "</strong><small class='muted-cell'>" + escapeHtml(row.offers?.category || "") + "</small></td><td>" + kes(row.selling_price_kes) + "</td><td>" + statusPill(row.is_published ? "published" : "hidden") + "</td><td><button class='button outline small' data-action='toggle-agent-offer' data-id='" + escapeHtml(row.id) + "'>" + (row.is_published ? "Hide" : "Publish") + "</button></td></tr>"
@@ -507,6 +507,15 @@ document.addEventListener("click", async (event) => {
     case "edit-sitelink": {
       const row = state.siteLinks.find(x => x.id === action.dataset.id);
       if (row) siteLinkModal(row);
+      break;
+    }
+    case "delete-sitelink": {
+      const row = state.siteLinks.find(x => x.id === action.dataset.id);
+      if (row && window.confirm("Delete this store link? Existing orders and payment records will be kept, but the public store URL will stop working.")) {
+        const { error } = await supabase.from("site_links").delete().eq("id", row.id).eq("business_id", state.business.id).eq("agent_user_id", state.session.user.id);
+        if (error) flash(error.message, true);
+        else { flash("Store link deleted."); await loadWorkspaceData(); }
+      }
       break;
     }
     case "toggle-sitelink": {
