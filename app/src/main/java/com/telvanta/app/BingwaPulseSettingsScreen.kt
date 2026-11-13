@@ -150,13 +150,26 @@ fun BingwaPulseSettingsScreen(onNavigate: (String) -> Unit) {
         item { settingsGroup {
             Row(Modifier.fillMaxWidth().clickable { mode = "express"; prefs.edit().putString("processing_mode", mode).apply() }.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
                 RadioButton(selected = mode == "express", onClick = { mode = "express"; prefs.edit().putString("processing_mode", mode).apply() }, colors = RadioButtonDefaults.colors(selectedColor = SettingsCyan))
-                Column(Modifier.padding(start = 8.dp)) { Text("Express", color = Color.White, fontWeight = FontWeight.SemiBold); Text("Direct USSD dial (default)", color = SettingsMuted, style = MaterialTheme.typography.bodySmall) }
+                Column(Modifier.padding(start = 8.dp)) { Text("Express", color = Color.White, fontWeight = FontWeight.SemiBold); Text("Manual USSD only · automatic order claiming stays paused until manual completion is supported", color = SettingsMuted, style = MaterialTheme.typography.bodySmall) }
             }
             Row(Modifier.fillMaxWidth().clickable { mode = "advanced"; prefs.edit().putString("processing_mode", mode).apply() }.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
                 RadioButton(selected = mode == "advanced", onClick = { mode = "advanced"; prefs.edit().putString("processing_mode", mode).apply() }, colors = RadioButtonDefaults.colors(selectedColor = SettingsCyan))
-                Column(Modifier.padding(start = 8.dp)) { Text("Advanced", color = Color.White, fontWeight = FontWeight.SemiBold); Text("Menu navigation (requires Accessibility)", color = SettingsMuted, style = MaterialTheme.typography.bodySmall) }
+                Column(Modifier.padding(start = 8.dp)) { Text("Advanced", color = Color.White, fontWeight = FontWeight.SemiBold); Text("Configured menu navigation · requires Accessibility and Phone permissions", color = SettingsMuted, style = MaterialTheme.typography.bodySmall) }
             }
         } }
+        item {
+            Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF102631)), shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    if (mode == "express")
+                        "Express is selected. The fulfilment worker will not claim orders because a safe manual completion flow is not yet available."
+                    else
+                        "Advanced is selected. Automatic fulfilment can claim orders only when Accessibility and Phone permissions are enabled. Uncertain sessions are never retried automatically.",
+                    color = Color.White,
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(14.dp)
+                )
+            }
+        }
         item { sectionTitle("Permissions & automation") }
         item { settingsGroup {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
