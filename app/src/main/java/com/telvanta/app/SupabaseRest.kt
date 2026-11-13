@@ -169,6 +169,15 @@ class BingwaSupabaseApi {
         return json.optString("access_token").takeIf { it.isNotBlank() }?.let { parseSession(json) }
     }
 
+    fun verifyEmailSignupOtp(email: String, token: String): BingwaSession {
+        require(token.matches(Regex("^[0-9]{6}$"))) { "Enter the six-digit email verification code." }
+        val response = request(
+            "POST", "/auth/v1/verify",
+            JSONObject().put("type", "signup").put("email", email.trim()).put("token", token)
+        )
+        return parseSession(JSONObject(response))
+    }
+
     fun signIn(email: String, password: String): BingwaSession {
         val response = request(
             "POST", "/auth/v1/token?grant_type=password",
