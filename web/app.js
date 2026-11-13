@@ -7,7 +7,7 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
 });
 
 const $ = (id) => document.getElementById(id);
-const state = { session: null, business: null, role: null, page: "overview", metrics: {}, orders: [], offers: [], providers: [], customers: [], payments: [], candidates: [], rules: [], channels: [], devices: [], siteLinks: [], agentOffers: [] };
+const state = { session: null, business: null, role: null, page: "overview", metrics: {}, orders: [], offers: [], providers: [], customers: [], payments: [], candidates: [], rules: [], channels: [], devices: [], subscriptions: [], siteLinks: [], agentOffers: [], pairingCode: null };
 let createAccountMode = false;
 let toastTimer;
 
@@ -140,20 +140,28 @@ function renderPayments() {
     <p class="empty-note">Raw notification text is not displayed in this browser dashboard.</p>`;
 }
 function renderAutomation() {
-  const canManage = ["owner", "business_admin"].includes(state.role);
+  const canManage = ["owner", "business_admin", "agent_manager"].includes(state.role);
+  const activeSubscription = state.subscriptions.find(x => x.status === "active" && (!x.ends_at || new Date(x.ends_at) > new Date()));
+  const deviceRows = state.devices.map(d => {
+    const lastSeen = d.last_seen_at ? new Date(d.last_seen_at) : null;
+    const fresh = lastSeen && Date.now() - lastSeen.getTime() < 180000;
+    const liveStatus = d.status === "online" && !fresh ? "offline" : d.status;
+    const controls = d.status === "pending_pairing" ? '<button class="button primary small" data-action="approve-device" data-id="' + escapeHtml(d.id) + '">Approve</button> <button class="button subtle small" data-action="revoke-device" data-id="' + escapeHtml(d.id) + '">Reject</button>' : d.status === "revoked" ? '<span class="muted-cell">Revoked</span>' : d.status === "paused" ? '<button class="button outline small" data-action="resume-device" data-id="' + escapeHtml(d.id) + '">Resume</button> <button class="button subtle small" data-action="revoke-device" data-id="' + escapeHtml(d.id) + '">Revoke</button>' : '<button class="button outline small" data-action="pause-device" data-id="' + escapeHtml(d.id) + '">Pause</button> <button class="button subtle small" data-action="revoke-device" data-id="' + escapeHtml(d.id) + '">Revoke</button>';
+    return "<tr><td><strong>" + escapeHtml(d.device_label) + "</strong><small class='muted-cell'>" + escapeHtml(d.platform) + " · " + escapeHtml(d.id.slice(0,8)) + "</small></td><td>" + statusPill(liveStatus) + "</td><td>" + when(d.last_seen_at) + "</td><td>" + controls + "</td></tr>";
+  });
   const channelRows = state.channels.map(c => "<tr><td><strong>" + escapeHtml(c.shortcode) + "</strong></td><td>" + escapeHtml(c.channel_type) + "</td><td>" + statusPill(c.is_active ? "active" : "inactive") + "</td><td>" + when(c.created_at) + "</td></tr>");
   const ruleRows = state.rules.map(r => "<tr><td><strong>" + kes(Number(r.amount_minor) / 100) + "</strong></td><td>" + escapeHtml(r.offers?.name || "Offer") + "</td><td>" + escapeHtml(r.menu_entry_code) + "</td><td>" + statusPill(r.is_enabled ? "active" : "inactive") + "</td></tr>");
-  const deviceRows = state.devices.map(d => "<tr><td><strong>" + escapeHtml(d.device_label) + "</strong></td><td>" + escapeHtml(d.platform) + "</td><td>" + statusPill(d.status) + "</td><td>" + when(d.last_seen_at) + "</td></tr>");
   $("pageContent").innerHTML = `
     <div class="section-heading"><div><h2>Automation readiness</h2><p>Configuration records and Android worker visibility.</p></div><button class="button outline small" data-action="refresh">Refresh data</button></div>
-    <div class="notice"><strong>Automation is not live.</strong> The callback service has not been deployed or registered with Safaricom, and the Android USSD worker is still observation-only. This page cannot initiate purchases or mark payments as paid.</div>
+    <section class="panel"><div class="panel-head"><div><h2>Connect Pulse</h2><p>Securely pair, monitor and control your selling phones.</p></div>${canManage ? '<button class="button primary small" data-action="new-pairing">Pair a phone</button>' : ""}</div><div class="stat-grid"><article class="stat-card"><div class="stat-label">SUBSCRIPTION</div><div class="stat-value" style="font-size:20px">${activeSubscription ? "Subscribed" : "Not subscribed"}</div><div class="stat-note">${activeSubscription ? escapeHtml(activeSubscription.plan_code || "Active plan") + (activeSubscription.ends_at ? " · Ends " + when(activeSubscription.ends_at) : "") : "Subscription required for relay forwarding"}</div></article><article class="stat-card"><div class="stat-label">LINKED PHONES</div><div class="stat-value">${state.devices.filter(d => d.status !== "revoked").length}</div><div class="stat-note">${state.devices.filter(d => d.status === "pending_pairing").length} awaiting approval</div></article><article class="stat-card"><div class="stat-label">ONLINE NOW</div><div class="stat-value">${state.devices.filter(d => d.status === "online" && d.last_seen_at && Date.now() - new Date(d.last_seen_at).getTime() < 180000).length}</div><div class="stat-note">Based on recent secure heartbeat</div></article></div><p class="empty-note">Pairing codes expire after 10 minutes and can be used once. Online status comes from secure device heartbeats.</p></section>
+    <div class="notice"><strong>Automation safety:</strong> Connect Pulse reports device connectivity. This dashboard does not trigger USSD purchases, verify payments or guarantee bundle delivery.</div>
     <div class="section-heading"><div><h2>M-PESA collection channels</h2><p>New channels are saved inactive. Callback registration must be completed separately.</p></div>${canManage ? '<button class="button primary small" data-action="new-channel">Add Till / PayBill</button>' : ""}</div>
     ${tableMarkup(["Shortcode", "Type", "Status", "Created"], channelRows, "No M-PESA channel configured", "Add your Till or PayBill as an inactive record.")}
     <div class="section-heading"><div><h2>Amount-to-offer rules</h2><p>Every amount maps to one specific offer. Rules remain inactive until the real menu flow is verified.</p></div>${canManage ? '<button class="button outline small" data-action="new-rule">Add offer rule</button>' : ""}</div>
     ${tableMarkup(["Payment amount", "Offer", "USSD entry code", "Rule status"], ruleRows, "No offer rules configured", "Add a rule only after confirming the exact payment amount and USSD entry code.")}
-    <div class="section-heading"><div><h2>Worker devices</h2><p>Android devices paired with this business workspace.</p></div></div>
-    ${tableMarkup(["Device", "Platform", "Status", "Last seen"], deviceRows, "No Android worker paired", "Install BingwaPulse Android and complete the device-pairing setup when it is available.")}
-    <p class="empty-note">This is a readiness view only. No background purchases, automatic USSD confirmations or live payment actions are enabled.</p>`;
+    <div class="section-heading"><div><h2>Linked phones</h2><p>Approve pairing requests and manage access for existing devices.</p></div><button class="button outline small" data-action="refresh">Refresh devices</button></div>
+    ${tableMarkup(["Device", "Connection", "Last heartbeat", "Controls"], deviceRows, "No phone linked yet", "Choose Pair a phone, then enter the one-time code in Connect Pulse on the other device.")}
+    <p class="empty-note">Revoking a device blocks future heartbeats. Pausing stops it from reporting online until resumed.</p>`;
 }
 function renderSiteLinks() {
   const currentUser = state.session?.user?.id;
@@ -227,13 +235,14 @@ async function loadWorkspaceData() {
     rowsFor("payment_notification_candidates", "id,receipt_candidate,amount_minor,sender_phone_candidate,candidate_status,match_status,created_at", id),
     rowsFor("payment_offer_rules", "id,amount_minor,menu_entry_code,is_enabled,menu_flow_verified_at,created_at,offers(name)", id),
     rowsFor("payment_ingress_channels", "id,shortcode,channel_type,is_active,created_at", id),
-    rowsFor("devices", "id,device_label,platform,status,last_seen_at,created_at", id),
+    rowsFor("devices", "id,device_label,platform,status,last_seen_at,paired_at,revoked_at,created_at", id),
+    rowsFor("business_platform_subscriptions", "id,plan_code,status,starts_at,ends_at", id),
     rowsFor("site_links", "id,agent_user_id,slug,display_name,payout_type,till_number,paybill_number,paybill_account_number,is_active,created_at", id),
     rowsFor("agent_offers", "id,offer_id,agent_user_id,selling_price_kes,is_published,created_at,offers(id,name,category,is_active)", id)
   ]);
   [state.metrics.orders, state.metrics.offers, state.metrics.customers, state.metrics.providers,
     state.orders, state.offers, state.providers, state.customers, state.payments, state.candidates,
-    state.rules, state.channels, state.devices, state.siteLinks, state.agentOffers] = results;
+    state.rules, state.channels, state.devices, state.subscriptions, state.siteLinks, state.agentOffers] = results;
   $("navOrderCount").textContent = String(state.metrics.orders);
   renderPage();
 }
@@ -285,6 +294,21 @@ async function startApp() {
 function openModal(title, description, fields, submitText) {
   $("modalContent").innerHTML = '<h2>' + escapeHtml(title) + '</h2><p>' + escapeHtml(description) + '</p><form class="modal-form" data-modal-form="' + escapeHtml(fields.kind) + '">' + fields.html + '<button class="button primary wide" type="submit">' + escapeHtml(submitText || "Save") + "</button></form>";
   $("modal").showModal();
+}
+function pairingModal() {
+  openModal("Pair a selling phone", "Give this phone a name. BingwaPulse will generate a one-time code that you enter on the Connect Pulse companion phone.", { kind: "pair-device", html: '<label>Device name<input name="device_label" maxlength="100" minlength="2" placeholder="e.g. Shop phone 2" required></label><p class="empty-note">The code expires in 10 minutes and can only be used once.</p>' }, "Generate one-time code");
+}
+async function createPairingCode(deviceLabel) {
+  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  const bytes = crypto.getRandomValues(new Uint8Array(10));
+  const code = Array.from(bytes, b => alphabet[b % alphabet.length]).join("");
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(code));
+  const codeHash = Array.from(new Uint8Array(digest), b => b.toString(16).padStart(2,"0")).join("");
+  const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+  const { error } = await supabase.from("device_pairing_challenges").insert({ business_id: state.business.id, created_by: state.session.user.id, device_label: deviceLabel, code_hash: codeHash, expires_at: expiresAt });
+  if (error) throw error;
+  state.pairingCode = code;
+  $("modalContent").innerHTML = '<h2>One-time pairing code</h2><p>Enter this code in Connect Pulse on the phone you are linking. It expires in 10 minutes and will not be shown again.</p><div style="font:800 30px ui-monospace,monospace;letter-spacing:.18em;padding:20px 8px;text-align:center;background:var(--surface-2,#111b2b);border-radius:14px;margin:18px 0">' + code + '</div><div class="action-row"><button class="button primary wide" type="button" data-action="copy-pair-code">Copy code</button><button class="button outline wide" type="button" data-action="close-modal">Done</button></div>';
 }
 function providerModal() {
   openModal("Add a provider", "Create an inactive provider record. Do not activate a connection until its method is confirmed.", {
@@ -398,7 +422,12 @@ async function submitModal(form) {
   const values = Object.fromEntries(new FormData(form).entries());
   const business_id = state.business.id;
   let result;
-  if (form.dataset.modalForm === "provider") {
+  if (form.dataset.modalForm === "pair-device") {
+    const label = values.device_label.trim();
+    if (label.length < 2 || label.length > 100) throw new Error("Enter a device name between 2 and 100 characters.");
+    await createPairingCode(label);
+    return;
+  } else if (form.dataset.modalForm === "provider") {
     result = await supabase.from("providers").insert({ business_id, name: values.name.trim(), adapter_key: values.adapter_key, status: "inactive" });
   } else if (form.dataset.modalForm === "offer") {
     result = await supabase.from("offers").insert({
@@ -490,6 +519,21 @@ document.addEventListener("click", async (event) => {
       try { await loadWorkspaceData(); flash("Workspace data refreshed."); }
       catch (err) { flash(err.message || "Refresh failed.", true); }
       break;
+    case "new-pairing": pairingModal(); break;
+    case "copy-pair-code": if (state.pairingCode) { try { await navigator.clipboard.writeText(state.pairingCode); flash("Pairing code copied."); } catch { window.prompt("Copy this one-time pairing code:", state.pairingCode); } } break;
+    case "close-modal": state.pairingCode = null; $("modal").close(); break;
+    case "approve-device": case "pause-device": case "resume-device": case "revoke-device": {
+      const row = state.devices.find(d => d.id === action.dataset.id);
+      if (!row) break;
+      const nextStatus = action.dataset.action === "approve-device" || action.dataset.action === "resume-device" ? "online" : action.dataset.action === "pause-device" ? "paused" : "revoked";
+      if (nextStatus === "revoked" && !window.confirm("Revoke this phone? It will no longer be able to send accepted heartbeats.")) break;
+      const payload = { status: nextStatus };
+      if (nextStatus === "online" && row.status === "pending_pairing") payload.paired_at = new Date().toISOString();
+      if (nextStatus === "revoked") payload.revoked_at = new Date().toISOString();
+      const { error } = await supabase.from("devices").update(payload).eq("id", row.id).eq("business_id", state.business.id);
+      if (error) flash(error.message, true); else { flash("Phone access updated."); await loadWorkspaceData(); }
+      break;
+    }
     case "new-provider": providerModal(); break;
     case "new-offer": offerModal(); break;
     case "new-customer": customerModal(); break;
