@@ -68,6 +68,24 @@ class FulfilmentWorkerService : Service() {
                     api.refreshSession(saved).also(store::save)
                 } else saved
                 api.heartbeatWorkerDevice(session, businessId, deviceId)
+
+                // Express has no verified manual completion flow yet. Pause before claiming
+                // orders so switching modes cannot strand a paid job.
+                val processingMode = prefs.getString(KEY_PROCESSING_MODE, MODE_EXPRESS) ?: MODE_EXPRESS
+                if (processingMode != MODE_ADVANCED) {
+                    updateNotification("Express mode selected: automatic fulfilment paused")
+                    delay(POLL_INTERVAL_MS)
+                    continue
+                }
+
+                // Advanced mode requires both capabilities before an order is claimed.
+                if (!isUssdAccessibilityEnabled() ||
+                    ContextCompat.checkSelfPermission(this, android.Manifest.permission.CALL_PHONE) != PackageManager.PERMISSION_GRANTED) {
+                    updateNotification("Advanced mode needs Accessibility and Phone permissions")
+                    delay(POLL_INTERVAL_MS)
+                    continue
+                }
+
                 if (jobVault.load() != null) {
                     delay(POLL_INTERVAL_MS)
                     continue
@@ -123,6 +141,14 @@ class FulfilmentWorkerService : Service() {
                 delay(ERROR_BACKOFF_MS)
             }
         }
+    }
+
+    private fun isUssdAccessibilityEnabled(): Boolean {
+        val expected = "$packageName/${UssdAccessibilityService::class.java.name}"
+        return android.provider.Settings.Secure.getString(
+            contentResolver,
+            android.provider.Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
+        ).orEmpty().split(':').any { it.equals(expected, ignoreCase = true) }
     }
 
     private suspend fun finishUnknown(
@@ -181,6 +207,9 @@ class FulfilmentWorkerService : Service() {
     companion object {
         const val EXTRA_BUSINESS_ID = "business_id"
         const val EXTRA_DEVICE_ID = "device_id"
+        private const val KEY_PROCESSING_MODE = "processing_mode"
+        private const val MODE_EXPRESS = "express"
+        private const val MODE_ADVANCED = "advanced"
         private const val CHANNEL_ID = "bingwapulse_fulfilment"
         private const val NOTIFICATION_ID = 7301
         private const val POLL_INTERVAL_MS = 8000L
