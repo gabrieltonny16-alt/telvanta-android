@@ -114,40 +114,40 @@ fun BingwaPulseSettingsScreen(onNavigate: (String) -> Unit) {
         item { settingsGroup {
             settingRow("▣", "EngageBot", "Recover sales and engage customers", { onNavigate("EngageBot") })
             HorizontalDivider(color = Color(0xFF202B38))
-            item("▤", "SIM Setup", "Choose SIMs for payments and USSD", { onNavigate("Quick Dial") })
+            settingRow("▤", "SIM Setup", "Choose SIMs for payments and USSD", { onNavigate("Quick Dial") })
             HorizontalDivider(color = Color(0xFF202B38))
-            item("↩", "Auto-Reply Messages", "Edit customer SMS reply rules", { onNavigate("Auto-Reply") })
+            settingRow("↩", "Auto-Reply Messages", "Edit customer SMS reply rules", { onNavigate("Auto-Reply") })
             HorizontalDivider(color = Color(0xFF202B38))
-            item("♙", "My Customers", "View and manage customer records", { onNavigate("Customers") })
+            settingRow("♙", "My Customers", "View and manage customer records", { onNavigate("Customers") })
             HorizontalDivider(color = Color(0xFF202B38))
-            item("◷", "Transaction History", "Review your transactions", { onNavigate("Transaction History") })
+            settingRow("◷", "Transaction History", "Review your transactions", { onNavigate("Transaction History") })
         } }
-        item { heading("Message processing") }
-        item { group {
+        item { sectionTitle("Message processing") }
+        item { settingsGroup {
             settingToggle("Process M-PESA Messages", "Read matching payment notifications", processMpesa) { processMpesa = it; save("process_mpesa", it) }
             HorizontalDivider(color = Color(0xFF202B38))
-            toggle("Process Till Messages", "Process Till / Buy Goods confirmations", processTill) { processTill = it; save("process_till", it) }
+            settingToggle("Process Till Messages", "Process Till / Buy Goods confirmations", processTill) { processTill = it; save("process_till", it) }
             HorizontalDivider(color = Color(0xFF202B38))
-            toggle("Process Paybill Messages", "Process Paybill confirmations", processPaybill) { processPaybill = it; save("process_paybill", it) }
+            settingToggle("Process Paybill Messages", "Process Paybill confirmations", processPaybill) { processPaybill = it; save("process_paybill", it) }
             HorizontalDivider(color = Color(0xFF202B38))
-            toggle("Process SiteLink Messages", "Process online-store sales notifications", processSiteLink) { processSiteLink = it; save("process_sitelink", it) }
+            settingToggle("Process SiteLink Messages", "Process online-store sales notifications", processSiteLink) { processSiteLink = it; save("process_sitelink", it) }
             HorizontalDivider(color = Color(0xFF202B38))
-            item("⬡", "Authorized Senders", "Manage senders allowed for processing", { onNavigate("Authorized Senders") })
+            settingRow("⬡", "Authorized Senders", "Manage senders allowed for processing", { onNavigate("Authorized Senders") })
             HorizontalDivider(color = Color(0xFF202B38))
-            toggle("Auto-Save Contacts", "Save paying customers to your contacts", autoSave) { autoSave = it; save("auto_save_contacts", it) }
+            settingToggle("Auto-Save Contacts", "Save paying customers to your contacts", autoSave) { autoSave = it; save("auto_save_contacts", it) }
             HorizontalDivider(color = Color(0xFF202B38))
-            item("◇", "Contact name tag", "Configure the saved customer name format", { onNavigate("Contact Name Tag") })
+            settingRow("◇", "Contact name tag", "Configure the saved customer name format", { onNavigate("Contact Name Tag") })
             HorizontalDivider(color = Color(0xFF202B38))
-            item("⊘", "BlackList", "Manage customers excluded from offers", { onNavigate("Blacklist") })
+            settingRow("⊘", "BlackList", "Manage customers excluded from offers", { onNavigate("Blacklist") })
         } }
-        item { heading("Customer tools") }
-        item { group { toggle("EngageBot", "Engage customers on eligible recommended offers", engageBot) { engageBot = it; save("engage_bot", it) } } }
-        item { heading("Connect Pulse") }
-        item { group { item("⌁", "Connect Pulse", "Pair and manage your M-PESA companion phone", { onNavigate("Connect Pulse") }) } }
-        item { heading("Offline readiness") }
-        item { group { item("☁", "Offline Status", "Inspect offline offer mirror and sync readiness", { onNavigate("Offline Status") }) } }
-        item { heading("Processing mode") }
-        item { group {
+        item { sectionTitle("Customer tools") }
+        item { settingsGroup { settingToggle("EngageBot", "Engage customers on eligible recommended offers", engageBot) { engageBot = it; save("engage_bot", it) } } }
+        item { sectionTitle("Connect Pulse") }
+        item { settingsGroup { settingRow("⌁", "Connect Pulse", "Pair and manage your M-PESA companion phone", { onNavigate("Connect Pulse") }) } }
+        item { sectionTitle("Offline readiness") }
+        item { settingsGroup { settingRow("☁", "Offline Status", "Inspect offline offer mirror and sync readiness", { onNavigate("Offline Status") }) } }
+        item { sectionTitle("Processing mode") }
+        item { settingsGroup {
             Row(Modifier.fillMaxWidth().clickable { mode = "express"; prefs.edit().putString("processing_mode", mode).apply() }.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
                 RadioButton(selected = mode == "express", onClick = { mode = "express"; prefs.edit().putString("processing_mode", mode).apply() }, colors = RadioButtonDefaults.colors(selectedColor = SettingsCyan))
                 Column(Modifier.padding(start = 8.dp)) { Text("Express", color = Color.White, fontWeight = FontWeight.SemiBold); Text("Direct USSD dial (default)", color = SettingsMuted, style = MaterialTheme.typography.bodySmall) }
@@ -157,8 +157,8 @@ fun BingwaPulseSettingsScreen(onNavigate: (String) -> Unit) {
                 Column(Modifier.padding(start = 8.dp)) { Text("Advanced", color = Color.White, fontWeight = FontWeight.SemiBold); Text("Menu navigation (requires Accessibility)", color = SettingsMuted, style = MaterialTheme.typography.bodySmall) }
             }
         } }
-        item { heading("Permissions & automation") }
-        item { group {
+        item { sectionTitle("Permissions & automation") }
+        item { settingsGroup {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("App notifications · ${if (notificationGranted) "ALLOWED" else "BLOCKED"}", color = Color.White, fontWeight = FontWeight.SemiBold)
                 Button(onClick = { if (Build.VERSION.SDK_INT >= 33 && !notificationGranted) notificationLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS) else context.startActivity(Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)) }, modifier = Modifier.fillMaxWidth()) { Text(if (notificationGranted) "Open notification settings" else "Allow app notifications") }
@@ -171,17 +171,17 @@ fun BingwaPulseSettingsScreen(onNavigate: (String) -> Unit) {
                 OutlinedButton(onClick = { refresh++ }, modifier = Modifier.fillMaxWidth()) { Text("Refresh permission status") }
             }
         } }
-        item { heading("Account settings") }
-        item { group {
-            item("♙", "Profile Information", "Update your personal details", { onNavigate("Account & Session") })
+        item { sectionTitle("Account settings") }
+        item { settingsGroup {
+            settingRow("♙", "Profile Information", "Update your personal details", { onNavigate("Account & Session") })
             HorizontalDivider(color = Color(0xFF202B38))
-            item("▣", "Security", "Manage your account security and PIN", { onNavigate("Account & Session") })
+            settingRow("▣", "Security", "Manage your account security and PIN", { onNavigate("Account & Session") })
         } }
-        item { heading("Support") }
-        item { group {
-            item("↓", "Updates", "Check the latest app version", { onNavigate("Updates") })
+        item { sectionTitle("Support") }
+        item { settingsGroup {
+            settingRow("↓", "Updates", "Check the latest app version", { onNavigate("Updates") })
             HorizontalDivider(color = Color(0xFF202B38))
-            item("ⓘ", "About BingwaPulse", "App version and information", { onNavigate("About BingwaPulse") })
+            settingRow("ⓘ", "About BingwaPulse", "App version and information", { onNavigate("About BingwaPulse") })
         } }
         item { Text("Settings are saved on this device. Android special permissions must be granted in system settings.", color = SettingsMuted, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(8.dp)) }
     }
