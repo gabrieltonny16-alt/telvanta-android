@@ -86,6 +86,17 @@ class LocalDatabase(context: Context) : SQLiteOpenHelper(context, "telvanta.db",
         if (id == null) writableDatabase.insertOrThrow("customers", null, v)
         else writableDatabase.update("customers", v, "id=?", arrayOf(id.toString()))
     }
+    fun upsertCustomer(name: String, phone: String, notes: String = "") {
+        require(name.isNotBlank() && phone.isNotBlank())
+        val values = ContentValues().apply {
+            put("name", name.trim())
+            put("phone", phone.trim())
+            put("notes", notes.trim())
+        }
+        val db = writableDatabase
+        val updated = db.update("customers", values, "phone=?", arrayOf(phone.trim()))
+        if (updated == 0) db.insertOrThrow("customers", null, values)
+    }
     fun deleteCustomer(id: Long) { writableDatabase.delete("customers", "id=?", arrayOf(id.toString())) }
     fun orders(): List<OrderRow> = readableDatabase.rawQuery("SELECT id,customer_phone,offer_name,selling_price,status,created_at FROM orders ORDER BY id DESC", null).use { c ->
         buildList { while(c.moveToNext()) add(OrderRow(c.getLong(0),c.getString(1),c.getString(2),c.getDouble(3),c.getString(4),c.getLong(5))) }
