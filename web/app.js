@@ -331,7 +331,7 @@ function siteLinkModal(existing = null) {
     html: '<label>Store name<input name="display_name" maxlength="120" value="' + escapeHtml(row.display_name || state.business.name) + '" required></label>' +
       '<label>Username<input name="slug" id="siteLinkUsername" maxlength="49" pattern="[A-Za-z0-9_]{3,49}" value="' + escapeHtml(username) + '" autocomplete="off" required><small id="usernameStatus" class="form-hint">Letters, numbers and underscores only. 3–49 characters.</small></label>' +
       '<label>Payout account<select name="payout_type" id="payoutType"><option value="till"' + (payoutType === "till" ? " selected" : "") + '>Till Number</option><option value="paybill"' + (payoutType === "paybill" ? " selected" : "") + '>PayBill</option></select></label>' +
-      '<label id="tillField">Till Number<input name="till_number" inputmode="numeric" pattern="[0-9]{4,20}" maxlength="20" value="' + escapeHtml(row.till_number || "1561763") + '"></label>' +
+      '<label id="tillField">Till Number<input name="till_number" inputmode="numeric" pattern="[0-9]{4,20}" maxlength="20" value="' + escapeHtml(row.till_number || "") + '"></label>' +
       '<label id="paybillField">PayBill Number<input name="paybill_number" inputmode="numeric" pattern="[0-9]{4,20}" maxlength="20" value="' + escapeHtml(row.paybill_number || "") + '"></label>' +
       '<label id="accountField">PayBill Account Number<input name="paybill_account_number" maxlength="40" value="' + escapeHtml(row.paybill_account_number || "") + '"></label>' +
       '<div id="storeUrlPreview" class="form-hint"></div><input type="hidden" name="record_id" value="' + escapeHtml(row.id || "") + '">'
