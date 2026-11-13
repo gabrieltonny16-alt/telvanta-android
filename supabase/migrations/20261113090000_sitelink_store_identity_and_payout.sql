@@ -20,13 +20,25 @@ alter table public.site_links
 alter table public.site_links
   add constraint site_links_payout_details_check
   check (
+    (till_number is null and paybill_number is null and paybill_account_number is null)
+    or
     (payout_type = 'till'
-      and till_number ~ '^[0-9]{4,20}$'
+      and till_number ~ '^[0-9]{4,20}
+  ) not valid;
+
+-- Keep existing rows valid during rollout; new/updated records must satisfy payout details.
+alter table public.site_links validate constraint site_links_payout_details_check;
+
       and paybill_number is null
       and paybill_account_number is null)
     or
     (payout_type = 'paybill'
-      and paybill_number ~ '^[0-9]{4,20}$'
+      and paybill_number ~ '^[0-9]{4,20}
+  ) not valid;
+
+-- Keep existing rows valid during rollout; new/updated records must satisfy payout details.
+alter table public.site_links validate constraint site_links_payout_details_check;
+
       and paybill_account_number is not null
       and length(trim(paybill_account_number)) between 1 and 40
       and till_number is null)
