@@ -129,17 +129,17 @@ private fun BingwaAuthScreen(store: SecureSessionStore, api: BingwaSupabaseApi, 
                                     message = "Email verified. Set up your business workspace."
                                 }
                             } else {
-                            if (code.length !in 6..8) throw IllegalArgumentException("Enter the verification code sent to your phone.")
-                            val verified = withContext(Dispatchers.IO) { api.verifyPhoneOtp(identifier, code) }
-                            store.save(verified)
-                            val businessId = withContext(Dispatchers.IO) { api.firstBusinessId(verified) }
-                            if (businessId != null) {
-                                store.save(verified.copy(businessId = businessId))
-                                onComplete()
-                            } else {
-                                session = verified
-                                message = "Phone verified. Set up your business workspace."
-                            }
+                                if (code.length !in 6..8) throw IllegalArgumentException("Enter the verification code sent to your phone.")
+                                val verified = withContext(Dispatchers.IO) { api.verifyPhoneOtp(identifier, code) }
+                                store.save(verified)
+                                val businessId = withContext(Dispatchers.IO) { api.firstBusinessId(verified) }
+                                if (businessId != null) {
+                                    store.save(verified.copy(businessId = businessId))
+                                    onComplete()
+                                } else {
+                                    session = verified
+                                    message = "Phone verified. Set up your business workspace."
+                                }
                             }
                         } else {
                             if (identifier.isBlank() || password.length < 8) {
