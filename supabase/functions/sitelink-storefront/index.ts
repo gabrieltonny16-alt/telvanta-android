@@ -21,7 +21,7 @@ function normalizePhone(value: unknown): string | null {
 }
 
 async function getStore(slug: string) {
-  if (!/^[a-z0-9][a-z0-9-]{2,48}$/.test(slug)) return { error: "This store link is invalid.", status: 400 };
+  if (!/^[a-zA-Z0-9_-]{3,49}$/.test(slug)) return { error: "This store link is invalid.", status: 400 };
   const { data: link, error } = await db.from("site_links")
     .select("business_id,agent_user_id,slug,display_name,businesses(name)")
     .eq("slug", slug).eq("is_active", true).maybeSingle();
