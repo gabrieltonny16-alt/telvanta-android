@@ -206,6 +206,9 @@ private fun BingwaPulseApp(db: LocalDatabase) {
                         "Updates" -> UpdatesScreen()
                         "Device Activation" -> PermissionSetupScreen()
                         "Settings" -> BingwaPulseSettingsScreen { destination -> selected = destination }
+                        "Authorized Senders" -> MessageProcessingRulesScreen("Authorized Senders") { message = it }
+                        "Blacklist" -> MessageProcessingRulesScreen("Blacklist") { message = it }
+                        "Contact Name Tag" -> ContactNameTagScreen { message = it }
                         else -> FeatureWorkspaceScreen(selected)
                     }
                     }
