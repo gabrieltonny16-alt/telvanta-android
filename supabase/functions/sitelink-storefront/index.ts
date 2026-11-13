@@ -20,8 +20,14 @@ function normalizePhone(value: unknown): string | null {
   return null;
 }
 
-async function getStore(slug: string) {
-  if (!/^[a-zA-Z0-9_-]{3,49}$/.test(slug)) return { error: "This store link is invalid.", status: 400 };
+function normalizeSlug(value: unknown): string | null {
+  const slug = String(value ?? "").trim().toUpperCase();
+  return /^[A-Z0-9_-]{3,49}$/.test(slug) ? slug : null;
+}
+
+async function getStore(rawSlug: string) {
+  const slug = normalizeSlug(rawSlug);
+  if (!slug) return { error: "This store link is invalid.", status: 400 };
   const { data: link, error } = await db.from("site_links")
     .select("business_id,agent_user_id,slug,display_name,businesses(name)")
     .eq("slug", slug).eq("is_active", true).maybeSingle();
@@ -59,7 +65,8 @@ Deno.serve(async (req: Request) => {
     if (raw.length > 6000) return json({ error: "Request is too large." }, 413);
     let body: any;
     try { body = JSON.parse(raw); } catch { return json({ error: "Invalid request body." }, 400); }
-    const slug = String(body.slug ?? "");
+    const slug = normalizeSlug(body.slug);
+    if (!slug) return json({ error: "This store link is invalid." }, 400);
     const offerId = String(body.offer_id ?? "");
     const recipient = normalizePhone(body.recipient_phone);
     const payer = normalizePhone(body.payer_phone);
