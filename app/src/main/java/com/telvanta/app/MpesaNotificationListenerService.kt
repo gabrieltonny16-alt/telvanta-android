@@ -88,6 +88,7 @@ class MpesaNotificationListenerService : NotificationListenerService() {
         val receipt = parsed.receiptCode ?: extractReceipt(text)
         val amount = extractAmount(text)
         val sender = parsed.senderPhone ?: extractSenderPhone(text)
+        if (!isSenderAllowed(sender)) return
         val senderName = parsed.senderName
         val completeness = when {
             parsed.isTillConfirmation && receipt != null && amount != null && sender != null -> "REVIEW_READY"
@@ -112,6 +113,24 @@ class MpesaNotificationListenerService : NotificationListenerService() {
         postCapturedPaymentAlert(receipt, amount, completeness)
     }
 
+
+    private fun isSenderAllowed(sender: String?): Boolean {
+        val normalized = sender.orEmpty().filter(Char::isDigit).let { digits ->
+            when {
+                digits.startsWith("254") && digits.length == 12 -> digits
+                digits.startsWith("0") && digits.length == 10 -> "254" + digits.drop(1)
+                digits.length == 9 -> "254$digits"
+                else -> digits
+            }
+        }
+        val settings = getSharedPreferences("bingwapulse_settings", MODE_PRIVATE)
+        val blocked = settings.getStringSet("blacklisted_senders", emptySet()).orEmpty()
+            .map { it.filter(Char::isDigit) }.toSet()
+        if (normalized.isNotBlank() && normalized in blocked) return false
+        val authorized = settings.getStringSet("authorized_senders", emptySet()).orEmpty()
+            .map { it.filter(Char::isDigit) }.toSet()
+        return authorized.isEmpty() || (normalized.isNotBlank() && normalized in authorized)
+    }
 
     private fun ensureActivityChannel() {
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
@@ -145,6 +164,7 @@ class MpesaNotificationListenerService : NotificationListenerService() {
         val prefs = getSharedPreferences(PREFS, MODE_PRIVATE)
         val rawText = prefs.getString(KEY_TEXT, "").orEmpty()
         if (rawText.isBlank()) return
+        if (!isSenderAllowed(prefs.getString(KEY_SENDER_PHONE, "").orEmpty().ifBlank { null })) return
         val status = prefs.getString(KEY_SYNC_STATUS, "").orEmpty()
         if (status == "SYNCED") return
         enqueueRelay(
