@@ -366,7 +366,8 @@ function siteLinkModal(existing = null) {
     status.textContent = "Checking username…";
     status.className = "form-hint";
     try {
-      const { data, error } = await supabase.from("site_links").select("id").ilike("slug", value).limit(1);
+      const escapedValue = value.replace(/[\\%_]/g, "\\\\const { data, error } = await supabase.from("site_links").select("id").ilike("slug", value).limit(1);");
+      const { data, error } = await supabase.from("site_links").select("id").ilike("slug", escapedValue).limit(1);
       if (sequence !== checkSequence) return;
       if (error) throw error;
       const available = !data?.some(item => item.id !== row.id);
