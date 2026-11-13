@@ -82,14 +82,30 @@ class MpesaNotificationListenerService : NotificationListenerService() {
         val parsed = MpesaReceiptParser.parse(title, text)
         val settings = getSharedPreferences("bingwapulse_settings", MODE_PRIVATE)
         val isTillConfirmation = parsed.isTillConfirmation
-        val processingEnabled = if (isTillConfirmation) settings.getBoolean("process_till", true)
-            else settings.getBoolean("process_mpesa", true)
+        val isPaybillConfirmation = Regex("""(?i)\\bpaybill\\b""").containsMatchIn(text) ||
+            Regex("""(?i)\\baccount\\s*(?:number|no\\.?|:)""").containsMatchIn(text)
+        val isSiteLinkConfirmation = Regex("""(?i)\\b(?:sitelink|bingwapulse\\s+store|online\\s+store\\s+order)\\b""")
+            .containsMatchIn(source + " " + text)
+        val processingEnabled = when {
+            isSiteLinkConfirmation -> settings.getBoolean("process_sitelink", true)
+            isPaybillConfirmation -> settings.getBoolean("process_paybill", false)
+            isTillConfirmation -> settings.getBoolean("process_till", true)
+            else -> settings.getBoolean("process_mpesa", true)
+        }
         if (!processingEnabled) return
         val receipt = parsed.receiptCode ?: extractReceipt(text)
         val amount = extractAmount(text)
         val sender = parsed.senderPhone ?: extractSenderPhone(text)
         if (!isSenderAllowed(sender)) return
         val senderName = parsed.senderName
+        if (settings.getBoolean("auto_save_contacts", true) && !sender.isNullOrBlank()) {
+            val prefix = settings.getString("contact_name_prefix", "").orEmpty().trim()
+            val suffix = settings.getString("contact_name_suffix", "Bingwa").orEmpty().trim()
+            val separator = settings.getString("contact_name_separator", " ").orEmpty()
+            val baseName = senderName?.trim().takeUnless { it.isNullOrBlank() } ?: sender
+            val taggedName = listOf(prefix, baseName, suffix).filter { it.isNotBlank() }.joinToString(separator)
+            runCatching { LocalDatabase(applicationContext).upsertCustomer(taggedName, sender) }
+        }
         val completeness = when {
             parsed.isTillConfirmation && receipt != null && amount != null && sender != null -> "REVIEW_READY"
             receipt != null || amount != null || sender != null || senderName != null -> "PARTIAL_CANDIDATE"
