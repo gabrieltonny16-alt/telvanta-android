@@ -51,11 +51,11 @@ fun BingwaPulseSettingsScreen(onNavigate: (String) -> Unit) {
     val notificationLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { refresh++ }
 
     fun save(key: String, value: Boolean) { prefs.edit().putBoolean(key, value).apply() }
-    @Composable fun heading(text: String) {
+    @Composable fun sectionTitle(text: String) {
         Text(text.uppercase(), color = SettingsMuted, fontWeight = FontWeight.Bold, letterSpacing = 1.2.sp,
             style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(start = 4.dp, top = 12.dp, bottom = 2.dp))
     }
-    @Composable fun item(icon: String, title: String, detail: String, action: () -> Unit) {
+    @Composable fun settingRow(icon: String, title: String, detail: String, action: () -> Unit) {
         Row(Modifier.fillMaxWidth().clickable(onClick = action).padding(horizontal = 14.dp, vertical = 15.dp),
             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(13.dp)) {
             Surface(color = Color(0xFF103642), shape = RoundedCornerShape(12.dp), modifier = Modifier.size(42.dp)) {
@@ -68,7 +68,7 @@ fun BingwaPulseSettingsScreen(onNavigate: (String) -> Unit) {
             Text("›", color = SettingsMuted, style = MaterialTheme.typography.headlineSmall)
         }
     }
-    @Composable fun toggle(title: String, detail: String, checked: Boolean, change: (Boolean) -> Unit) {
+    @Composable fun settingToggle(title: String, detail: String, checked: Boolean, change: (Boolean) -> Unit) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
@@ -78,7 +78,7 @@ fun BingwaPulseSettingsScreen(onNavigate: (String) -> Unit) {
             Switch(checked = checked, onCheckedChange = change)
         }
     }
-    @Composable fun group(content: @Composable ColumnScope.() -> Unit) {
+    @Composable fun settingsGroup(content: @Composable ColumnScope.() -> Unit) {
         Card(colors = CardDefaults.cardColors(containerColor = SettingsCard), shape = RoundedCornerShape(17.dp),
             modifier = Modifier.fillMaxWidth(), content = { Column(content = content) })
     }
@@ -110,9 +110,9 @@ fun BingwaPulseSettingsScreen(onNavigate: (String) -> Unit) {
                 }
             }
         }
-        item { heading("Agent tools") }
-        item { group {
-            item("▣", "EngageBot", "Recover sales and engage customers", { onNavigate("EngageBot") })
+        item { sectionTitle("Agent tools") }
+        item { settingsGroup {
+            settingRow("▣", "EngageBot", "Recover sales and engage customers", { onNavigate("EngageBot") })
             HorizontalDivider(color = Color(0xFF202B38))
             item("▤", "SIM Setup", "Choose SIMs for payments and USSD", { onNavigate("Quick Dial") })
             HorizontalDivider(color = Color(0xFF202B38))
@@ -124,7 +124,7 @@ fun BingwaPulseSettingsScreen(onNavigate: (String) -> Unit) {
         } }
         item { heading("Message processing") }
         item { group {
-            toggle("Process M-PESA Messages", "Read matching payment notifications", processMpesa) { processMpesa = it; save("process_mpesa", it) }
+            settingToggle("Process M-PESA Messages", "Read matching payment notifications", processMpesa) { processMpesa = it; save("process_mpesa", it) }
             HorizontalDivider(color = Color(0xFF202B38))
             toggle("Process Till Messages", "Process Till / Buy Goods confirmations", processTill) { processTill = it; save("process_till", it) }
             HorizontalDivider(color = Color(0xFF202B38))
