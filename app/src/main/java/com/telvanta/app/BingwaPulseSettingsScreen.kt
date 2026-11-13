@@ -142,6 +142,8 @@ fun BingwaPulseSettingsScreen(onNavigate: (String) -> Unit) {
         } }
         item { sectionTitle("Customer tools") }
         item { settingsGroup { settingToggle("EngageBot", "Engage customers on eligible recommended offers", engageBot) { engageBot = it; save("engage_bot", it) } } }
+        item { sectionTitle("Device & activation") }
+        item { settingsGroup { settingRow("▣", "Device Activation", "View and manage this device activation", { onNavigate("Device Activation") }) } }
         item { sectionTitle("Connect Pulse") }
         item { settingsGroup { settingRow("⌁", "Connect Pulse", "Pair and manage your M-PESA companion phone", { onNavigate("Connect Pulse") }) } }
         item { sectionTitle("Offline readiness") }
