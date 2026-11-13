@@ -205,7 +205,7 @@ private fun BingwaPulseApp(db: LocalDatabase) {
                         "Connect Pulse" -> ConnectPulseScreen()
                         "Updates" -> UpdatesScreen()
                         "Device Activation" -> PermissionSetupScreen()
-                        "Settings" -> UssdAutomationSettingsScreen()
+                        "Settings" -> BingwaPulseSettingsScreen { destination -> selected = destination }
                         else -> FeatureWorkspaceScreen(selected)
                     }
                     }
