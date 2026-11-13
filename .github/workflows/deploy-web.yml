@@ -3,7 +3,7 @@ name: Publish BingwaPulse web dashboard
 on:
   push:
     branches:
-      - feature/vecta-branding
+      - feature/app-wide-ui-ux-cleanup
     paths:
       - "web/**"
       - ".github/workflows/deploy-web.yml"
