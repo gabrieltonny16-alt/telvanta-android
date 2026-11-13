@@ -161,21 +161,24 @@ function renderSiteLinks() {
   const linkRows = state.siteLinks.map(link => {
     const target = new URL("./sitelink/", location.href);
     target.searchParams.set("slug", link.slug);
-    return "<tr><td><strong>" + escapeHtml(link.display_name || state.business.name) + "</strong><small class='muted-cell'>" + escapeHtml(link.slug) + "</small></td><td>" + statusPill(link.is_active ? "active" : "paused") + "</td><td><button class='button outline small' data-action='copy-sitelink' data-url='" + escapeHtml(target.toString()) + "'>Copy link</button> <button class='button subtle small' data-action='toggle-sitelink' data-id='" + escapeHtml(link.id) + "'>" + (link.is_active ? "Pause" : "Activate") + "</button></td></tr>";
+    const payout = link.payout_type === "paybill"
+      ? "PayBill " + (link.paybill_number || "—") + (link.paybill_account_number ? " · Account " + link.paybill_account_number : "")
+      : "Till " + (link.till_number || "—");
+    return "<tr><td><strong>" + escapeHtml(link.display_name || state.business.name) + "</strong><small class='muted-cell'>@" + escapeHtml(link.slug) + " · " + escapeHtml(payout) + "</small></td><td>" + statusPill(link.is_active ? "active" : "paused") + "</td><td><button class='button outline small' data-action='copy-sitelink' data-url='" + escapeHtml(target.toString()) + "'>Copy link</button> <button class='button outline small' data-action='edit-sitelink' data-id='" + escapeHtml(link.id) + "'>Edit</button> <button class='button subtle small' data-action='toggle-sitelink' data-id='" + escapeHtml(link.id) + "'>" + (link.is_active ? "Pause" : "Activate") + "</button></td></tr>";
   });
   const agentRows = state.agentOffers.filter(row => row.agent_user_id === currentUser).map(row =>
     "<tr><td><strong>" + escapeHtml(row.offers?.name || "Offer") + "</strong><small class='muted-cell'>" + escapeHtml(row.offers?.category || "") + "</small></td><td>" + kes(row.selling_price_kes) + "</td><td>" + statusPill(row.is_published ? "published" : "hidden") + "</td><td><button class='button outline small' data-action='toggle-agent-offer' data-id='" + escapeHtml(row.id) + "'>" + (row.is_published ? "Hide" : "Publish") + "</button></td></tr>"
   );
   const canManage = ["owner", "business_admin", "agent_manager"].includes(state.role);
-  const createButton = canManage && !ownLink ? '<button class="button primary small" data-action="new-sitelink">Create my SiteLink</button>' : "";
+  const createButton = canManage && !ownLink ? '<button class="button primary small" data-action="new-sitelink">Register my store</button>' : "";
   const assignButton = canManage ? '<button class="button outline small" data-action="new-agent-offer">Add offer to my store</button>' : "";
   $("pageContent").innerHTML =
-    '<div class="section-heading"><div><h2>Public SiteLink storefront</h2><p>Create a separate customer-facing shop. Your management dashboard remains private.</p></div>' + createButton + '</div>' +
-    '<div class="notice"><strong>Safe order requests:</strong> customers can submit a pending request only. This storefront does not collect payment, verify M-PESA, or trigger bundle delivery.</div>' +
-    tableMarkup(["Store name / slug", "Status", "Actions"], linkRows, "No SiteLink created", "Create a store link for your signed-in account.") +
+    '<div class="section-heading"><div><h2>Store registration & management</h2><p>Register your public store, choose its username and set the M-PESA payout destination.</p></div>' + createButton + '</div>' +
+    '<div class="notice"><strong>Storefront safety:</strong> customer requests remain pending. This setup does not collect payments, verify M-PESA or trigger bundle delivery.</div>' +
+    tableMarkup(["Store / username / payout", "Status", "Actions"], linkRows, "No store registered", "Register your store to create its customer-facing link.") +
     '<div class="section-heading"><div><h2>My published offers</h2><p>Only active offers that you publish here appear in your customer storefront.</p></div>' + assignButton + '</div>' +
     tableMarkup(["Offer", "Selling price", "Visibility", "Action"], agentRows, "No offers assigned", "Add an active offer and choose the selling price before publishing it.") +
-    '<p class="empty-note">A public store shows no offers until an offer is active and published. Pausing a SiteLink hides its catalogue.</p>';
+    '<p class="empty-note">Pausing a store hides its catalogue. Editing store details does not change existing orders.</p>';
 }
 
 function renderPage() {
@@ -225,7 +228,7 @@ async function loadWorkspaceData() {
     rowsFor("payment_offer_rules", "id,amount_minor,menu_entry_code,is_enabled,menu_flow_verified_at,created_at,offers(name)", id),
     rowsFor("payment_ingress_channels", "id,shortcode,channel_type,is_active,created_at", id),
     rowsFor("devices", "id,device_label,platform,status,last_seen_at,created_at", id),
-    rowsFor("site_links", "id,agent_user_id,slug,display_name,is_active,created_at", id),
+    rowsFor("site_links", "id,agent_user_id,slug,display_name,payout_type,till_number,paybill_number,paybill_account_number,is_active,created_at", id),
     rowsFor("agent_offers", "id,offer_id,agent_user_id,selling_price_kes,is_published,created_at,offers(id,name,category,is_active)", id)
   ]);
   [state.metrics.orders, state.metrics.offers, state.metrics.customers, state.metrics.providers,
@@ -317,12 +320,68 @@ function ruleModal() {
     html: '<label>Offer<select name="offer_id" required>' + choices + '</select></label><label>Customer payment amount (KES)<input name="amount_kes" type="number" min="1" step="1" required></label><label>Confirmed USSD entry code<input name="menu_entry_code" placeholder="e.g. *xxx#" pattern="\\*[0-9*]+#" required></label><p class="empty-note">Menu steps and verification remain empty. Automatic fulfilment remains disabled until the real menu flow is captured and reviewed.</p>'
   }, "Save inactive rule");
 }
-function siteLinkModal() {
-  const suggested = slugify(state.business.slug + "-" + (state.session?.user?.email || "agent").split("@")[0]);
-  openModal("Create your SiteLink", "Create a public store for your account. It starts paused until you activate it.", {
+function siteLinkModal(existing = null) {
+  const suggested = (state.business.name || "MY_STORE").toUpperCase().replace(/[^A-Z0-9]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 40) || "MY_STORE";
+  const row = existing || {};
+  const username = row.slug || suggested;
+  const payoutType = row.payout_type || "till";
+  const isEdit = Boolean(row.id);
+  openModal(isEdit ? "Edit store" : "Register your store", "Choose your public store identity and the M-PESA account where customers should pay you. The store starts paused until you activate it.", {
     kind: "sitelink",
-    html: '<label>Store display name<input name="display_name" maxlength="120" value="' + escapeHtml(state.business.name) + '"></label><label>Public link slug<input name="slug" maxlength="49" pattern="[a-z0-9][a-z0-9-]{2,48}" value="' + escapeHtml(suggested) + '" required></label>'
-  }, "Create paused store");
+    html: '<label>Store name<input name="display_name" maxlength="120" value="' + escapeHtml(row.display_name || state.business.name) + '" required></label>' +
+      '<label>Username<input name="slug" id="siteLinkUsername" maxlength="49" pattern="[A-Za-z0-9_]{3,49}" value="' + escapeHtml(username) + '" autocomplete="off" required><small id="usernameStatus" class="form-hint">Letters, numbers and underscores only. 3–49 characters.</small></label>' +
+      '<label>Payout account<select name="payout_type" id="payoutType"><option value="till"' + (payoutType === "till" ? " selected" : "") + '>Till Number</option><option value="paybill"' + (payoutType === "paybill" ? " selected" : "") + '>PayBill</option></select></label>' +
+      '<label id="tillField">Till Number<input name="till_number" inputmode="numeric" pattern="[0-9]{4,20}" maxlength="20" value="' + escapeHtml(row.till_number || "1561763") + '"></label>' +
+      '<label id="paybillField">PayBill Number<input name="paybill_number" inputmode="numeric" pattern="[0-9]{4,20}" maxlength="20" value="' + escapeHtml(row.paybill_number || "") + '"></label>' +
+      '<label id="accountField">PayBill Account Number<input name="paybill_account_number" maxlength="40" value="' + escapeHtml(row.paybill_account_number || "") + '"></label>' +
+      '<div id="storeUrlPreview" class="form-hint"></div><input type="hidden" name="record_id" value="' + escapeHtml(row.id || "") + '">'
+  }, isEdit ? "Update store" : "Register store");
+  const form = $("modalContent").querySelector('[data-modal-form="sitelink"]');
+  const usernameInput = $("siteLinkUsername");
+  const status = $("usernameStatus");
+  const payout = $("payoutType");
+  const syncPayout = () => {
+    $("tillField").hidden = payout.value !== "till";
+    $("paybillField").hidden = payout.value !== "paybill";
+    $("accountField").hidden = payout.value !== "paybill";
+  };
+  const preview = () => {
+    const value = usernameInput.value.trim().toUpperCase();
+    $("storeUrlPreview").textContent = value ? "Store URL: " + new URL("./sitelink/?slug=" + encodeURIComponent(value), location.href).toString() : "";
+  };
+  let checkSequence = 0;
+  const checkUsername = async () => {
+    const value = usernameInput.value.trim().toUpperCase();
+    if (!/^[A-Z0-9_]{3,49}$/.test(value)) {
+      status.textContent = "Use 3–49 letters, numbers or underscores.";
+      status.className = "form-hint error";
+      preview(); return;
+    }
+    if (value === String(row.slug || "").toUpperCase()) {
+      status.textContent = "Current username";
+      status.className = "form-hint success";
+      preview(); return;
+    }
+    const sequence = ++checkSequence;
+    status.textContent = "Checking username…";
+    status.className = "form-hint";
+    try {
+      const { data, error } = await supabase.from("site_links").select("id").ilike("slug", value).limit(1);
+      if (sequence !== checkSequence) return;
+      if (error) throw error;
+      const available = !data?.some(item => item.id !== row.id);
+      status.textContent = available ? "Username is available" : "Username is already taken";
+      status.className = "form-hint " + (available ? "success" : "error");
+    } catch {
+      status.textContent = "Could not check availability. Saving will still be checked securely.";
+      status.className = "form-hint";
+    }
+    preview();
+  };
+  usernameInput.addEventListener("input", preview);
+  usernameInput.addEventListener("blur", checkUsername);
+  payout.addEventListener("change", syncPayout);
+  syncPayout(); preview();
 }
 function agentOfferModal() {
   const available = state.offers.filter(o => o.is_active && !state.agentOffers.some(a => a.agent_user_id === state.session?.user?.id && a.offer_id === o.id));
@@ -355,9 +414,27 @@ async function submitModal(form) {
     if (!/^[0-9]{4,20}$/.test(shortcode)) throw new Error("Enter a valid Till or PayBill number.");
     result = await supabase.from("payment_ingress_channels").insert({ business_id, shortcode, channel_type: values.channel_type, is_active: false });
   } else if (form.dataset.modalForm === "sitelink") {
-    const slug = values.slug.trim().toLowerCase();
-    if (!/^[a-z0-9][a-z0-9-]{2,48}$/.test(slug)) throw new Error("Use 3–49 lowercase letters, numbers or hyphens for the link.");
-    result = await supabase.from("site_links").insert({ business_id, agent_user_id: state.session.user.id, slug, display_name: values.display_name.trim() || state.business.name, is_active: false });
+    const slug = values.slug.trim().toUpperCase();
+    if (!/^[A-Z0-9_]{3,49}$/.test(slug)) throw new Error("Use 3–49 letters, numbers or underscores for the username.");
+    const payoutType = values.payout_type;
+    const till = values.till_number.trim();
+    const paybill = values.paybill_number.trim();
+    const account = values.paybill_account_number.trim();
+    if (payoutType === "till" && !/^[0-9]{4,20}$/.test(till)) throw new Error("Enter a valid Till Number.");
+    if (payoutType === "paybill" && (!/^[0-9]{4,20}$/.test(paybill) || !account || account.length > 40)) throw new Error("Enter a valid PayBill number and account number.");
+    const recordId = values.record_id.trim();
+    const { data: collision, error: collisionError } = await supabase.from("site_links").select("id").ilike("slug", slug).limit(1);
+    if (collisionError) throw collisionError;
+    if (collision?.some(item => item.id !== recordId)) throw new Error("That username is already taken. Choose another one.");
+    const payload = {
+      slug, display_name: values.display_name.trim(), payout_type: payoutType,
+      till_number: payoutType === "till" ? till : null,
+      paybill_number: payoutType === "paybill" ? paybill : null,
+      paybill_account_number: payoutType === "paybill" ? account : null
+    };
+    result = recordId
+      ? await supabase.from("site_links").update(payload).eq("id", recordId).eq("business_id", business_id).eq("agent_user_id", state.session.user.id)
+      : await supabase.from("site_links").insert({ ...payload, business_id, agent_user_id: state.session.user.id, is_active: false });
   } else if (form.dataset.modalForm === "agent-offer") {
     const price = Number(values.selling_price_kes);
     if (!Number.isSafeInteger(price) || price < 0) throw new Error("Enter a whole-number selling price in KES.");
@@ -427,11 +504,16 @@ document.addEventListener("click", async (event) => {
       }
       break;
     }
+    case "edit-sitelink": {
+      const row = state.siteLinks.find(x => x.id === action.dataset.id);
+      if (row) siteLinkModal(row);
+      break;
+    }
     case "toggle-sitelink": {
       const row = state.siteLinks.find(x => x.id === action.dataset.id);
       if (row) {
         const { error } = await supabase.from("site_links").update({ is_active: !row.is_active }).eq("id", row.id).eq("business_id", state.business.id);
-        if (error) flash(error.message, true); else { flash("SiteLink status updated."); await loadWorkspaceData(); }
+        if (error) flash(error.message, true); else { flash("Store status updated."); await loadWorkspaceData(); }
       }
       break;
     }
