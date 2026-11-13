@@ -80,6 +80,11 @@ class MpesaNotificationListenerService : NotificationListenerService() {
         if (!looksLikeMpesa || text.isBlank()) return
 
         val parsed = MpesaReceiptParser.parse(title, text)
+        val settings = getSharedPreferences("bingwapulse_settings", MODE_PRIVATE)
+        val isTillConfirmation = parsed.isTillConfirmation
+        val processingEnabled = if (isTillConfirmation) settings.getBoolean("process_till", true)
+            else settings.getBoolean("process_mpesa", true)
+        if (!processingEnabled) return
         val receipt = parsed.receiptCode ?: extractReceipt(text)
         val amount = extractAmount(text)
         val sender = parsed.senderPhone ?: extractSenderPhone(text)
