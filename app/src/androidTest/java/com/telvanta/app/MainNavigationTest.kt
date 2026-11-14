@@ -1,7 +1,7 @@
 package com.telvanta.app
 
 import android.content.Context
-import androidx.compose.ui.test.assertExists
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -37,24 +37,24 @@ class MainNavigationTest {
 
     @Test
     fun drawerAndBottomNavigationOpenTheirExpectedScreens() {
-        composeRule.onNodeWithText("DASHBOARD").assertExists()
+        composeRule.onNodeWithText("DASHBOARD").assertIsDisplayed()
 
         composeRule.onNodeWithText("≡").performClick()
         composeRule.onNodeWithText("Customers").performClick()
-        composeRule.onNodeWithText("CUSTOMERS").assertExists()
+        composeRule.onNodeWithText("CUSTOMERS").assertIsDisplayed()
 
         composeRule.onNodeWithText("≡").performClick()
         composeRule.onNodeWithText("Signature").performClick()
-        composeRule.onNodeWithText("SIGNATURE").assertExists()
+        composeRule.onNodeWithText("SIGNATURE").assertIsDisplayed()
 
         composeRule.onNodeWithText("≡").performClick()
         composeRule.onNodeWithText("Offers").performClick()
-        composeRule.onNodeWithText("OFFERS").assertExists()
+        composeRule.onNodeWithText("OFFERS").assertIsDisplayed()
 
         composeRule.onNodeWithText("Transactions").performClick()
-        composeRule.onNodeWithText("TRANSACTION HISTORY").assertExists()
+        composeRule.onNodeWithText("TRANSACTION HISTORY").assertIsDisplayed()
 
         composeRule.onNodeWithText("Wallet").performClick()
-        composeRule.onNodeWithText("WALLET").assertExists()
+        composeRule.onNodeWithText("WALLET").assertIsDisplayed()
     }
 }
