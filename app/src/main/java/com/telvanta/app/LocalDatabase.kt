@@ -45,6 +45,11 @@ class LocalDatabase(context: Context) : SQLiteOpenHelper(context, "telvanta.db",
     }
     fun saveOffer(id: Long?, name: String, category: String, price: Double, originalPrice: Double? = null, source: String = "Manual", verified: Boolean = false, active: Boolean = false, ussdCode: String = "", duration: String = "", sourceId: String = "", simProfile: String = "", tags: String = "") {
         require(name.isNotBlank() && category.isNotBlank() && price >= 0 && (originalPrice == null || originalPrice >= 0) && source.isNotBlank())
+        val duplicatePrice = readableDatabase.rawQuery(
+            "SELECT id FROM offers WHERE selling_price=? AND id<>? LIMIT 1",
+            arrayOf(price.toString(), (id ?: -1L).toString())
+        ).use { it.moveToFirst() }
+        require(!duplicatePrice) { "KES ${price} is already assigned to another offer. Every offer must have a unique selling price." }
         val v = ContentValues().apply {
             put("name", name.trim()); put("category", category.trim()); put("selling_price", price)
             if (originalPrice == null) putNull("original_price") else put("original_price", originalPrice)
