@@ -1137,101 +1137,186 @@ private fun OffersScreen(db: LocalDatabase, onMessage: (String) -> Unit) {
 @Composable
 private fun CustomersScreen(db: LocalDatabase, onMessage: (String) -> Unit) {
     val context = LocalContext.current
-    var search by remember { mutableStateOf("") }
-    var filter by remember { mutableStateOf("All") }
-    var reload by remember { mutableIntStateOf(0) }
-    var showEditor by remember { mutableStateOf(false) }
-    var showSimulation by remember { mutableStateOf(false) }
     var editId by remember { mutableStateOf<Long?>(null) }
     var name by remember { mutableStateOf("") }
     var phone by remember { mutableStateOf("") }
     var notes by remember { mutableStateOf("") }
-    var simPhone by remember { mutableStateOf("") }
-    var simOffer by remember { mutableStateOf("") }
-    var simPrice by remember { mutableStateOf("") }
-    val all = remember(reload) { db.customers() }
+    var search by remember { mutableStateOf("") }
+    var filter by remember { mutableStateOf("All") }
+    var reload by remember { mutableIntStateOf(0) }
+    var showEditor by remember { mutableStateOf(false) }
+    var simulateCustomer by remember { mutableStateOf<CustomerRow?>(null) }
+    var simulatedOffer by remember { mutableStateOf("1GB - 1 Hr") }
+    var simulatedPrice by remember { mutableStateOf("20") }
+
+    val customers = remember(reload, search) { db.customers(search.trim()) }
     val orders = remember(reload) { db.orders() }
-    val key: (String) -> String = { it.filter { ch -> ch.isDigit() }.takeLast(9) }
-    val shown = all.filter { customer ->
-        val customerOrders = orders.filter { key(it.customer) == key(customer.phone) && key(customer.phone).isNotBlank() }
-        val recent = customerOrders.maxOfOrNull { it.createdAt }?.let { System.currentTimeMillis() - it < 30L * 86400000L } ?: false
-        val matches = search.isBlank() || customer.name.contains(search, true) || customer.phone.contains(search, true)
-        matches && when(filter) { "Frequent" -> customerOrders.size >= 5; "Recent" -> recent; "Blacklisted" -> false; else -> true }
+    val offers = remember(reload) { db.offers() }
+    val phoneKey: (String) -> String = { value -> value.filter { it.isDigit() }.takeLast(9) }
+    val recentCutoff = System.currentTimeMillis() - 30L * 24 * 60 * 60 * 1000
+    fun customerOrders(customer: CustomerRow) = orders.filter { phoneKey(it.customer) == phoneKey(customer.phone) && phoneKey(customer.phone).isNotBlank() }
+    val visibleCustomers = customers.filter { customer ->
+        val count = customerOrders(customer).size
+        when (filter) {
+            "Frequent" -> count >= 5 && !customer.blacklisted
+            "Recent" -> customerOrders(customer).any { it.createdAt >= recentCutoff } && !customer.blacklisted
+            "Blacklisted" -> customer.blacklisted
+            else -> true
+        }
     }
-    val dateFormat = remember { SimpleDateFormat("dd MMM · HH:mm", Locale.getDefault()) }
+    val totalCustomers = db.count("customers")
+    val totalOrders = orders.count { !it.status.equals("SIMULATED", true) }
+
     fun clearEditor() { editId = null; name = ""; phone = ""; notes = "" }
+
     Box(Modifier.fillMaxSize()) {
-        LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(top = 2.dp, bottom = 86.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            item {
-                OutlinedTextField(search, { search = it }, Modifier.fillMaxWidth(), placeholder = { Text("Search name or phone", color = Muted) }, leadingIcon = { Text("⌕", color = Muted) }, singleLine = true, shape = RoundedCornerShape(18.dp), colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Cyan, unfocusedBorderColor = Color(0xFF202A3B), focusedContainerColor = Color(0xFF10192B), unfocusedContainerColor = Color(0xFF10192B), focusedTextColor = Color.White, unfocusedTextColor = Color.White, cursorColor = Cyan))
-            }
-            item {
-                Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    listOf("All", "Frequent", "Recent", "Blacklisted").forEach { item ->
-                        FilterChip(filter == item, { filter = item }, label = { Text(item) }, colors = FilterChipDefaults.filterChipColors(selectedContainerColor = Cyan, selectedLabelColor = Color(0xFF06111B), containerColor = Color(0xFF10192B), labelColor = Color(0xFFD4DCE8)))
-                    }
+        Column(
+            Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(bottom = 78.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text("CUSTOMERS", color = Muted, fontWeight = FontWeight.Bold, letterSpacing = 1.5.sp, style = MaterialTheme.typography.labelMedium)
+                    Text("Customer records ($totalCustomers)", color = Color.White, fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.titleLarge)
+                }
+                TextButton(onClick = { simulateCustomer = customers.firstOrNull(); if (simulateCustomer == null) onMessage("Add a customer before simulating a purchase.") }) {
+                    Text("+ Simulate Purchase", color = Cyan, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelMedium)
                 }
             }
-            item {
-                Row(Modifier.fillMaxWidth(), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-                    Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                        Box(Modifier.size(8.dp).clip(RoundedCornerShape(50)).background(Cyan))
-                        Text("Customer records (" + shown.size + ")", color = Color.White, fontWeight = FontWeight.Bold)
-                    }
-                    TextButton(onClick = { simPhone = ""; simOffer = ""; simPrice = ""; showSimulation = true }) { Text("+ Simulate Purchase", color = Cyan, fontWeight = FontWeight.Bold) }
+            OutlinedTextField(
+                value = search, onValueChange = { search = it },
+                modifier = Modifier.fillMaxWidth().heightIn(min = 54.dp),
+                placeholder = { Text("Search name or phone", color = Muted) },
+                leadingIcon = { Text("⌕", color = Muted, style = MaterialTheme.typography.titleLarge) },
+                singleLine = true, shape = RoundedCornerShape(18.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = Cyan, unfocusedBorderColor = Color(0xFF202A3B),
+                    focusedContainerColor = Color(0xFF111A2D), unfocusedContainerColor = Color(0xFF111A2D),
+                    focusedTextColor = Color.White, unfocusedTextColor = Color.White, cursorColor = Cyan
+                )
+            )
+            Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                listOf("All", "Frequent", "Recent", "Blacklisted").forEach { item ->
+                    FilterChip(
+                        selected = filter == item, onClick = { filter = item },
+                        label = { Text(item) },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = Cyan, selectedLabelColor = Color(0xFF04121A),
+                            containerColor = Color(0xFF111A2D), labelColor = Color(0xFFD7DFEA)
+                        ),
+                        border = FilterChipDefaults.filterChipBorder(
+                            enabled = true, selected = filter == item,
+                            borderColor = Color(0xFF202A3B), selectedBorderColor = Cyan
+                        )
+                    )
                 }
-                if (filter == "Blacklisted") Text("No blacklist records are stored yet.", color = Muted, style = MaterialTheme.typography.bodySmall)
             }
-            if (shown.isEmpty() && filter != "Blacklisted") item { InfoCard("No matching customers", "Saved customer contacts and recorded orders appear here.") }
-            items(shown.size) { index ->
-                val customer = shown[index]
-                val customerOrders = orders.filter { key(it.customer) == key(customer.phone) && key(customer.phone).isNotBlank() }.sortedByDescending { it.createdAt }
-                val latest = customerOrders.firstOrNull()
-                val initials = customer.name.trim().split(Regex("\\s+")).take(2).mapNotNull { it.firstOrNull()?.uppercaseChar() }.joinToString("")
-                Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = Color(0xFF10192B)), border = BorderStroke(1.dp, Color(0xFF202A3B)), shape = RoundedCornerShape(22.dp)) {
-                    Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                    Box(Modifier.size(8.dp).clip(RoundedCornerShape(50)).background(Cyan))
+                    Text("Customer records (\${visibleCustomers.size})", color = Color.White, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
+                }
+                Text("\${totalOrders} orders", color = Muted, style = MaterialTheme.typography.labelSmall)
+            }
+            if (visibleCustomers.isEmpty()) {
+                InfoCard(if (filter == "Blacklisted") "No blacklisted customers" else "No customers found", "Customers and their recorded order activity will appear here.")
+            }
+            visibleCustomers.forEach { customer ->
+                val customerOrders = customerOrders(customer)
+                val latest = customerOrders.maxByOrNull { it.createdAt }
+                val spend = customerOrders.filterNot { it.status.equals("SIMULATED", true) }.sumOf { it.price }
+                val initials = customer.name.trim().split(Regex("\\s+")).filter { it.isNotBlank() }.take(2).mapNotNull { it.firstOrNull()?.uppercaseChar() }.joinToString("")
+                val vip = customerOrders.count { !it.status.equals("SIMULATED", true) } >= 8
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFF111A2D)),
+                    border = BorderStroke(1.dp, Color(0xFF202A3B)),
+                    shape = RoundedCornerShape(20.dp)
+                ) {
+                    Column(Modifier.fillMaxWidth().padding(horizontal = 15.dp, vertical = 14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Row(Modifier.fillMaxWidth(), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                             Surface(color = Color(0xFF123548), shape = RoundedCornerShape(15.dp), border = BorderStroke(1.dp, Color(0xFF24536A))) {
-                                Box(Modifier.size(46.dp), contentAlignment = androidx.compose.ui.Alignment.Center) { Text(initials.ifBlank { "?" }, color = Cyan, fontWeight = FontWeight.ExtraBold) }
+                                Box(Modifier.size(48.dp), contentAlignment = androidx.compose.ui.Alignment.Center) {
+                                    Text(initials.ifBlank { "?" }, color = Cyan, fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.titleMedium)
+                                }
                             }
                             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                                 Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                    Text(customer.name, color = Color.White, fontWeight = FontWeight.ExtraBold, maxLines = 1)
-                                    if (customerOrders.size >= 5) Surface(color = Color(0xFF123A4A), shape = RoundedCornerShape(50)) { Text("VIP", color = Cyan, modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold) }
+                                    Text(customer.name, color = Color.White, fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.titleMedium, maxLines = 1)
+                                    if (vip) Surface(color = Color(0xFF103D50), shape = RoundedCornerShape(50)) { Text("VIP", color = Cyan, modifier = Modifier.padding(horizontal=8.dp, vertical=3.dp), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold) }
+                                    if (customer.blacklisted) Surface(color = Color(0xFF49212B), shape = RoundedCornerShape(50)) { Text("BLACKLISTED", color = Color(0xFFFF9AAA), modifier = Modifier.padding(horizontal=7.dp, vertical=3.dp), style = MaterialTheme.typography.labelSmall) }
                                 }
-                                Text(customer.phone, color = Cyan, fontWeight = FontWeight.SemiBold)
+                                Text(customer.phone, color = Cyan, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
                             }
-                            Surface(color = if (customerOrders.isEmpty()) Color(0xFF252F40) else Color(0xFF123A4A), shape = RoundedCornerShape(50)) {
-                                Text(if (customerOrders.isEmpty()) "Saved" else "Returning", color = if (customerOrders.isEmpty()) Muted else Cyan, modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp), style = MaterialTheme.typography.labelSmall)
-                            }
+                            OutlinedButton(
+                                onClick = { runCatching { context.startActivity(Intent(Intent.ACTION_DIAL, Uri.fromParts("tel", customer.phone, null))) }.onFailure { onMessage("Could not open the phone dialler.") },
+                                contentPadding = PaddingValues(horizontal=12.dp, vertical=8.dp),
+                                shape = RoundedCornerShape(15.dp),
+                                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
+                                border = BorderStroke(1.dp, Color(0xFF283447))
+                            ) { Text("☎ Dial", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelMedium) }
                         }
                         Row(Modifier.fillMaxWidth(), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-                            Text("Last: " + (latest?.offer ?: "No purchase"), color = Color(0xFFD4DCE8), modifier = Modifier.weight(1f), maxLines = 1, style = MaterialTheme.typography.bodySmall)
-                            Text(customerOrders.size.toString() + " orders · KES " + money(customerOrders.sumOf { it.price }), color = Muted, style = MaterialTheme.typography.bodySmall)
+                            Text("Last: \${latest?.let { it.offer + " · " + SimpleDateFormat("d MMM", Locale.getDefault()).format(Date(it.createdAt)) } ?: "No orders"}", color = Muted, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f), maxLines = 1)
+                            Text("\${customerOrders.size} orders · KES \${money(spend)}", color = Color(0xFFD8E2EF), fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodySmall)
                         }
-                        if (latest != null) {
-                            val age = (System.currentTimeMillis() - latest.createdAt).coerceAtLeast(0)
-                            val time = when { age < 60000 -> "just now"; age < 3600000 -> (age / 60000).toString() + " mins ago"; age < 86400000 -> (age / 3600000).toString() + " hr ago"; else -> dateFormat.format(Date(latest.createdAt)) }
-                            Text(time + " · " + latest.status, color = Muted, style = MaterialTheme.typography.labelSmall)
-                        }
-                        if (customer.notes.isNotBlank()) Text("Note: " + customer.notes, color = Muted, style = MaterialTheme.typography.bodySmall, maxLines = 2)
+                        if (customer.notes.isNotBlank()) Text("Note: \${customer.notes}", color = Muted, style = MaterialTheme.typography.bodySmall, maxLines = 2)
+                        HorizontalDivider(color = Color(0xFF202A3B))
                         Row(Modifier.fillMaxWidth(), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-                            TextButton(onClick = { runCatching { context.startActivity(Intent(Intent.ACTION_DIAL, Uri.fromParts("tel", customer.phone, null))) }.onFailure { onMessage("Could not open the phone dialler.") } }, contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp)) { Text("☎ Dial", color = Color.White, fontWeight = FontWeight.Bold) }
+                            TextButton(onClick = { editId=customer.id; name=customer.name; phone=customer.phone; notes=customer.notes; showEditor=true }, contentPadding = PaddingValues(horizontal=5.dp)) { Text("EDIT", color=Cyan, style=MaterialTheme.typography.labelSmall) }
+                            TextButton(onClick = { runCatching { db.setCustomerBlacklisted(customer.id, !customer.blacklisted); reload++ }.onFailure { onMessage("Could not update blacklist.") } }, contentPadding = PaddingValues(horizontal=5.dp)) { Text(if (customer.blacklisted) "UNBLOCK" else "BLACKLIST", color=Color(0xFFFFB86B), style=MaterialTheme.typography.labelSmall) }
                             Spacer(Modifier.weight(1f))
-                            TextButton(onClick = { editId = customer.id; name = customer.name; phone = customer.phone; notes = customer.notes; showEditor = true }) { Text("Edit", color = Cyan) }
-                            TextButton(onClick = { runCatching { db.deleteCustomer(customer.id); reload++; onMessage("Customer deleted.") }.onFailure { onMessage(it.message ?: "Could not delete customer.") } }) { Text("Delete", color = Color(0xFFE88BA4)) }
+                            TextButton(onClick = { runCatching { db.deleteCustomer(customer.id); reload++; onMessage("Customer deleted.") }.onFailure { onMessage("Could not delete customer.") } }, contentPadding = PaddingValues(horizontal=5.dp)) { Text("DELETE", color=Color(0xFFE88BA4), style=MaterialTheme.typography.labelSmall) }
                         }
                     }
                 }
             }
         }
-        FloatingActionButton(onClick = { clearEditor(); showEditor = true }, modifier = Modifier.align(androidx.compose.ui.Alignment.BottomEnd).padding(end = 8.dp, bottom = 10.dp), containerColor = Cyan, contentColor = Color(0xFF06111B), shape = RoundedCornerShape(20.dp)) { Text("+", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold) }
+        FloatingActionButton(
+            onClick = { clearEditor(); showEditor = true },
+            modifier = Modifier.align(androidx.compose.ui.Alignment.BottomEnd).padding(end = 8.dp, bottom = 12.dp),
+            containerColor = Cyan, contentColor = Color(0xFF04121A), shape = RoundedCornerShape(19.dp)
+        ) { Text("+", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold) }
     }
-    if (showEditor) AlertDialog(onDismissRequest = { showEditor = false; clearEditor() }, title = { Text(if (editId == null) "Add customer" else "Edit customer") }, text = { Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) { OutlinedTextField(name, { name = it }, label = { Text("Customer name") }, modifier = Modifier.fillMaxWidth()); OutlinedTextField(phone, { phone = it }, label = { Text("Phone number") }, modifier = Modifier.fillMaxWidth()); OutlinedTextField(notes, { notes = it }, label = { Text("Note (optional)") }, modifier = Modifier.fillMaxWidth(), minLines = 2) } }, confirmButton = { TextButton(onClick = { if (name.isBlank() || phone.isBlank()) onMessage("Enter customer name and phone number.") else try { db.saveCustomer(editId, name, phone, notes); showEditor = false; clearEditor(); reload++; onMessage("Customer saved.") } catch (_: Exception) { onMessage("Could not save customer. Check whether the phone number is already saved.") } }) { Text("Save", color = Cyan) } }, dismissButton = { TextButton(onClick = { showEditor = false; clearEditor() }) { Text("Cancel") } }, containerColor = Color(0xFF10192B), titleContentColor = Color.White, textContentColor = Color(0xFFD4DCE8))
-    if (showSimulation) AlertDialog(onDismissRequest = { showSimulation = false }, title = { Text("Simulate a purchase") }, text = { Column(verticalArrangement = Arrangement.spacedBy(8.dp)) { OutlinedTextField(simPhone, { simPhone = it }, label = { Text("Customer phone") }, modifier = Modifier.fillMaxWidth()); OutlinedTextField(simOffer, { simOffer = it }, label = { Text("Offer name") }, modifier = Modifier.fillMaxWidth()); OutlinedTextField(simPrice, { simPrice = it.filter { ch -> ch.isDigit() || ch == '.' } }, label = { Text("Amount (KES)") }, modifier = Modifier.fillMaxWidth()); Text("Local test order only. No payment or message is sent.", color = Muted, style = MaterialTheme.typography.bodySmall) } }, confirmButton = { TextButton(onClick = { val amount = simPrice.toDoubleOrNull(); if (simPhone.isBlank() || simOffer.isBlank() || amount == null || amount <= 0) onMessage("Enter a phone, offer and valid amount.") else try { db.createOrder(simPhone, simOffer, amount, "Simulated purchase"); showSimulation = false; reload++; onMessage("Local simulated order recorded.") } catch (error: Exception) { onMessage(error.message ?: "Could not record test order.") } }) { Text("Record test order", color = Cyan) } }, dismissButton = { TextButton(onClick = { showSimulation = false }) { Text("Cancel") } }, containerColor = Color(0xFF10192B), titleContentColor = Color.White, textContentColor = Color(0xFFD4DCE8))
+
+    if (showEditor) AlertDialog(
+        onDismissRequest = { showEditor=false; clearEditor() },
+        title = { Text(if (editId == null) "Add customer" else "Edit customer") },
+        text = { Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedTextField(name, { name=it }, label={ Text("Customer name") }, modifier=Modifier.fillMaxWidth(), singleLine=true)
+            OutlinedTextField(phone, { phone=it }, label={ Text("Phone number") }, modifier=Modifier.fillMaxWidth(), singleLine=true)
+            OutlinedTextField(notes, { notes=it }, label={ Text("Notes (optional)") }, modifier=Modifier.fillMaxWidth(), minLines=2)
+        } },
+        confirmButton = { TextButton(onClick = {
+            if(name.isBlank() || phone.isBlank()) onMessage("Enter customer name and phone number.")
+            else try { db.saveCustomer(editId,name,phone,notes); showEditor=false; clearEditor(); reload++; onMessage("Customer saved locally.") }
+            catch (_:Exception) { onMessage("Could not save customer. Check whether the phone number is already used.") }
+        }) { Text(if(editId==null) "Save customer" else "Update customer", color=Cyan) } },
+        dismissButton = { TextButton(onClick={ showEditor=false; clearEditor() }) { Text("Cancel") } },
+        containerColor=Color(0xFF111A2D), titleContentColor=Color.White, textContentColor=Color(0xFFD1D9E6)
+    )
+
+    simulateCustomer?.let { selectedCustomer ->
+        AlertDialog(
+            onDismissRequest = { simulateCustomer=null },
+            title = { Text("Simulate a purchase") },
+            text = { Column(verticalArrangement=Arrangement.spacedBy(8.dp)) {
+                Text("Local demo only. This does not send a payment request or activate a bundle.", color=Muted, style=MaterialTheme.typography.bodySmall)
+                OutlinedTextField(value=selectedCustomer.name, onValueChange={}, readOnly=true, label={Text("Customer")}, modifier=Modifier.fillMaxWidth())
+                OutlinedTextField(value=simulatedOffer, onValueChange={simulatedOffer=it}, label={Text("Offer name")}, modifier=Modifier.fillMaxWidth(), singleLine=true)
+                OutlinedTextField(value=simulatedPrice, onValueChange={simulatedPrice=it.filter { ch -> ch.isDigit() || ch=='.' }}, label={Text("Price (KES)")}, modifier=Modifier.fillMaxWidth(), singleLine=true)
+            } },
+            confirmButton = { TextButton(onClick={
+                val price=simulatedPrice.toDoubleOrNull()
+                if(price==null || price<=0 || simulatedOffer.isBlank()) onMessage("Enter an offer and a valid price.")
+                else try { db.createSimulatedOrder(selectedCustomer.phone,simulatedOffer,price); reload++; simulateCustomer=null; onMessage("Demo purchase recorded locally. No payment was made.") }
+                catch (_:Exception) { onMessage("Could not record the demo purchase.") }
+            }) { Text("Record simulation", color=Cyan) } },
+            dismissButton = { TextButton(onClick={simulateCustomer=null}) { Text("Cancel") } },
+            containerColor=Color(0xFF111A2D), titleContentColor=Color.White, textContentColor=Color(0xFFD1D9E6)
+        )
+    }
 }
-
-
 @Composable
 private fun OrdersScreen(db:LocalDatabase,onMessage:(String)->Unit) {
     var phone by remember { mutableStateOf("") };var offer by remember { mutableStateOf("") };var price by remember { mutableStateOf("") };var reload by remember { mutableIntStateOf(0) }
