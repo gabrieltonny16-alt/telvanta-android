@@ -29,7 +29,7 @@ jobs:
         run: |
           "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install "platforms;android-35" "build-tools;35.0.0"
       - name: Run all Android unit tests
-        run: gradle --no-daemon :app:testDebugUnitTest :shared:testDebugUnitTest
+        run: gradle --no-daemon :app:testDebugUnitTest :shared:testDebugUnitTest :app:assembleDebugAndroidTest
       - name: Build both Android apps
         run: gradle --no-daemon :app:assembleDebug :connectpulse:assembleDebug
       - name: Name APKs
@@ -49,6 +49,7 @@ jobs:
           path: |
             BingwaPulse-debug.apk
             Connect-Pulse-debug.apk
+            app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
           if-no-files-found: error
           retention-days: 14
 
@@ -72,6 +73,7 @@ jobs:
             set -euo pipefail
             adb install --no-streaming BingwaPulse-debug.apk
             adb install --no-streaming Connect-Pulse-debug.apk
+            adb install --no-streaming app-debug-androidTest.apk
             adb shell pm path com.telvanta.app
             adb shell pm path com.bingwapulse.connectpulse
             adb logcat -c
@@ -81,6 +83,7 @@ jobs:
             adb shell monkey -p com.bingwapulse.connectpulse 1
             sleep 8
             adb shell pidof com.bingwapulse.connectpulse
+            adb shell am instrument -w -r com.telvanta.app.test/androidx.test.runner.AndroidJUnitRunner
             adb logcat -d -s AndroidRuntime:E > android-crashes.log
             if grep -q "FATAL EXCEPTION" android-crashes.log; then
               cat android-crashes.log
