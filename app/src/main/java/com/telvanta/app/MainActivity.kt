@@ -811,6 +811,8 @@ private fun SignatureOffersScreen(db: LocalDatabase, onQuickDial: () -> Unit, on
     var candidateToSave by remember { mutableStateOf<CandidateOffer?>(null) }
     var priceInput by remember { mutableStateOf("") }
     var duplicateOffer by remember { mutableStateOf<OfferRow?>(null) }
+    var editingDuplicatePrice by remember { mutableStateOf(false) }
+    var signaturePriceError by remember { mutableStateOf("") }
     val saved = remember(reload) { db.offers().filter { it.source.contains("signature", ignoreCase = true) } }
     CloudOfferSyncEffect(db, reload, onMessage)
     val visible = candidates.filter {
@@ -900,11 +902,12 @@ private fun SignatureOffersScreen(db: LocalDatabase, onQuickDial: () -> Unit, on
         }
     }
     candidateToSave?.let { offer ->
-        AlertDialog(onDismissRequest={candidateToSave=null}, title={Text("Download offer")}, text={
+        AlertDialog(onDismissRequest={candidateToSave=null; editingDuplicatePrice=false; signaturePriceError=""}, title={Text(if(editingDuplicatePrice) "Edit offer price" else "Download offer")}, text={
             Column(verticalArrangement=Arrangement.spacedBy(8.dp)) {
                 Text(offer.name, fontWeight=FontWeight.Bold)
                 Text("Set your selling price. Candidate price and USSD details are not independently verified.", color=Muted, style=MaterialTheme.typography.bodySmall)
-                OutlinedTextField(value=priceInput, onValueChange={priceInput=it.filter { ch -> ch.isDigit() || ch=='.' }}, label={Text("Selling price (KES)")}, singleLine=true)
+                OutlinedTextField(value=priceInput, onValueChange={priceInput=it.filter { ch -> ch.isDigit() || ch=='.' }; signaturePriceError=""}, label={Text("Selling price (KES)")}, singleLine=true, isError=signaturePriceError.isNotBlank())
+                if (signaturePriceError.isNotBlank()) Text(signaturePriceError, color=Color(0xFFFF8A8A), style=MaterialTheme.typography.bodySmall)
             }
         }, confirmButton={TextButton(onClick={
             val price=priceInput.toDoubleOrNull()
@@ -912,13 +915,17 @@ private fun SignatureOffersScreen(db: LocalDatabase, onQuickDial: () -> Unit, on
             else {
                 val existingAtPrice = db.offers().firstOrNull { it.price == price }
                 if (existingAtPrice != null) {
-                    duplicateOffer = existingAtPrice
+                    if (editingDuplicatePrice) {
+                        signaturePriceError = "KES ${money(price)} is already assigned to ${existingAtPrice.name}. Enter a different price to continue."
+                    } else {
+                        duplicateOffer = existingAtPrice
+                    }
                 } else try {
                     db.saveOffer(null, offer.name, when(offer.category.uppercase(Locale.ROOT)) { "VOICE" -> "Minutes"; "DATA" -> "Data"; "SMS" -> "SMS"; "COMBO" -> "Combo"; else -> offer.category }, price, if(offer.price>=0) offer.price.toDouble() else null, "Signature import · ${offer.simProfile} SIM", false, false, ussdCode=offer.code, duration=offer.duration, sourceId=offer.id, simProfile=offer.simProfile, tags=offer.tags)
-                    reload++; candidateToSave=null; onMessage("${offer.name} downloaded to My Offers.")
+                    reload++; candidateToSave=null; editingDuplicatePrice=false; signaturePriceError=""; onMessage("${offer.name} downloaded to My Offers.")
                 } catch(e:Exception) { onMessage(e.message ?: "Could not save offer.") }
             }
-        }) { Text("Download", color=Cyan) }}, dismissButton={TextButton(onClick={candidateToSave=null}){Text("Cancel")}}, containerColor=Color(0xFF111A2D), titleContentColor=Color.White, textContentColor=Color(0xFFD1D9E6))
+        }) { Text("Download", color=Cyan) }}, dismissButton={TextButton(onClick={candidateToSave=null; editingDuplicatePrice=false; signaturePriceError=""}){Text("Cancel")}}, containerColor=Color(0xFF111A2D), titleContentColor=Color.White, textContentColor=Color(0xFFD1D9E6))
     }
     duplicateOffer?.let { existing ->
         val pending = candidateToSave
@@ -942,7 +949,7 @@ private fun SignatureOffersScreen(db: LocalDatabase, onQuickDial: () -> Unit, on
                 }) { Text("Replace", color = Cyan, fontWeight = FontWeight.Bold) }
             },
             dismissButton = {
-                TextButton(onClick = { duplicateOffer = null }) { Text("Edit", color = Color.White) }
+                TextButton(onClick = { editingDuplicatePrice = true; signaturePriceError = ""; duplicateOffer = null }) { Text("Edit", color = Color.White) }
             },
             containerColor = Color(0xFF111A2D), titleContentColor = Color.White, textContentColor = Color(0xFFD1D9E6)
         )
