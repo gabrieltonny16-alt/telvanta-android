@@ -810,6 +810,7 @@ private fun SignatureOffersScreen(db: LocalDatabase, onQuickDial: () -> Unit, on
     var editing by remember { mutableStateOf<OfferRow?>(null) }
     var candidateToSave by remember { mutableStateOf<CandidateOffer?>(null) }
     var priceInput by remember { mutableStateOf("") }
+    var duplicateOffer by remember { mutableStateOf<OfferRow?>(null) }
     val saved = remember(reload) { db.offers().filter { it.source.contains("signature", ignoreCase = true) } }
     CloudOfferSyncEffect(db, reload, onMessage)
     val visible = candidates.filter {
@@ -908,12 +909,45 @@ private fun SignatureOffersScreen(db: LocalDatabase, onQuickDial: () -> Unit, on
         }, confirmButton={TextButton(onClick={
             val price=priceInput.toDoubleOrNull()
             if(price==null || price<=0) onMessage("Enter a valid selling price.")
-            else try {
-                db.saveOffer(null, offer.name, when(offer.category.uppercase(Locale.ROOT)) { "VOICE" -> "Minutes"; "DATA" -> "Data"; "SMS" -> "SMS"; "COMBO" -> "Combo"; else -> offer.category }, price, if(offer.price>=0) offer.price.toDouble() else null, "Signature import · ${offer.simProfile} SIM", false, false, ussdCode=offer.code, duration=offer.duration, sourceId=offer.id, simProfile=offer.simProfile, tags=offer.tags)
-                reload++; candidateToSave=null; onMessage("${offer.name} downloaded to My Offers.")
-            } catch(e:Exception) { onMessage(e.message ?: "Could not save offer.") }
+            else {
+                val existingAtPrice = db.offers().firstOrNull { it.price == price }
+                if (existingAtPrice != null) {
+                    duplicateOffer = existingAtPrice
+                } else try {
+                    db.saveOffer(null, offer.name, when(offer.category.uppercase(Locale.ROOT)) { "VOICE" -> "Minutes"; "DATA" -> "Data"; "SMS" -> "SMS"; "COMBO" -> "Combo"; else -> offer.category }, price, if(offer.price>=0) offer.price.toDouble() else null, "Signature import · ${offer.simProfile} SIM", false, false, ussdCode=offer.code, duration=offer.duration, sourceId=offer.id, simProfile=offer.simProfile, tags=offer.tags)
+                    reload++; candidateToSave=null; onMessage("${offer.name} downloaded to My Offers.")
+                } catch(e:Exception) { onMessage(e.message ?: "Could not save offer.") }
+            }
         }) { Text("Download", color=Cyan) }}, dismissButton={TextButton(onClick={candidateToSave=null}){Text("Cancel")}}, containerColor=Color(0xFF111A2D), titleContentColor=Color.White, textContentColor=Color(0xFFD1D9E6))
     }
+    duplicateOffer?.let { existing ->
+        val pending = candidateToSave
+        AlertDialog(
+            onDismissRequest = { duplicateOffer = null },
+            title = { Text("Price already in use") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("KES ${money(existing.price)} is already assigned to ${existing.name}. Every offer must have a different selling price.", color = Color.White)
+                    Text("Choose whether to edit the new offer's price or replace the existing offer with this Signature offer.", color = Muted, style = MaterialTheme.typography.bodySmall)
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    val candidate = pending
+                    if (candidate == null) duplicateOffer = null
+                    else try {
+                        db.saveOffer(existing.id, candidate.name, when(candidate.category.uppercase(Locale.ROOT)) { "VOICE" -> "Minutes"; "DATA" -> "Data"; "SMS" -> "SMS"; "COMBO" -> "Combo"; else -> candidate.category }, existing.price, if(candidate.price>=0) candidate.price.toDouble() else null, "Signature import · ${candidate.simProfile} SIM", false, false, ussdCode=candidate.code, duration=candidate.duration, sourceId=candidate.id, simProfile=candidate.simProfile, tags=candidate.tags)
+                        reload++; duplicateOffer=null; candidateToSave=null; onMessage("${candidate.name} replaced ${existing.name} at KES ${money(existing.price)}.")
+                    } catch(e:Exception) { onMessage(e.message ?: "Could not replace the existing offer.") }
+                }) { Text("Replace", color = Cyan, fontWeight = FontWeight.Bold) }
+            },
+            dismissButton = {
+                TextButton(onClick = { duplicateOffer = null }) { Text("Edit price", color = Color.White) }
+            },
+            containerColor = Color(0xFF111A2D), titleContentColor = Color.White, textContentColor = Color(0xFFD1D9E6)
+        )
+    }
+
     editing?.let { offer ->
         AlertDialog(onDismissRequest={editing=null}, title={Text("Edit selling price")}, text={
             Column(verticalArrangement=Arrangement.spacedBy(8.dp)) {
