@@ -794,25 +794,9 @@ private fun SignatureOffersScreen(db: LocalDatabase, onMessage: (String) -> Unit
     val context = LocalContext.current
     val candidates = remember {
         runCatching {
-            val raw = context.assets.open("signature_offers_seed.json").bufferedReader().use { it.readText() }
-            val root = JSONObject(raw)
+            val root = JSONObject(context.assets.open("signature_offers_seed.json").bufferedReader().use { it.readText() })
             val rows = root.getJSONArray("offers")
-            buildList {
-                for (i in 0 until rows.length()) {
-                    val row = rows.getJSONObject(i)
-                    add(CandidateOffer(
-                        id = row.optString("id"),
-                        simProfile = row.optString("simProfile", "any"),
-                        category = row.optString("category", "OTHER"),
-                        name = row.optString("name", "Unnamed offer"),
-                        duration = row.optString("duration", "Duration not captured"),
-                        price = row.optInt("amountKes", -1),
-                        code = row.optString("entryCode", ""),
-                        tags = row.optString("tags", ""),
-                        note = row.optString("reviewNote", if (row.has("entryCode")) "Candidate code — not independently verified" else "Exact entry code not captured")
-                    ))
-                }
-            }
+            buildList { for (i in 0 until rows.length()) { val row = rows.getJSONObject(i); add(CandidateOffer(row.optString("id"), row.optString("simProfile", "any"), row.optString("category", "OTHER"), row.optString("name", "Unnamed offer"), row.optString("duration", "Duration not captured"), row.optInt("amountKes", -1), row.optString("entryCode", ""), row.optString("tags", ""), row.optString("reviewNote", "Candidate offer — not independently verified"))) } }
         }.getOrElse { emptyList() }
     }
     var search by remember { mutableStateOf("") }
@@ -820,283 +804,57 @@ private fun SignatureOffersScreen(db: LocalDatabase, onMessage: (String) -> Unit
     var simProfile by remember { mutableStateOf("ALL") }
     var showSaved by remember { mutableStateOf(false) }
     var reload by remember { mutableIntStateOf(0) }
-    var downloadCandidate by remember { mutableStateOf<CandidateOffer?>(null) }
-    var downloadPrice by remember { mutableStateOf("") }
-    val saved = remember(reload) { db.offers().filter { it.source.contains("signature", ignoreCase = true) } }
+    var selectedOffer by remember { mutableStateOf<CandidateOffer?>(null) }
+    var sellingPrice by remember { mutableStateOf("") }
+    val saved = remember(reload) { db.offers().filter { it.source.contains("signature", true) } }
     CloudOfferSyncEffect(db, reload, onMessage)
-    val categories = listOf("ALL", "DATA", "VOICE", "SMS", "COMBO")
-    val visible = candidates.filter {
-        (category == "ALL" || it.category.equals(category, true)) &&
-            (simProfile == "ALL" || it.simProfile.equals(simProfile, true)) &&
-            (search.isBlank() || it.name.contains(search, true) || it.price.toString().contains(search) || it.code.contains(search, true))
-    }
-    Text("Signature Offers", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = Cyan)
-    Surface(
-        color = Color(0xFF08232B),
-        shape = RoundedCornerShape(20.dp),
-        border = BorderStroke(1.dp, Color(0xFF00B8D4).copy(alpha = 0.32f)),
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Row(Modifier.padding(16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-            Surface(color = Color(0xFF00B8D4).copy(alpha = 0.16f), shape = RoundedCornerShape(14.dp)) {
-                Text("✦", color = Cyan, fontWeight = FontWeight.ExtraBold, modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp))
+    val visible = candidates.filter { (category == "ALL" || it.category.equals(category, true)) && (simProfile == "ALL" || it.simProfile.equals(simProfile, true)) && (search.isBlank() || it.name.contains(search, true) || it.code.contains(search, true) || it.price.toString().contains(search)) }
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(11.dp)) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) { Text("SIGNATURE", color = Color.White, fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.titleLarge); Text(if (showSaved) "Your saved offers" else "Extracted offer catalogue", color = Muted, style = MaterialTheme.typography.bodySmall) }
+            TextButton(onClick = { showSaved = !showSaved }) { Text(if (showSaved) "CANDIDATES" else "MY OFFERS", color = Cyan, fontWeight = FontWeight.Bold) }
+        }
+        if (!showSaved) {
+            Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                listOf("ALL", "DATA", "VOICE", "SMS").forEach { item -> FilterChip(category == item, { category = item }, label = { Text(if (item == "ALL") "All (" + candidates.size + ")" else item.replaceFirstChar { it.uppercase() }) }, colors = FilterChipDefaults.filterChipColors(selectedContainerColor = Cyan, selectedLabelColor = Color(0xFF06111B), containerColor = Color(0xFF10192B), labelColor = Color(0xFFD4DCE8))) }
             }
-            Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                Text("Original Signature catalogue", color = Navy, fontWeight = FontWeight.Bold)
-                Text("44 extracted offer records · Any SIM, Normal SIM and Notification SIM", color = Cyan, style = MaterialTheme.typography.bodySmall)
+            OutlinedTextField(search, { search = it }, Modifier.fillMaxWidth(), placeholder = { Text("⌕  Search…", color = Muted) }, singleLine = true, shape = RoundedCornerShape(16.dp), colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Cyan, unfocusedBorderColor = Color(0xFF202A3B), focusedContainerColor = Color(0xFF10192B), unfocusedContainerColor = Color(0xFF10192B), focusedTextColor = Color.White, unfocusedTextColor = Color.White, cursorColor = Cyan))
+            Row(Modifier.fillMaxWidth(), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(visible.size.toString() + " offers", color = Muted, style = MaterialTheme.typography.labelSmall)
+                var expanded by remember { mutableStateOf(false) }
+                Box { TextButton(onClick = { expanded = true }) { Text(if (simProfile == "ALL" || simProfile == "any") "ANY SIM ▾" else simProfile.uppercase() + " ▾", color = Cyan, style = MaterialTheme.typography.labelSmall) }; DropdownMenu(expanded, { expanded = false }) { listOf("ALL" to "Any SIM", "any" to "Any SIM", "normal" to "Normal SIM", "notification" to "Notification SIM").forEach { opt -> DropdownMenuItem(text = { Text(opt.second) }, onClick = { simProfile = opt.first; expanded = false }) } } }
             }
-        }
-    }
-    Surface(
-        color = Color(0xFF0A1B22),
-        shape = RoundedCornerShape(18.dp),
-        border = BorderStroke(1.dp, Color(0xFF00B8D4).copy(alpha = 0.24f)),
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Row(Modifier.padding(15.dp), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-            Text("ⓘ", color = Cyan, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleLarge)
-            Text("These are your previously supplied offer records. Prices and USSD codes remain candidate details until checked against the live Safaricom menu. No purchase or USSD action is triggered here.", color = Muted, style = MaterialTheme.typography.bodySmall)
-        }
-    }
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        listOf("Candidates" to false, "Saved offers" to true).forEach { item ->
-            FilterChip(selected = showSaved == item.second, onClick = { showSaved = item.second }, label = { Text(item.first) })
-        }
-    }
-    if (!showSaved) {
-        OutlinedTextField(value = search, onValueChange = { search = it }, label = { Text("Search name, price or code") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
-        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            categories.forEach { item -> FilterChip(selected = category == item, onClick = { category = item }, label = { Text(item) }) }
-        }
-        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            listOf("ALL" to "All SIMs", "any" to "Any SIM", "normal" to "Normal SIM", "notification" to "Notification SIM").forEach { item -> FilterChip(selected = simProfile == item.first, onClick = { simProfile = item.first }, label = { Text(item.second) }) }
-        }
-        Text("Showing ${visible.size} of ${candidates.size} candidate records", color = Muted, style = MaterialTheme.typography.labelMedium)
-        if (candidates.isEmpty()) InfoCard("Catalogue unavailable", "The bundled candidate catalogue could not be read. No data was imported.")
-        visible.forEach { offer ->
-            Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF0B0F19)), modifier = Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = androidx.compose.ui.Alignment.Top) {
-                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                            Text(offer.name, fontWeight = FontWeight.Bold, color = Navy, style = MaterialTheme.typography.titleMedium, maxLines = 2)
-                            Text("${offer.category} · ${offer.duration}", color = Muted, style = MaterialTheme.typography.bodySmall)
-                            Text(when(offer.simProfile) { "normal" -> "NORMAL SIM"; "notification" -> "NOTIFICATION SIM"; else -> "ANY SIM" }, color = Muted, style = MaterialTheme.typography.labelSmall)
+            visible.forEach { offer ->
+                Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = Color(0xFF10192B)), border = BorderStroke(1.dp, Color(0xFF202A3B)), shape = RoundedCornerShape(20.dp)) {
+                    Column(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Row(Modifier.fillMaxWidth(), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                                Text(offer.name, color = Color.White, fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.titleMedium, maxLines = 1)
+                                Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) { Text(offer.duration, color = Muted, style = MaterialTheme.typography.bodySmall); Surface(color = Color(0xFF3A2C18), shape = RoundedCornerShape(50)) { Text("● Unverified", color = Color(0xFFFFD36E), modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp), style = MaterialTheme.typography.labelSmall) } }
+                            }
+                            Column(horizontalAlignment = androidx.compose.ui.Alignment.End, verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                                Text(if (offer.price >= 0) "KES " + offer.price else "KES —", color = Cyan, fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.titleMedium)
+                                Button(onClick = { selectedOffer = offer; sellingPrice = if (offer.price >= 0) offer.price.toString() else "" }, contentPadding = PaddingValues(horizontal = 12.dp, vertical = 5.dp), shape = RoundedCornerShape(50), colors = ButtonDefaults.buttonColors(containerColor = Cyan, contentColor = Color(0xFF06111B))) { Text("↓ Download", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold) }
+                            }
                         }
-                        Text(if (offer.price >= 0) "KES ${offer.price}" else "Price unknown", color = Cyan, fontWeight = FontWeight.ExtraBold, maxLines = 1)
-                    }
-                    if (offer.code.isNotBlank()) Surface(color = Color(0xFF05070D), shape = RoundedCornerShape(8.dp)) { Text(offer.code, color = Muted, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Medium, modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp), maxLines = 1, softWrap = false, style = MaterialTheme.typography.labelMedium) } else Text("USSD code not captured", color = Muted, style = MaterialTheme.typography.bodySmall)
-                    if (offer.tags.isNotBlank()) Text("Tags: ${offer.tags}", color = Muted, style = MaterialTheme.typography.bodySmall)
-                    Text(offer.note, color = Muted, style = MaterialTheme.typography.bodySmall)
-                    Surface(color = Color(0xFF3A2C18), shape = RoundedCornerShape(50)) {
-                        Row(Modifier.padding(horizontal = 9.dp, vertical = 5.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            Text("●", color = Color(0xFFFFC857), style = MaterialTheme.typography.labelSmall)
-                            Text("CANDIDATE · NOT VERIFIED", color = Color(0xFFFFD58A), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall)
+                        Row(Modifier.fillMaxWidth(), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Surface(color = Color(0xFF070C16), shape = RoundedCornerShape(8.dp)) { Text(offer.code.ifBlank { "USSD not captured" }, color = Color(0xFFD4DCE8), fontFamily = FontFamily.Monospace, modifier = Modifier.padding(horizontal = 9.dp, vertical = 7.dp), style = MaterialTheme.typography.labelMedium, maxLines = 1) }
+                            Text(if (offer.simProfile == "normal") "NORMAL SIM" else if (offer.simProfile == "notification") "NOTIFICATION SIM" else "ANY SIM", color = Muted, style = MaterialTheme.typography.labelSmall)
                         }
                     }
-                    Button(onClick = { downloadCandidate = offer; downloadPrice = if (offer.price >= 0) offer.price.toString() else "" }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) { Text("Download to My Offers") }
                 }
             }
-        }
-    } else {
-        Text("Saved signature offers (${saved.size})", fontWeight = FontWeight.Bold, color = Navy)
-        if (saved.isEmpty()) InfoCard("No saved offers yet", "Candidate records are shown separately so unverified source entries do not silently become active offers.")
-        saved.forEach { offer ->
-            Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF0B0F19)), modifier = Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                    Text(offer.name, fontWeight = FontWeight.Bold, color = Navy, style = MaterialTheme.typography.titleMedium, maxLines = 2)
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) { Text(offer.category + " · " + offer.duration, color = Muted, style = MaterialTheme.typography.bodySmall); Text("KES " + money(offer.price), color = Cyan, fontWeight = FontWeight.ExtraBold) }
-                    Text("Source: " + offer.source + " · " + if (offer.verified) "Operator marked verified" else "Unverified", color = Muted, style = MaterialTheme.typography.bodySmall)
-                }
-            }
+        } else {
+            Text("Saved signature offers (" + saved.size + ")", color = Color.White, fontWeight = FontWeight.Bold)
+            if (saved.isEmpty()) InfoCard("No saved offers yet", "Downloaded offers appear here.")
+            saved.forEach { offer -> Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = Color(0xFF10192B)), border = BorderStroke(1.dp, Color(0xFF202A3B)), shape = RoundedCornerShape(18.dp)) { Row(Modifier.fillMaxWidth().padding(14.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) { Column(Modifier.weight(1f)) { Text(offer.name, color = Color.White, fontWeight = FontWeight.Bold); Text(offer.category.uppercase() + " · " + offer.duration, color = Muted, style = MaterialTheme.typography.bodySmall) }; Text("KES " + money(offer.price), color = Cyan, fontWeight = FontWeight.ExtraBold) } } }
         }
     }
-    downloadCandidate?.let { candidate ->
-        AlertDialog(
-            onDismissRequest = { downloadCandidate = null },
-            title = { Text("Set selling price") },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(candidate.name, fontWeight = FontWeight.Bold)
-                    Text(if (candidate.price >= 0) "Signature reference price: KES ${candidate.price}" else "Signature reference price was not captured.")
-                    OutlinedTextField(
-                        value = downloadPrice,
-                        onValueChange = { downloadPrice = it.filter { ch -> ch.isDigit() || ch == '.' } },
-                        label = { Text("Your selling price (KES)") },
-                        singleLine = true
-                    )
-                    Text("The offer will be added to My Offers using this price.", style = MaterialTheme.typography.bodySmall, color = Muted)
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = {
-                    val price = downloadPrice.toDoubleOrNull()
-                    if (price == null || price <= 0.0) onMessage("Enter a valid selling price greater than zero.")
-                    else try {
-                        db.saveOffer(null, candidate.name, when (candidate.category.uppercase()) { "VOICE" -> "Minutes"; "DATA" -> "Data"; "SMS" -> "SMS"; "COMBO" -> "Combo"; else -> candidate.category },
-                            price, if (candidate.price >= 0) candidate.price.toDouble() else null,
-                            "Signature import · ${candidate.simProfile} SIM", false, false,
-                            ussdCode = candidate.code, duration = candidate.duration, sourceId = candidate.id,
-                            simProfile = candidate.simProfile, tags = candidate.tags)
-                        reload++
-                        downloadCandidate = null
-                        onMessage("${candidate.name} added to My Offers at KES ${money(price)}.")
-                    } catch (e: Exception) {
-                        onMessage(e.message ?: "Could not download this offer. Check whether its selling price is already used.")
-                    }
-                }) { Text("Download offer") }
-            },
-            dismissButton = { TextButton(onClick = { downloadCandidate = null }) { Text("Cancel") } }
-        )
+    selectedOffer?.let { offer ->
+        AlertDialog(onDismissRequest = { selectedOffer = null }, title = { Text("Set selling price") }, text = { Column(verticalArrangement = Arrangement.spacedBy(8.dp)) { Text(offer.name, fontWeight = FontWeight.Bold); Text(if (offer.price >= 0) "Reference price: KES " + offer.price else "Reference price not captured."); OutlinedTextField(sellingPrice, { sellingPrice = it.filter { ch -> ch.isDigit() || ch == '.' } }, label = { Text("Your selling price (KES)") }, singleLine = true); Text("Adds to My Offers only. No purchase is triggered.", color = Muted, style = MaterialTheme.typography.bodySmall) } }, confirmButton = { TextButton(onClick = { val price = sellingPrice.toDoubleOrNull(); if (price == null || price <= 0) onMessage("Enter a valid selling price.") else try { db.saveOffer(null, offer.name, when (offer.category.uppercase()) { "VOICE" -> "Minutes"; "DATA" -> "Data"; "SMS" -> "SMS"; "COMBO" -> "Combo"; else -> offer.category }, price, if (offer.price >= 0) offer.price.toDouble() else null, "Signature import · " + offer.simProfile + " SIM", false, false, ussdCode = offer.code, duration = offer.duration, sourceId = offer.id, simProfile = offer.simProfile, tags = offer.tags); reload++; selectedOffer = null; onMessage("Offer added to My Offers.") } catch (error: Exception) { onMessage(error.message ?: "Could not save offer.") } }) { Text("Download offer", color = Cyan) } }, dismissButton = { TextButton(onClick = { selectedOffer = null }) { Text("Cancel") } }, containerColor = Color(0xFF10192B), titleContentColor = Color.White, textContentColor = Color(0xFFD4DCE8))
     }
 }
-@Composable
-private fun UpdatesScreen() {
-    val context = LocalContext.current
-    var checking by remember { mutableStateOf(false) }
-    var checkAttempt by remember { mutableIntStateOf(0) }
-    var status by remember { mutableStateOf("Checking for the latest published release…") }
-    var latestVersion by remember { mutableStateOf("") }
-    var releaseNotes by remember { mutableStateOf("") }
-    var apkUrl by remember { mutableStateOf("") }
-    var currentVersion by remember { mutableStateOf("0.1.0") }
-    var downloadId by remember { mutableStateOf<Long?>(null) }
-    val scope = rememberCoroutineScope()
 
-    fun installDownloadedApk(id: Long) {
-        try {
-            val manager = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
-            val uri = manager.getUriForDownloadedFile(id)
-            if (uri == null) { status = "Download did not finish. Try again."; return }
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !context.packageManager.canRequestPackageInstalls()) {
-                status = "Download complete. Allow BingwaPulse to install unknown apps in Android Settings, then tap Install downloaded update."
-                return
-            }
-            val intent = Intent(Intent.ACTION_VIEW).apply {
-                setDataAndType(uri, "application/vnd.android.package-archive")
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            }
-            context.startActivity(intent)
-            status = "Android installer opened. Approve the update to finish."
-        } catch (_: Exception) {
-            status = "Download is ready, but Android could not open the installer. Check app-install permission in Settings."
-        }
-    }
-
-    LaunchedEffect(checkAttempt) {
-        currentVersion = try { context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "unknown" } catch (_: Exception) { "unknown" }
-        checking = true
-        val result = withContext(Dispatchers.IO) {
-            try {
-                val conn = (URL("https://api.github.com/repos/gabrieltonny16-alt/telvanta-android/releases/latest").openConnection() as HttpURLConnection).apply {
-                    connectTimeout = 10000; readTimeout = 10000
-                    setRequestProperty("Accept", "application/vnd.github+json")
-                    setRequestProperty("User-Agent", "BingwaPulse-Android")
-                }
-                try {
-                    if (conn.responseCode == 404) "NO_RELEASE" to ""
-                    else if (conn.responseCode !in 200..299) "ERROR" to "Release service returned HTTP " + conn.responseCode
-                    else "OK" to conn.inputStream.bufferedReader().use { it.readText() }
-                } finally { conn.disconnect() }
-            } catch (e: Exception) { "ERROR" to (e.message ?: "Network error") }
-        }
-        checking = false
-        when (result.first) {
-            "NO_RELEASE" -> status = "No published update is available yet. This app checks automatically when opened; publish a signed release to enable updates."
-            "ERROR" -> status = "Could not check updates. Check your internet connection and try again."
-            else -> try {
-                val json = JSONObject(result.second)
-                latestVersion = json.optString("tag_name", "")
-                releaseNotes = json.optString("body", "No release notes provided.")
-                val assets = json.optJSONArray("assets")
-                if (assets != null) for (i in 0 until assets.length()) {
-                    val asset = assets.getJSONObject(i)
-                    if (asset.optString("name").endsWith(".apk", ignoreCase = true)) { apkUrl = asset.optString("browser_download_url"); break }
-                }
-                status = when {
-                    latestVersion.isBlank() -> "Release information is incomplete."
-                    latestVersion.trimStart('v','V') == currentVersion.trimStart('v','V') -> "You’re using the latest published version ($currentVersion)."
-                    apkUrl.isBlank() -> "Version $latestVersion is published, but it has no APK asset attached yet."
-                    else -> "Version $latestVersion is available."
-                }
-            } catch (_: Exception) { status = "Could not read release information. Try again later." }
-        }
-    }
-
-    val receiver = remember {
-        object : BroadcastReceiver() {
-            override fun onReceive(ctx: Context?, intent: Intent?) {
-                val id = intent?.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1L) ?: -1L
-                if (id > 0 && id == downloadId) installDownloadedApk(id)
-            }
-        }
-    }
-    DisposableEffect(context) {
-        val filter = IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE)
-        if (Build.VERSION.SDK_INT >= 33) context.registerReceiver(receiver, filter, Context.RECEIVER_NOT_EXPORTED)
-        else @Suppress("DEPRECATION") context.registerReceiver(receiver, filter)
-        onDispose { try { context.unregisterReceiver(receiver) } catch (_: Exception) {} }
-    }
-
-    Text("App updates", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = Navy)
-    InfoCard("Current version", "BingwaPulse $currentVersion")
-    InfoCard("Update status", status)
-    if (latestVersion.isNotBlank()) {
-        InfoCard("Latest release", latestVersion)
-        InfoCard("Release notes", releaseNotes.ifBlank { "No release notes provided." })
-    }
-    Button(onClick = {
-        if (apkUrl.isBlank()) status = "No downloadable APK is available. Publish a signed release with an APK asset first."
-        else try {
-            val request = DownloadManager.Request(Uri.parse(apkUrl))
-                .setTitle("BingwaPulse update $latestVersion")
-                .setDescription("Downloading app update")
-                .setMimeType("application/vnd.android.package-archive")
-                .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
-                .setDestinationInExternalFilesDir(context, Environment.DIRECTORY_DOWNLOADS, "bingwapulse-update.apk")
-            downloadId = (context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager).enqueue(request)
-            status = "Downloading version $latestVersion. Android will notify you when it is ready."
-        } catch (_: Exception) { status = "Could not start the update download. Try again." }
-    }, enabled = apkUrl.isNotBlank() && !checking, modifier = Modifier.fillMaxWidth()) { Text("Update now") }
-    OutlinedButton(onClick = { checkAttempt++ }, enabled = !checking, modifier = Modifier.fillMaxWidth()) { Text(if (checking) "Checking…" else "Check again") }
-    InfoCard("Android security", "Android requires your approval to install an APK update. Updates must be signed with the same certificate as the installed app.")
-}
-
-@Composable
-private fun PlannedFeatureScreen(title: String, details: String) {
-    Text(title, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = Navy)
-    InfoCard("Not implemented yet", details)
-    InfoCard("Build status", "This menu item is shown so the workspace is organized, but it is not an active integration. We will implement and test it before calling it ready.")
-}
-
-@Composable
-private fun CloudOfferSyncEffect(db: LocalDatabase, revision: Int, onMessage: (String) -> Unit) {
-    val context = LocalContext.current
-    val store = remember { SecureSessionStore(context) }
-    val api = remember { BingwaSupabaseApi() }
-    LaunchedEffect(revision) {
-        if (store.isLocalWorkspace()) return@LaunchedEffect
-        val saved = store.load() ?: return@LaunchedEffect
-        try {
-            var active = if (saved.expiresAtEpochSeconds <= System.currentTimeMillis() / 1000L + 60L) {
-                withContext(Dispatchers.IO) { api.refreshSession(saved) }.also(store::save)
-            } else saved
-            val businessId = active.businessId
-                ?: withContext(Dispatchers.IO) { api.firstBusinessId(active) }
-                ?: throw IllegalStateException("No business workspace is connected.")
-            if (active.businessId != businessId) {
-                active = active.copy(businessId = businessId)
-                store.save(active)
-            }
-            val localOffers = db.offers()
-            withContext(Dispatchers.IO) {
-                localOffers.forEach { offer -> api.syncLocalOfferToCloud(active, businessId, offer) }
-            }
-            if (localOffers.isNotEmpty()) onMessage("${localOffers.size} local offer(s) synchronized with the cloud catalogue.")
-        } catch (error: Exception) {
-            onMessage(error.message ?: "Could not synchronize local offers with the cloud catalogue.")
-        }
-    }
-}
 
 @Composable
 private fun OffersScreen(db: LocalDatabase, onMessage: (String) -> Unit) {
@@ -1379,558 +1137,100 @@ private fun OffersScreen(db: LocalDatabase, onMessage: (String) -> Unit) {
 @Composable
 private fun CustomersScreen(db: LocalDatabase, onMessage: (String) -> Unit) {
     val context = LocalContext.current
+    var search by remember { mutableStateOf("") }
+    var filter by remember { mutableStateOf("All") }
+    var reload by remember { mutableIntStateOf(0) }
+    var showEditor by remember { mutableStateOf(false) }
+    var showSimulation by remember { mutableStateOf(false) }
     var editId by remember { mutableStateOf<Long?>(null) }
     var name by remember { mutableStateOf("") }
     var phone by remember { mutableStateOf("") }
     var notes by remember { mutableStateOf("") }
-    var search by remember { mutableStateOf("") }
-    var reload by remember { mutableIntStateOf(0) }
-    var showEditor by remember { mutableStateOf(false) }
-
-    val customers = remember(reload, search) { db.customers(search.trim()) }
+    var simPhone by remember { mutableStateOf("") }
+    var simOffer by remember { mutableStateOf("") }
+    var simPrice by remember { mutableStateOf("") }
+    val all = remember(reload) { db.customers() }
     val orders = remember(reload) { db.orders() }
-    val phoneKey: (String) -> String = { value -> value.filter { it.isDigit() }.takeLast(9) }
-    val dateFormat = remember { SimpleDateFormat("dd MMM yyyy · HH:mm", Locale.getDefault()) }
-    val totalOrders = orders.size
-    val totalCustomers = db.count("customers")
-
-    fun clearEditor() {
-        editId = null
-        name = ""
-        phone = ""
-        notes = ""
+    val key: (String) -> String = { it.filter { ch -> ch.isDigit() }.takeLast(9) }
+    val shown = all.filter { customer ->
+        val customerOrders = orders.filter { key(it.customer) == key(customer.phone) && key(customer.phone).isNotBlank() }
+        val recent = customerOrders.maxOfOrNull { it.createdAt }?.let { System.currentTimeMillis() - it < 30L * 86400000L } ?: false
+        val matches = search.isBlank() || customer.name.contains(search, true) || customer.phone.contains(search, true)
+        matches && when(filter) { "Frequent" -> customerOrders.size >= 5; "Recent" -> recent; "Blacklisted" -> false; else -> true }
     }
-
-    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Row(
-            Modifier.fillMaxWidth(),
-            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                Text("CUSTOMER MANAGEMENT", color = Cyan, fontWeight = FontWeight.ExtraBold, letterSpacing = 1.4.sp, style = MaterialTheme.typography.labelMedium)
-                Text("Your customers", color = Color.White, fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.headlineSmall)
-                Text("$totalCustomers saved contacts · $totalOrders recorded orders", color = Muted, style = MaterialTheme.typography.bodySmall)
+    val dateFormat = remember { SimpleDateFormat("dd MMM · HH:mm", Locale.getDefault()) }
+    fun clearEditor() { editId = null; name = ""; phone = ""; notes = "" }
+    Box(Modifier.fillMaxSize()) {
+        LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(top = 2.dp, bottom = 86.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            item {
+                OutlinedTextField(search, { search = it }, Modifier.fillMaxWidth(), placeholder = { Text("Search name or phone", color = Muted) }, leadingIcon = { Text("⌕", color = Muted) }, singleLine = true, shape = RoundedCornerShape(18.dp), colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Cyan, unfocusedBorderColor = Color(0xFF202A3B), focusedContainerColor = Color(0xFF10192B), unfocusedContainerColor = Color(0xFF10192B), focusedTextColor = Color.White, unfocusedTextColor = Color.White, cursorColor = Cyan))
             }
-            Surface(color = Color(0xFF102C36), shape = RoundedCornerShape(14.dp), border = BorderStroke(1.dp, Color(0xFF1D5969))) {
-                Text("＋ ADD", color = Cyan, fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.labelMedium,
-                    modifier = Modifier.clickable { clearEditor(); showEditor = true }.padding(horizontal = 13.dp, vertical = 11.dp))
-            }
-        }
-
-        OutlinedTextField(
-            value = search,
-            onValueChange = { search = it },
-            modifier = Modifier.fillMaxWidth(),
-            placeholder = { Text("Search customer or phone…", color = Muted) },
-            leadingIcon = { Text("⌕", color = Cyan, style = MaterialTheme.typography.titleLarge) },
-            trailingIcon = { if (search.isNotBlank()) TextButton(onClick = { search = "" }) { Text("CLEAR", color = Cyan, style = MaterialTheme.typography.labelSmall) } },
-            singleLine = true,
-            shape = RoundedCornerShape(15.dp),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = Cyan, unfocusedBorderColor = Color(0xFF253044),
-                focusedContainerColor = Color(0xFF111622), unfocusedContainerColor = Color(0xFF111622),
-                focusedTextColor = Color.White, unfocusedTextColor = Color.White, cursorColor = Cyan
-            )
-        )
-
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            listOf("CONTACTS" to customers.size.toString(), "ORDERS" to totalOrders.toString()).forEach { metric ->
-                Card(
-                    modifier = Modifier.weight(1f),
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFF111622)),
-                    border = BorderStroke(1.dp, Color(0xFF202A3B)),
-                    shape = RoundedCornerShape(14.dp)
-                ) {
-                    Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                        Text(metric.first, color = Muted, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall, letterSpacing = 1.sp)
-                        Text(metric.second, color = Color.White, fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.titleLarge)
+            item {
+                Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf("All", "Frequent", "Recent", "Blacklisted").forEach { item ->
+                        FilterChip(filter == item, { filter = item }, label = { Text(item) }, colors = FilterChipDefaults.filterChipColors(selectedContainerColor = Cyan, selectedLabelColor = Color(0xFF06111B), containerColor = Color(0xFF10192B), labelColor = Color(0xFFD4DCE8)))
                     }
                 }
             }
-        }
-
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-            Text("CUSTOMER LIST", color = Muted, fontWeight = FontWeight.Bold, letterSpacing = 1.2.sp, style = MaterialTheme.typography.labelSmall)
-            Text("${customers.size} shown", color = Muted, style = MaterialTheme.typography.labelSmall)
-        }
-
-        if (customers.isEmpty()) {
-            InfoCard(
-                if (search.isBlank()) "No customers saved yet" else "No matching customers",
-                if (search.isBlank()) "Add a customer to keep their contact details and see their recorded order history here."
-                else "Try another name or phone number, or clear your search."
-            )
-        }
-
-        customers.forEach { customer ->
-            val key = phoneKey(customer.phone)
-            val customerOrders = orders.filter { phoneKey(it.customer) == key && key.isNotBlank() }
-            val latestOrder = customerOrders.maxByOrNull { it.createdAt }
-            val orderValue = customerOrders.sumOf { it.price }
-            val initials = customer.name.trim().split(Regex("\\s+")).filter { it.isNotBlank() }
-                .take(2).mapNotNull { it.firstOrNull()?.uppercaseChar() }.joinToString("")
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = Color(0xFF111622)),
-                border = BorderStroke(1.dp, Color(0xFF202A3B)),
-                shape = RoundedCornerShape(17.dp)
-            ) {
-                Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
-                    Row(Modifier.fillMaxWidth(), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Surface(
-                            color = Color(0xFF123548),
-                            shape = RoundedCornerShape(50),
-                            border = BorderStroke(1.dp, Color(0xFF24536A))
-                        ) {
-                            Box(Modifier.size(43.dp), contentAlignment = androidx.compose.ui.Alignment.Center) {
-                                Text(initials.ifBlank { "?" }, color = Cyan, fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.titleMedium)
-                            }
-                        }
-                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                            Text(customer.name, color = Color.White, fontWeight = FontWeight.Bold, maxLines = 1, style = MaterialTheme.typography.titleMedium)
-                            Text(customer.phone, color = Muted, style = MaterialTheme.typography.bodySmall)
-                        }
-                        Surface(color = if (customerOrders.isNotEmpty()) Color(0xFF123A32) else Color(0xFF252B38), shape = RoundedCornerShape(50)) {
-                            Text(
-                                if (customerOrders.isEmpty()) "NEW" else "RETURNING",
-                                color = if (customerOrders.isEmpty()) Muted else Color(0xFF80E6BC),
-                                fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall,
-                                modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp)
-                            )
-                        }
+            item {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                    Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                        Box(Modifier.size(8.dp).clip(RoundedCornerShape(50)).background(Cyan))
+                        Text("Customer records (" + shown.size + ")", color = Color.White, fontWeight = FontWeight.Bold)
                     }
-
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                        listOf("ORDERS" to customerOrders.size.toString(), "ORDER VALUE" to "KES ${money(orderValue)}").forEach { metric ->
-                            Surface(
-                                modifier = Modifier.weight(1f),
-                                color = Color(0xFF0B111B),
-                                shape = RoundedCornerShape(10.dp),
-                                border = BorderStroke(1.dp, Color(0xFF202A3B))
-                            ) {
-                                Column(Modifier.padding(horizontal = 9.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                                    Text(metric.first, color = Muted, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall)
-                                    Text(metric.second, color = Color.White, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium, maxLines = 1)
+                    TextButton(onClick = { simPhone = ""; simOffer = ""; simPrice = ""; showSimulation = true }) { Text("+ Simulate Purchase", color = Cyan, fontWeight = FontWeight.Bold) }
+                }
+                if (filter == "Blacklisted") Text("No blacklist records are stored yet.", color = Muted, style = MaterialTheme.typography.bodySmall)
+            }
+            if (shown.isEmpty() && filter != "Blacklisted") item { InfoCard("No matching customers", "Saved customer contacts and recorded orders appear here.") }
+            items(shown.size) { index ->
+                val customer = shown[index]
+                val customerOrders = orders.filter { key(it.customer) == key(customer.phone) && key(customer.phone).isNotBlank() }.sortedByDescending { it.createdAt }
+                val latest = customerOrders.firstOrNull()
+                val initials = customer.name.trim().split(Regex("\\s+")).take(2).mapNotNull { it.firstOrNull()?.uppercaseChar() }.joinToString("")
+                Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = Color(0xFF10192B)), border = BorderStroke(1.dp, Color(0xFF202A3B)), shape = RoundedCornerShape(22.dp)) {
+                    Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Row(Modifier.fillMaxWidth(), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Surface(color = Color(0xFF123548), shape = RoundedCornerShape(15.dp), border = BorderStroke(1.dp, Color(0xFF24536A))) {
+                                Box(Modifier.size(46.dp), contentAlignment = androidx.compose.ui.Alignment.Center) { Text(initials.ifBlank { "?" }, color = Cyan, fontWeight = FontWeight.ExtraBold) }
+                            }
+                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    Text(customer.name, color = Color.White, fontWeight = FontWeight.ExtraBold, maxLines = 1)
+                                    if (customerOrders.size >= 5) Surface(color = Color(0xFF123A4A), shape = RoundedCornerShape(50)) { Text("VIP", color = Cyan, modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold) }
                                 }
+                                Text(customer.phone, color = Cyan, fontWeight = FontWeight.SemiBold)
+                            }
+                            Surface(color = if (customerOrders.isEmpty()) Color(0xFF252F40) else Color(0xFF123A4A), shape = RoundedCornerShape(50)) {
+                                Text(if (customerOrders.isEmpty()) "Saved" else "Returning", color = if (customerOrders.isEmpty()) Muted else Cyan, modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp), style = MaterialTheme.typography.labelSmall)
                             }
                         }
-                    }
-
-                    if (latestOrder != null) {
-                        Text(
-                            "Last order · ${latestOrder.offer} · ${dateFormat.format(Date(latestOrder.createdAt))}",
-                            color = Muted, style = MaterialTheme.typography.labelSmall, maxLines = 2
-                        )
-                        Text("Latest status · ${latestOrder.status}", color = Muted, style = MaterialTheme.typography.labelSmall)
-                    }
-                    if (customer.notes.isNotBlank()) {
-                        Text(customer.notes, color = Color(0xFFD1D9E6), style = MaterialTheme.typography.bodySmall, maxLines = 3)
-                    }
-                    HorizontalDivider(color = Color(0xFF202A3B))
-                    Row(Modifier.fillMaxWidth(), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-                        TextButton(
-                            onClick = { runCatching { context.startActivity(Intent(Intent.ACTION_DIAL, Uri.fromParts("tel", customer.phone, null))) }
-                                .onFailure { onMessage("Could not open the phone dialler.") } },
-                            contentPadding = PaddingValues(horizontal = 7.dp, vertical = 2.dp)
-                        ) { Text("☎ CALL", color = Cyan, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall) }
-                        Spacer(Modifier.weight(1f))
-                        TextButton(onClick = {
-                            editId = customer.id; name = customer.name; phone = customer.phone; notes = customer.notes; showEditor = true
-                        }, contentPadding = PaddingValues(horizontal = 7.dp, vertical = 2.dp)) {
-                            Text("EDIT", color = Cyan, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall)
+                        Row(Modifier.fillMaxWidth(), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                            Text("Last: " + (latest?.offer ?: "No purchase"), color = Color(0xFFD4DCE8), modifier = Modifier.weight(1f), maxLines = 1, style = MaterialTheme.typography.bodySmall)
+                            Text(customerOrders.size.toString() + " orders · KES " + money(customerOrders.sumOf { it.price }), color = Muted, style = MaterialTheme.typography.bodySmall)
                         }
-                        TextButton(onClick = {
-                            runCatching { db.deleteCustomer(customer.id); reload++; onMessage("Customer deleted.") }
-                                .onFailure { onMessage(it.message ?: "Could not delete customer.") }
-                        }, contentPadding = PaddingValues(horizontal = 7.dp, vertical = 2.dp)) {
-                            Text("DELETE", color = Color(0xFFE88BA4), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall)
+                        if (latest != null) {
+                            val age = (System.currentTimeMillis() - latest.createdAt).coerceAtLeast(0)
+                            val time = when { age < 60000 -> "just now"; age < 3600000 -> (age / 60000).toString() + " mins ago"; age < 86400000 -> (age / 3600000).toString() + " hr ago"; else -> dateFormat.format(Date(latest.createdAt)) }
+                            Text(time + " · " + latest.status, color = Muted, style = MaterialTheme.typography.labelSmall)
+                        }
+                        if (customer.notes.isNotBlank()) Text("Note: " + customer.notes, color = Muted, style = MaterialTheme.typography.bodySmall, maxLines = 2)
+                        Row(Modifier.fillMaxWidth(), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                            TextButton(onClick = { runCatching { context.startActivity(Intent(Intent.ACTION_DIAL, Uri.fromParts("tel", customer.phone, null))) }.onFailure { onMessage("Could not open the phone dialler.") } }, contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp)) { Text("☎ Dial", color = Color.White, fontWeight = FontWeight.Bold) }
+                            Spacer(Modifier.weight(1f))
+                            TextButton(onClick = { editId = customer.id; name = customer.name; phone = customer.phone; notes = customer.notes; showEditor = true }) { Text("Edit", color = Cyan) }
+                            TextButton(onClick = { runCatching { db.deleteCustomer(customer.id); reload++; onMessage("Customer deleted.") }.onFailure { onMessage(it.message ?: "Could not delete customer.") } }) { Text("Delete", color = Color(0xFFE88BA4)) }
                         }
                     }
-                    if (customerOrders.isNotEmpty()) {
-                        Text("Order value is based on recorded orders; it is not a verified payment total.", color = Muted, style = MaterialTheme.typography.labelSmall)
-                    }
                 }
             }
         }
+        FloatingActionButton(onClick = { clearEditor(); showEditor = true }, modifier = Modifier.align(androidx.compose.ui.Alignment.BottomEnd).padding(end = 8.dp, bottom = 10.dp), containerColor = Cyan, contentColor = Color(0xFF06111B), shape = RoundedCornerShape(20.dp)) { Text("+", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold) }
     }
-
-    if (showEditor) AlertDialog(
-        onDismissRequest = { showEditor = false; clearEditor() },
-        title = { Text(if (editId == null) "Add customer" else "Edit customer") },
-        text = {
-            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(name, { name = it }, label = { Text("Customer name") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
-                OutlinedTextField(phone, { phone = it }, label = { Text("Phone number") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
-                OutlinedTextField(notes, { notes = it }, label = { Text("Notes (optional)") }, modifier = Modifier.fillMaxWidth(), minLines = 2)
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = {
-                if (name.isBlank() || phone.isBlank()) onMessage("Enter customer name and phone number.")
-                else try {
-                    db.saveCustomer(editId, name, phone, notes)
-                    showEditor = false; clearEditor(); reload++
-                    onMessage("Customer saved locally.")
-                } catch (_: Exception) {
-                    onMessage("Could not save customer. Check that the phone number is not already used.")
-                }
-            }) { Text(if (editId == null) "Save customer" else "Update customer", color = Cyan) }
-        },
-        dismissButton = { TextButton(onClick = { showEditor = false; clearEditor() }) { Text("Cancel") } },
-        containerColor = Color(0xFF111622),
-        titleContentColor = Color.White,
-        textContentColor = Color(0xFFD1D9E6)
-    )
+    if (showEditor) AlertDialog(onDismissRequest = { showEditor = false; clearEditor() }, title = { Text(if (editId == null) "Add customer" else "Edit customer") }, text = { Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) { OutlinedTextField(name, { name = it }, label = { Text("Customer name") }, modifier = Modifier.fillMaxWidth()); OutlinedTextField(phone, { phone = it }, label = { Text("Phone number") }, modifier = Modifier.fillMaxWidth()); OutlinedTextField(notes, { notes = it }, label = { Text("Note (optional)") }, modifier = Modifier.fillMaxWidth(), minLines = 2) } }, confirmButton = { TextButton(onClick = { if (name.isBlank() || phone.isBlank()) onMessage("Enter customer name and phone number.") else try { db.saveCustomer(editId, name, phone, notes); showEditor = false; clearEditor(); reload++; onMessage("Customer saved.") } catch (_: Exception) { onMessage("Could not save customer. Check whether the phone number is already saved.") } }) { Text("Save", color = Cyan) } }, dismissButton = { TextButton(onClick = { showEditor = false; clearEditor() }) { Text("Cancel") } }, containerColor = Color(0xFF10192B), titleContentColor = Color.White, textContentColor = Color(0xFFD4DCE8))
+    if (showSimulation) AlertDialog(onDismissRequest = { showSimulation = false }, title = { Text("Simulate a purchase") }, text = { Column(verticalArrangement = Arrangement.spacedBy(8.dp)) { OutlinedTextField(simPhone, { simPhone = it }, label = { Text("Customer phone") }, modifier = Modifier.fillMaxWidth()); OutlinedTextField(simOffer, { simOffer = it }, label = { Text("Offer name") }, modifier = Modifier.fillMaxWidth()); OutlinedTextField(simPrice, { simPrice = it.filter { ch -> ch.isDigit() || ch == '.' } }, label = { Text("Amount (KES)") }, modifier = Modifier.fillMaxWidth()); Text("Local test order only. No payment or message is sent.", color = Muted, style = MaterialTheme.typography.bodySmall) } }, confirmButton = { TextButton(onClick = { val amount = simPrice.toDoubleOrNull(); if (simPhone.isBlank() || simOffer.isBlank() || amount == null || amount <= 0) onMessage("Enter a phone, offer and valid amount.") else try { db.createOrder(simPhone, simOffer, amount, "Simulated purchase"); showSimulation = false; reload++; onMessage("Local simulated order recorded.") } catch (error: Exception) { onMessage(error.message ?: "Could not record test order.") } }) { Text("Record test order", color = Cyan) } }, dismissButton = { TextButton(onClick = { showSimulation = false }) { Text("Cancel") } }, containerColor = Color(0xFF10192B), titleContentColor = Color.White, textContentColor = Color(0xFFD4DCE8))
 }
 
-@Composable
-private fun PaymentInboxScreen() {
-    val context = LocalContext.current
-    val store = remember { SecureSessionStore(context) }
-    val api = remember { BingwaSupabaseApi() }
-    val scope = rememberCoroutineScope()
-    var session by remember { mutableStateOf(store.load()) }
-    var candidates by remember { mutableStateOf<List<MpesaNotificationReviewCandidate>>(emptyList()) }
-    var notice by remember { mutableStateOf("") }
-    var busy by remember { mutableStateOf(false) }
-    var pendingVerification by remember { mutableStateOf<MpesaNotificationReviewCandidate?>(null) }
-    var tillNumber by remember { mutableStateOf("1561763") }
-    var tillBusy by remember { mutableStateOf(false) }
-    var tillNotice by remember { mutableStateOf("") }
-    var businessName by remember { mutableStateOf("GABRIEL'S INTERNET SERVICES") }
-    var workspaceExists by remember { mutableStateOf(session?.businessId != null) }
-    var workspaceBusy by remember { mutableStateOf(false) }
-    var workspaceNotice by remember { mutableStateOf("") }
-
-    fun createBusinessWorkspace() {
-        val current = session
-        if (current == null) {
-            workspaceNotice = "Sign in to BingwaPulse before creating a business workspace."
-            return
-        }
-        val name = businessName.trim()
-        if (name.length !in 2..120) {
-            workspaceNotice = "Business name must contain 2–120 characters."
-            return
-        }
-        scope.launch {
-            workspaceBusy = true
-            try {
-                var active = current
-                if (active.expiresAtEpochSeconds <= System.currentTimeMillis() / 1000L + 60L) {
-                    active = withContext(Dispatchers.IO) { api.refreshSession(active) }
-                    store.save(active)
-                }
-                val existingId = active.businessId
-                    ?: withContext(Dispatchers.IO) { api.firstBusinessId(active) }
-                val businessId = existingId ?: run {
-                    val baseSlug = name.lowercase()
-                        .replace(Regex("[^a-z0-9]+"), "-")
-                        .trim('-')
-                        .take(40)
-                        .ifBlank { "bingwapulse-business" }
-                    val slug = "$baseSlug-${active.userId.takeLast(6).lowercase()}"
-                    withContext(Dispatchers.IO) { api.createBusiness(active, name, slug) }
-                }
-                active = active.copy(businessId = businessId)
-                store.save(active)
-                session = active
-                workspaceExists = true
-                workspaceNotice = if (existingId == null) {
-                    "Business workspace created. Next, save the Till and sync your Signature offers."
-                } else {
-                    "Your existing business workspace is connected."
-                }
-                candidates = withContext(Dispatchers.IO) {
-                    api.listMpesaNotificationCandidates(active, businessId)
-                }
-            } catch (error: Exception) {
-                workspaceNotice = error.message ?: "Could not create the business workspace."
-            } finally {
-                workspaceBusy = false
-            }
-        }
-    }
-
-    fun saveTillConfiguration() {
-        val current = session
-        if (current == null) {
-            tillNotice = "Sign in to a business workspace first."
-            return
-        }
-        if (!tillNumber.trim().matches(Regex("^[0-9]{5,8}$"))) {
-            tillNotice = "Enter the exact 5–8 digit M-PESA Till number."
-            return
-        }
-        scope.launch {
-            tillBusy = true
-            try {
-                var active = current
-                if (active.expiresAtEpochSeconds <= System.currentTimeMillis() / 1000L + 60L) {
-                    active = withContext(Dispatchers.IO) { api.refreshSession(active) }
-                    store.save(active)
-                    session = active
-                }
-                val businessId = active.businessId
-                    ?: withContext(Dispatchers.IO) { api.firstBusinessId(active) }
-                    ?: throw IllegalStateException("Create your business workspace first.")
-                withContext(Dispatchers.IO) { api.savePaymentIngressTill(active, businessId, tillNumber) }
-                tillNotice = "Till saved. Safaricom C2B URL registration and the callback token are the remaining payment-verification setup."
-            } catch (error: Exception) {
-                tillNotice = error.message ?: "Could not save the Till configuration."
-            } finally {
-                tillBusy = false
-            }
-        }
-    }
-
-    fun refreshCandidates() {
-        if (store.isLocalWorkspace()) {
-            notice = "Sign in to a real business workspace to review payment candidates."
-            return
-        }
-        val current = session
-        if (current == null) {
-            notice = "Sign in to BingwaPulse before reviewing M-PESA payments."
-            return
-        }
-        scope.launch {
-            busy = true
-            try {
-                var activeSession = current
-                if (activeSession.expiresAtEpochSeconds <= System.currentTimeMillis() / 1000L + 60L) {
-                    activeSession = withContext(Dispatchers.IO) { api.refreshSession(activeSession) }
-                    store.save(activeSession)
-                    session = activeSession
-                }
-                val businessId = activeSession.businessId
-                    ?: withContext(Dispatchers.IO) { api.firstBusinessId(activeSession) }
-                    ?: throw IllegalStateException("This account has no active business workspace.")
-                if (activeSession.businessId == null) {
-                    activeSession = activeSession.copy(businessId = businessId)
-                    store.save(activeSession)
-                    session = activeSession
-                }
-                candidates = withContext(Dispatchers.IO) {
-                    api.listMpesaNotificationCandidates(activeSession, businessId)
-                }
-                notice = if (candidates.isEmpty()) {
-                    "No M-PESA notification candidates have reached this business inbox yet."
-                } else {
-                    "Loaded ${candidates.size} payment candidate(s)."
-                }
-            } catch (error: Exception) {
-                notice = error.message ?: "Could not load the payment inbox."
-            } finally {
-                busy = false
-            }
-        }
-    }
-
-    fun retryCandidate(candidate: MpesaNotificationReviewCandidate) {
-        val current = session ?: run {
-            notice = "Your session has expired. Sign in again."
-            return
-        }
-        scope.launch {
-            busy = true
-            try {
-                var activeSession = current
-                if (activeSession.expiresAtEpochSeconds <= System.currentTimeMillis() / 1000L + 60L) {
-                    activeSession = withContext(Dispatchers.IO) { api.refreshSession(activeSession) }
-                    store.save(activeSession)
-                    session = activeSession
-                }
-                val businessId = activeSession.businessId
-                    ?: withContext(Dispatchers.IO) { api.firstBusinessId(activeSession) }
-                    ?: throw IllegalStateException("This account has no active business workspace.")
-                withContext(Dispatchers.IO) {
-                    api.retryMpesaNotificationCandidate(activeSession, businessId, candidate.id)
-                }
-                notice = "Retry requested. The server will re-check the Till and offer configuration."
-                refreshCandidates()
-            } catch (error: Exception) {
-                notice = error.message ?: "The candidate could not be retried."
-            } finally {
-                busy = false
-            }
-        }
-    }
-
-    fun submitReview(candidate: MpesaNotificationReviewCandidate, decision: String) {
-        val current = session ?: run {
-            notice = "Your session has expired. Sign in again."
-            return
-        }
-        scope.launch {
-            busy = true
-            try {
-                var activeSession = current
-                if (activeSession.expiresAtEpochSeconds <= System.currentTimeMillis() / 1000L + 60L) {
-                    activeSession = withContext(Dispatchers.IO) { api.refreshSession(activeSession) }
-                    store.save(activeSession)
-                    session = activeSession
-                }
-                val businessId = activeSession.businessId
-                    ?: withContext(Dispatchers.IO) { api.firstBusinessId(activeSession) }
-                    ?: throw IllegalStateException("This account has no active business workspace.")
-                withContext(Dispatchers.IO) {
-                    api.reviewMpesaNotificationCandidate(activeSession, businessId, candidate.id, decision)
-                }
-                notice = if (decision == "verify") {
-                    "Payment verified. Its order is now PAID and awaits the separate fulfilment worker."
-                } else {
-                    "Payment candidate rejected and sent to reconciliation."
-                }
-                pendingVerification = null
-                refreshCandidates()
-            } catch (error: Exception) {
-                notice = error.message ?: "The payment review could not be saved."
-            } finally {
-                busy = false
-            }
-        }
-    }
-
-    LaunchedEffect(Unit) {
-        refreshCandidates()
-        val current = session
-        if (current != null && !store.isLocalWorkspace()) {
-            runCatching {
-                var active = current
-                val businessId = active.businessId ?: withContext(Dispatchers.IO) { api.firstBusinessId(active) }
-                if (businessId != null) {
-                    active = active.copy(businessId = businessId)
-                    store.save(active)
-                    session = active
-                    workspaceExists = true
-                    val savedTill = withContext(Dispatchers.IO) { api.getPaymentIngressTill(active, businessId) }
-                    if (!savedTill.isNullOrBlank()) tillNumber = savedTill
-                } else {
-                    workspaceExists = false
-                }
-            }
-        }
-    }
-
-    Text("M-PESA Payment Inbox", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.ExtraBold, color = Navy)
-    InfoCard(
-        "Payment evidence and order staging",
-        "Only strict incoming M-PESA Till confirmations qualify for automatic matching: the M-PESA sender title, receipt, date/time, amount, payer and new account balance must all be present. The business must have exactly one active Till configured. Generic wallet, outgoing, incomplete or ambiguous messages remain held. Trusted Safaricom C2B callbacks are also supported."
-    )
-    if (store.isLocalWorkspace()) {
-        InfoCard("Account connection required", "Payment review is unavailable in local preview mode. Sign in and connect a business workspace to load its candidates.")
-        return
-    }
-    if (session == null) {
-        InfoCard("Sign in required", "Sign in to your BingwaPulse account before creating the business workspace and connecting its Till.")
-        return
-    }
-    if (!workspaceExists) {
-        Text("BUSINESS WORKSPACE", color = Navy, fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.titleMedium)
-        InfoCard(
-            "Create your business workspace",
-            "This creates the owner workspace for your offers, agent phone, Till payments and customer orders. It does not initiate a payment."
-        )
-        OutlinedTextField(
-            value = businessName,
-            onValueChange = { businessName = it.take(120) },
-            label = { Text("Business name") },
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth()
-        )
-        Button(
-            onClick = { createBusinessWorkspace() },
-            enabled = !workspaceBusy && businessName.trim().length in 2..120,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text(if (workspaceBusy) "Creating workspace…" else "Create business workspace")
-        }
-        if (workspaceNotice.isNotBlank()) Text(workspaceNotice, color = Cyan, fontWeight = FontWeight.SemiBold)
-        return
-    }
-    Text("TRUSTED TILL PAYMENT SETUP", color = Navy, fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.titleMedium)
-    InfoCard(
-        "Automatic Till verification",
-        "Save the receiving Till here. Notification matching requires exactly one active Till and the strict incoming confirmation format described above. Trusted C2B callbacks can also verify receipts; anything incomplete or ambiguous remains held for reconciliation."
-    )
-    OutlinedTextField(
-        value = tillNumber,
-        onValueChange = { tillNumber = it.filter(Char::isDigit).take(8) },
-        label = { Text("M-PESA Buy Goods Till number") },
-        singleLine = true,
-        modifier = Modifier.fillMaxWidth()
-    )
-    Button(onClick = { saveTillConfiguration() }, enabled = !tillBusy && tillNumber.length in 5..8, modifier = Modifier.fillMaxWidth()) {
-        Text(if (tillBusy) "Saving Till…" else "Save Till for automatic verification")
-    }
-    if (tillNotice.isNotBlank()) Text(tillNotice, color = Cyan, style = MaterialTheme.typography.bodySmall)
-    InfoCard(
-        "Safaricom C2B registration URLs",
-        "Validation: https://tuuhucisljlaaovtnbeu.supabase.co/functions/v1/mpesa-c2b-callback?mode=validate&token=YOUR_SECRET_TOKEN\n\nConfirmation: https://tuuhucisljlaaovtnbeu.supabase.co/functions/v1/mpesa-c2b-callback?mode=confirm&token=YOUR_SECRET_TOKEN\n\nSet the same strong token as the Supabase Edge Function secret MPESA_C2B_CALLBACK_TOKEN, then register both URLs for this Till in Safaricom Daraja. This is C2B confirmation only; it does not send STK prompts."
-    )
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-        Button(onClick = { refreshCandidates() }, enabled = !busy, modifier = Modifier.weight(1f)) {
-            Text(if (busy) "Loading…" else "Refresh inbox")
-        }
-        if (busy) CircularProgressIndicator(modifier = Modifier.size(22.dp), color = Cyan, strokeWidth = 2.dp)
-    }
-    if (notice.isNotBlank()) Text(notice, color = Cyan, fontWeight = FontWeight.SemiBold)
-    if (candidates.isEmpty() && !busy) {
-        InfoCard("Nothing to review yet", "New matching M-PESA notifications will appear here after the agent phone has Notification Access and successfully syncs to this business.")
-    }
-    candidates.forEach { candidate ->
-        Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF0B0F19)), modifier = Modifier.fillMaxWidth()) {
-            Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-                    Text("KES ${candidate.amountMinor?.div(100) ?: "—"}", color = Navy, fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.titleLarge)
-                    Text(candidate.stagingStatus.replace('_', ' ').uppercase(), color = if (candidate.stagingStatus == "staged_for_review") Color(0xFFFFD166) else Muted, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall)
-                }
-                Text("Receipt: ${candidate.receiptCode ?: "Not identified"}", color = Navy, fontWeight = FontWeight.SemiBold)
-                Text("Payer: ${candidate.senderPhone ?: "Not identified"}", color = Muted)
-                if (!candidate.senderName.isNullOrBlank()) Text("Name: ${candidate.senderName}", color = Muted)
-                Text("Parser: ${candidate.candidateStatus.replace('_', ' ')} · Match: ${candidate.matchStatus.uppercase()}", color = Muted, style = MaterialTheme.typography.labelSmall)
-                if (!candidate.stagingReason.isNullOrBlank()) Text(candidate.stagingReason, color = Muted, style = MaterialTheme.typography.bodySmall)
-                if (!candidate.stagedOrderId.isNullOrBlank()) Text("Order: ${candidate.stagedOrderId}", color = Muted, style = MaterialTheme.typography.labelSmall)
-                if (candidate.stagingStatus == "blocked") {
-                    OutlinedButton(onClick = { retryCandidate(candidate) }, enabled = !busy, modifier = Modifier.fillMaxWidth()) {
-                        Text("Retry after fixing configuration")
-                    }
-                }
-                if (candidate.stagingStatus == "staged_for_review") {
-                    InfoCard(
-                        "Automatic match not completed",
-                        "No single recent Quick Dial order matched this receipt. The payment is held safely; no bundle will be sent until the order can be matched."
-                    )
-                }
-                if (candidate.stagingStatus == "verified") {
-                    Text("Automatically matched · payment marked PAID · fulfilment queued for the worker.", color = Cyan, style = MaterialTheme.typography.bodySmall)
-                }
-            }
-        }
-    }
-
-    pendingVerification?.let { candidate ->
-        AlertDialog(
-            onDismissRequest = { if (!busy) pendingVerification = null },
-            title = { Text("Verify this M-PESA payment?") },
-            text = {
-                Text("Only continue after checking the transaction in the actual Lipa na M-PESA Till record. Confirm receipt ${candidate.receiptCode ?: "—"} for KES ${candidate.amountMinor?.div(100) ?: "—"} and payer ${candidate.senderPhone ?: "—"}. This marks the linked order PAID; it does not itself start a bundle purchase.")
-            },
-            confirmButton = {
-                TextButton(onClick = { submitReview(candidate, "verify") }, enabled = !busy) {
-                    Text("I checked the Till record")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { pendingVerification = null }, enabled = !busy) {
-                    Text("Not yet")
-                }
-            }
-        )
-    }
-}
 
 @Composable
 private fun OrdersScreen(db:LocalDatabase,onMessage:(String)->Unit) {
