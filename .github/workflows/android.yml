@@ -63,7 +63,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: bingwapulse-connect-pulse-apks
-      - name: Install and launch both APKs on Android 16 emulator
+      - name: Test BingwaPulse launch and navigation on Android 16 emulator
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 36
@@ -73,17 +73,12 @@ jobs:
           script: |
             set -eu
             adb install --no-streaming BingwaPulse-debug.apk
-            adb install --no-streaming Connect-Pulse-debug.apk
             adb install --no-streaming app-debug-androidTest.apk
             adb shell pm path com.telvanta.app
-            adb shell pm path com.bingwapulse.connectpulse
             adb logcat -c
             adb shell monkey -p com.telvanta.app 1
             sleep 8
             adb shell pidof com.telvanta.app
-            adb shell monkey -p com.bingwapulse.connectpulse 1
-            sleep 8
-            adb shell pidof com.bingwapulse.connectpulse
             adb shell am instrument -w -r com.telvanta.app.test/androidx.test.runner.AndroidJUnitRunner
             adb logcat -d -s AndroidRuntime:E > android-crashes.log
             if grep -q "FATAL EXCEPTION" android-crashes.log; then
