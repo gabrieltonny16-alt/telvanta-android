@@ -169,18 +169,18 @@ private fun BingwaPulseApp(db: LocalDatabase) {
             title={Column(verticalArrangement=Arrangement.spacedBy(2.dp)) { Text("BINGWAPULSE",fontWeight=FontWeight.Black,color=Navy,letterSpacing=1.3.sp,style=MaterialTheme.typography.titleLarge); Text(selected.uppercase(),style=MaterialTheme.typography.labelSmall,color=Muted,letterSpacing=1.5.sp) }},
             colors=TopAppBarDefaults.topAppBarColors(containerColor=Color(0xFF05070D))
         ) }) { padding ->
-            LazyColumn(Modifier.fillMaxSize().padding(padding).padding(horizontal=16.dp),verticalArrangement=Arrangement.spacedBy(10.dp),contentPadding=PaddingValues(top=10.dp,bottom=12.dp)) {
+            Column(
+                Modifier.fillMaxSize().padding(padding).padding(horizontal = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
                 if (SecureSessionStore(context).isLocalWorkspace()) {
-                    item {
-                        Row(Modifier.fillMaxWidth(), horizontalArrangement=Arrangement.End) {
-                            Surface(color=Color(0xFF0B0F19), shape=RoundedCornerShape(50)) {
-                                Text("LOCAL PREVIEW", color=Muted, style=MaterialTheme.typography.labelSmall, modifier=Modifier.padding(horizontal=10.dp, vertical=5.dp))
-                            }
+                    Row(Modifier.fillMaxWidth().padding(top = 10.dp), horizontalArrangement = Arrangement.End) {
+                        Surface(color = Color(0xFF0B0F19), shape = RoundedCornerShape(50)) {
+                            Text("LOCAL PREVIEW", color = Muted, style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(horizontal=10.dp, vertical=5.dp))
                         }
                     }
                 }
-                item {
-                    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Box(Modifier.weight(1f).fillMaxWidth()) {
                     when(selected) {
                         "Dashboard" -> BingwaDashboard(db) { destination -> selected = destination; message = "" }
                         "Offers" -> OffersScreen(db){message=it}
@@ -211,9 +211,10 @@ private fun BingwaPulseApp(db: LocalDatabase) {
                         "Contact Name Tag" -> ContactNameTagScreen { message = it }
                         else -> FeatureWorkspaceScreen(selected)
                     }
-                    }
                 }
-                if(message.isNotBlank()) item { Text(message,color=Cyan,fontWeight=FontWeight.SemiBold) }
+                if(message.isNotBlank()) {
+                    Text(message, color=Cyan, fontWeight=FontWeight.SemiBold, modifier=Modifier.padding(bottom=8.dp))
+                }
             }
         }
         }
