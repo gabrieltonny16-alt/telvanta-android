@@ -942,7 +942,7 @@ private fun SignatureOffersScreen(db: LocalDatabase, onQuickDial: () -> Unit, on
                 }) { Text("Replace", color = Cyan, fontWeight = FontWeight.Bold) }
             },
             dismissButton = {
-                TextButton(onClick = { duplicateOffer = null }) { Text("Edit price", color = Color.White) }
+                TextButton(onClick = { duplicateOffer = null }) { Text("Edit", color = Color.White) }
             },
             containerColor = Color(0xFF111A2D), titleContentColor = Color.White, textContentColor = Color(0xFFD1D9E6)
         )
