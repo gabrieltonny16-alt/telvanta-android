@@ -48,6 +48,10 @@ class MainNavigationTest {
         composeRule.onNodeWithText("SIGNATURE").assertIsDisplayed()
 
         composeRule.onNodeWithText("≡").performClick()
+        composeRule.onNodeWithText("Settings").performClick()
+        composeRule.onNodeWithText("BINGWAPULSE CONTROL CENTRE").assertIsDisplayed()
+
+        composeRule.onNodeWithText("≡").performClick()
         composeRule.onNodeWithText("Offers").performClick()
         composeRule.onNodeWithText("OFFERS").assertIsDisplayed()
 
