@@ -169,51 +169,69 @@ private fun BingwaPulseApp(db: LocalDatabase) {
             title={Column(verticalArrangement=Arrangement.spacedBy(2.dp)) { Text("BINGWAPULSE",fontWeight=FontWeight.Black,color=Navy,letterSpacing=1.3.sp,style=MaterialTheme.typography.titleLarge); Text(selected.uppercase(),style=MaterialTheme.typography.labelSmall,color=Muted,letterSpacing=1.5.sp) }},
             colors=TopAppBarDefaults.topAppBarColors(containerColor=Color(0xFF05070D))
         ) }) { padding ->
-            LazyColumn(Modifier.fillMaxSize().padding(padding).padding(horizontal=16.dp),verticalArrangement=Arrangement.spacedBy(10.dp),contentPadding=PaddingValues(top=10.dp,bottom=12.dp)) {
-                if (SecureSessionStore(context).isLocalWorkspace()) {
-                    item {
-                        Row(Modifier.fillMaxWidth(), horizontalArrangement=Arrangement.End) {
-                            Surface(color=Color(0xFF0B0F19), shape=RoundedCornerShape(50)) {
-                                Text("LOCAL PREVIEW", color=Muted, style=MaterialTheme.typography.labelSmall, modifier=Modifier.padding(horizontal=10.dp, vertical=5.dp))
+            if (selected in setOf("Customers", "Signature", "Signature Offers", "Settings")) {
+                // These screens own their vertical scrolling. Do not nest them in the outer LazyColumn:
+                // nested vertical scroll containers can receive unbounded height and crash at runtime.
+                Column(Modifier.fillMaxSize().padding(padding).padding(horizontal = 16.dp).padding(top = 10.dp, bottom = 12.dp)) {
+                    if (SecureSessionStore(context).isLocalWorkspace()) {
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                            Surface(color = Color(0xFF0B0F19), shape = RoundedCornerShape(50)) {
+                                Text("LOCAL PREVIEW", color = Muted, style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp))
                             }
                         }
                     }
-                }
-                item {
-                    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    when(selected) {
-                        "Dashboard" -> BingwaDashboard(db) { destination -> selected = destination; message = "" }
-                        "Offers" -> OffersScreen(db){message=it}
-                        "Customers" -> CustomersScreen(db){message=it}
-                        "Orders" -> OrdersScreen(db){message=it}
-                        "Payment Inbox" -> PaymentInboxScreen()
-                        "Transactions", "Transaction History" -> TransactionsScreen(db){message=it}
-                        "Bulk Messenger" -> BulkMessengerScreen(db)
-                        "Auto-Reply" -> AutoReplyScreen()
-                        "Help & Support" -> FeatureWorkspaceScreen("Help & Support")
-                        "About BingwaPulse" -> FeatureWorkspaceScreen("About BingwaPulse")
-                        "EngageBot" -> EngageBotScreen()
-                        "Message Processing" -> FeatureWorkspaceScreen("Message Processing")
-                        "Account & Session" -> AccountSessionScreen { message = it }
-                        "SiteLink" -> SiteLinkScreen(db) { message = it }
-                        "Signature Offers", "Signature" -> SignatureOffersScreen(db, onQuickDial = { selected = "Quick Dial"; message = "" }) { message = it }
-                        "Statistics" -> StatisticsScreen(db)
-                        "Wallet" -> WalletScreen()
-                        "Quick Dial" -> QuickDialScreen(db) { message = it }
-                        "Auto Renewals" -> FeatureWorkspaceScreen("Auto Renewals")
-                        "Signature" -> FeatureWorkspaceScreen("Signature")
-                        "Connect Pulse" -> ConnectPulseScreen()
-                        "Updates" -> UpdatesScreen()
-                        "Device Activation" -> PermissionSetupScreen()
-                        "Settings" -> BingwaPulseSettingsScreen { destination -> selected = destination }
-                        "Authorized Senders" -> MessageProcessingRulesScreen("Authorized Senders") { message = it }
-                        "Blacklist" -> MessageProcessingRulesScreen("Blacklist") { message = it }
-                        "Contact Name Tag" -> ContactNameTagScreen { message = it }
-                        else -> FeatureWorkspaceScreen(selected)
+                    Box(Modifier.weight(1f).fillMaxWidth()) {
+                        when (selected) {
+                            "Customers" -> CustomersScreen(db) { message = it }
+                            "Signature", "Signature Offers" -> SignatureOffersScreen(db, onQuickDial = { selected = "Quick Dial"; message = "" }) { message = it }
+                            "Settings" -> BingwaPulseSettingsScreen { destination -> selected = destination }
+                        }
                     }
-                    }
+                    if (message.isNotBlank()) Text(message, color = Cyan, fontWeight = FontWeight.SemiBold)
                 }
-                if(message.isNotBlank()) item { Text(message,color=Cyan,fontWeight=FontWeight.SemiBold) }
+            } else {
+                LazyColumn(Modifier.fillMaxSize().padding(padding).padding(horizontal=16.dp),verticalArrangement=Arrangement.spacedBy(10.dp),contentPadding=PaddingValues(top=10.dp,bottom=12.dp)) {
+                    if (SecureSessionStore(context).isLocalWorkspace()) {
+                        item {
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                                Surface(color=Color(0xFF0B0F19), shape=RoundedCornerShape(50)) {
+                                    Text("LOCAL PREVIEW", color=Muted, style=MaterialTheme.typography.labelSmall, modifier=Modifier.padding(horizontal=10.dp, vertical=5.dp))
+                                }
+                            }
+                        }
+                    }
+                    item {
+                        Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        when(selected) {
+                            "Dashboard" -> BingwaDashboard(db) { destination -> selected = destination; message = "" }
+                            "Offers" -> OffersScreen(db){message=it}
+                            "Orders" -> OrdersScreen(db){message=it}
+                            "Payment Inbox" -> PaymentInboxScreen()
+                            "Transactions", "Transaction History" -> TransactionsScreen(db){message=it}
+                            "Bulk Messenger" -> BulkMessengerScreen(db)
+                            "Auto-Reply" -> AutoReplyScreen()
+                            "Help & Support" -> FeatureWorkspaceScreen("Help & Support")
+                            "About BingwaPulse" -> FeatureWorkspaceScreen("About BingwaPulse")
+                            "EngageBot" -> EngageBotScreen()
+                            "Message Processing" -> FeatureWorkspaceScreen("Message Processing")
+                            "Account & Session" -> AccountSessionScreen { message = it }
+                            "SiteLink" -> SiteLinkScreen(db) { message = it }
+                            "Statistics" -> StatisticsScreen(db)
+                            "Wallet" -> WalletScreen()
+                            "Quick Dial" -> QuickDialScreen(db) { message = it }
+                            "Auto Renewals" -> FeatureWorkspaceScreen("Auto Renewals")
+                            "Connect Pulse" -> ConnectPulseScreen()
+                            "Updates" -> UpdatesScreen()
+                            "Device Activation" -> PermissionSetupScreen()
+                            "Authorized Senders" -> MessageProcessingRulesScreen("Authorized Senders") { message = it }
+                            "Blacklist" -> MessageProcessingRulesScreen("Blacklist") { message = it }
+                            "Contact Name Tag" -> ContactNameTagScreen { message = it }
+                            else -> FeatureWorkspaceScreen(selected)
+                        }
+                        }
+                    }
+                    if(message.isNotBlank()) item { Text(message,color=Cyan,fontWeight=FontWeight.SemiBold) }
+                }
             }
         }
         }
