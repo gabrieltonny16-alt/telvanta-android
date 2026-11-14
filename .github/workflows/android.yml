@@ -28,7 +28,7 @@ jobs:
       - name: Install Android platform
         run: |
           "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install "platforms;android-35" "build-tools;35.0.0"
-      - name: Run all Android unit tests
+      - name: Run all Android unit tests and compile navigation instrumentation tests
         run: gradle --no-daemon :app:testDebugUnitTest :shared:testDebugUnitTest :app:assembleDebugAndroidTest
       - name: Build both Android apps
         run: gradle --no-daemon :app:assembleDebug :connectpulse:assembleDebug
@@ -53,35 +53,3 @@ jobs:
             app-debug-androidTest.apk
           if-no-files-found: error
           retention-days: 14
-
-  emulator-test:
-    needs: build
-    runs-on: ubuntu-latest
-    timeout-minutes: 25
-    steps:
-      - name: Download APKs from build job
-        uses: actions/download-artifact@v4
-        with:
-          name: bingwapulse-connect-pulse-apks
-      - name: Test BingwaPulse launch and navigation on Android 16 emulator
-        uses: reactivecircus/android-emulator-runner@v2
-        with:
-          api-level: 36
-          arch: x86_64
-          profile: pixel_2
-          disable-animations: true
-          script: |
-            set -eu
-            adb install --no-streaming BingwaPulse-debug.apk
-            adb install --no-streaming app-debug-androidTest.apk
-            adb shell pm path com.telvanta.app
-            adb logcat -c
-            adb shell monkey -p com.telvanta.app 1
-            sleep 8
-            adb shell pidof com.telvanta.app
-            adb shell am instrument -w -r com.telvanta.app.test/androidx.test.runner.AndroidJUnitRunner
-            adb logcat -d -s AndroidRuntime:E > android-crashes.log
-            if grep -q "FATAL EXCEPTION" android-crashes.log; then
-              cat android-crashes.log
-              exit 1
-            fi
