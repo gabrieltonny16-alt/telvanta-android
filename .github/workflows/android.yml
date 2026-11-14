@@ -28,8 +28,8 @@ jobs:
       - name: Install Android platform
         run: |
           "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install "platforms;android-35" "build-tools;35.0.0"
-      - name: Run M-PESA parser unit tests
-        run: gradle --no-daemon :app:testDebugUnitTest
+      - name: Run all Android unit tests
+        run: gradle --no-daemon :app:testDebugUnitTest :shared:testDebugUnitTest
       - name: Build both Android apps
         run: gradle --no-daemon :app:assembleDebug :connectpulse:assembleDebug
       - name: Name APKs
@@ -53,7 +53,6 @@ jobs:
           retention-days: 14
 
   emulator-test:
-    if: github.event_name == 'workflow_dispatch'
     needs: build
     runs-on: ubuntu-latest
     timeout-minutes: 25
@@ -70,7 +69,7 @@ jobs:
           profile: pixel_2
           disable-animations: true
           script: |
-            set -e
+            set -euo pipefail
             adb install --no-streaming BingwaPulse-debug.apk
             adb install --no-streaming Connect-Pulse-debug.apk
             adb shell pm path com.telvanta.app
@@ -83,4 +82,7 @@ jobs:
             sleep 8
             adb shell pidof com.bingwapulse.connectpulse
             adb logcat -d -s AndroidRuntime:E > android-crashes.log
-            ! grep -q "FATAL EXCEPTION" android-crashes.log
+            if grep -q "FATAL EXCEPTION" android-crashes.log; then
+              cat android-crashes.log
+              exit 1
+            fi
