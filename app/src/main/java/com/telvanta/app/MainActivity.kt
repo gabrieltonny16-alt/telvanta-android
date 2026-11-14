@@ -1221,87 +1221,85 @@ private fun OffersScreen(db: LocalDatabase, onMessage: (String) -> Unit) {
                 "COMBO" -> "▧"
                 else -> "◈"
             }
+            val categoryTint = when (offer.category.uppercase(Locale.ROOT)) {
+                "MINUTES", "VOICE" -> Color(0xFF103B35)
+                "SMS" -> Color(0xFF123447)
+                "COMBO" -> Color(0xFF29234A)
+                else -> Color(0xFF123548)
+            }
             Card(
                 colors = CardDefaults.cardColors(containerColor = Color(0xFF111622)),
-                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF202A3B)),
+                border = BorderStroke(1.dp, Color(0xFF202A3B)),
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(17.dp)
+                shape = RoundedCornerShape(16.dp)
             ) {
-                Row(
-                    Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 10.dp),
-                    verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(9.dp)
+                Column(
+                    Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 11.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Surface(
-                        color = when (offer.category.uppercase(Locale.ROOT)) {
-                            "MINUTES", "VOICE" -> Color(0xFF103B35)
-                            "SMS" -> Color(0xFF123447)
-                            "COMBO" -> Color(0xFF29234A)
-                            else -> Color(0xFF123548)
-                        },
-                        shape = RoundedCornerShape(50),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF24536A))
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        Box(Modifier.size(42.dp), contentAlignment = androidx.compose.ui.Alignment.Center) {
-                            Text(categoryGlyph, color = Cyan, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleLarge)
+                        Surface(color = categoryTint, shape = RoundedCornerShape(13.dp), border = BorderStroke(1.dp, Color(0xFF24536A))) {
+                            Box(Modifier.size(43.dp), contentAlignment = androidx.compose.ui.Alignment.Center) {
+                                Text(categoryGlyph, color = Cyan, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleLarge)
+                            }
+                        }
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                            Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                                Text(offer.name, color = Color.White, fontWeight = FontWeight.Bold, maxLines = 1, style = MaterialTheme.typography.titleSmall)
+                                if (offer.verified) Text("✓", color = Cyan, fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.titleSmall)
+                            }
+                            Text(offer.category.uppercase(Locale.ROOT), color = Muted, fontWeight = FontWeight.Bold, letterSpacing = 1.sp, style = MaterialTheme.typography.labelSmall)
+                        }
+                        Column(horizontalAlignment = androidx.compose.ui.Alignment.End, verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            Text("KES ${money(offer.price)}", color = Color.White, fontWeight = FontWeight.ExtraBold, maxLines = 1, style = MaterialTheme.typography.titleMedium)
+                            Text(if (offer.verified) "VERIFIED" else "NOT VERIFIED", color = if (offer.verified) Cyan else Color(0xFFFFD58A),
+                                fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall)
                         }
                     }
 
-                    Column(Modifier.weight(1f).clickable {
-                        editId = offer.id; name = offer.name; category = offer.category; duration = offer.duration
-                        code = offer.ussdCode; price = offer.price.toString(); active = offer.active; showEditor = true
-                    }, verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                            Text(offer.ussdCode.ifBlank { "USSD not set" }, color = Muted, maxLines = 1,
+                                style = MaterialTheme.typography.labelSmall, fontFamily = FontFamily.Monospace)
+                            if (offer.duration.isNotBlank()) Text(offer.duration, color = Muted, maxLines = 1, style = MaterialTheme.typography.labelSmall)
+                        }
                         Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-                            Text(offer.name, color = Color.White, fontWeight = FontWeight.Bold,
-                                maxLines = 1, style = MaterialTheme.typography.titleSmall)
-                            Text(if (offer.verified) "✓" else "•", color = if (offer.verified) Cyan else Color(0xFFFFC857),
-                                fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.titleSmall)
-                        }
-                        Text(
-                            listOf(offer.ussdCode.ifBlank { "USSD not set" }, offer.duration).filter { it.isNotBlank() }.joinToString(" · "),
-                            color = Muted, maxLines = 1, style = MaterialTheme.typography.labelSmall,
-                            fontFamily = FontFamily.Monospace
-                        )
-                    }
-
-                    Column(horizontalAlignment = androidx.compose.ui.Alignment.End, verticalArrangement = Arrangement.spacedBy(1.dp)) {
-                        Text("KES ${money(offer.price)}", color = Color.White, fontWeight = FontWeight.ExtraBold,
-                            maxLines = 1, style = MaterialTheme.typography.titleSmall)
-                        Text(if (offer.verified) "VERIFIED" else "UNVERIFIED",
-                            color = if (offer.verified) Cyan else Color(0xFFFFD58A),
-                            fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall)
-                    }
-
-                    Column(horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(0.dp)) {
-                        Switch(
-                            checked = offer.active,
-                            onCheckedChange = { enabled ->
-                                try {
-                                    db.setOfferActive(offer.id, enabled); reload++
-                                    onMessage(if (enabled) "Offer activated on SiteLink." else "Offer deactivated on SiteLink.")
-                                } catch (e: Exception) { onMessage(e.message ?: "Could not update offer.") }
-                            },
-                            colors = SwitchDefaults.colors(
-                                checkedThumbColor = Color(0xFF06131B),
-                                checkedTrackColor = Cyan,
-                                uncheckedThumbColor = Color(0xFF9AA6B8),
-                                uncheckedTrackColor = Color(0xFF344054),
-                                checkedBorderColor = Cyan,
-                                uncheckedBorderColor = Color(0xFF475467)
+                            Text(if (offer.active) "ACTIVE" else "INACTIVE", color = if (offer.active) Cyan else Muted,
+                                fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall)
+                            Switch(
+                                checked = offer.active,
+                                onCheckedChange = { enabled ->
+                                    try {
+                                        db.setOfferActive(offer.id, enabled); reload++
+                                        onMessage(if (enabled) "Offer activated on SiteLink." else "Offer deactivated on SiteLink.")
+                                    } catch (e: Exception) { onMessage(e.message ?: "Could not update offer.") }
+                                },
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = Color(0xFF06131B), checkedTrackColor = Cyan,
+                                    uncheckedThumbColor = Color(0xFF9AA6B8), uncheckedTrackColor = Color(0xFF344054),
+                                    checkedBorderColor = Cyan, uncheckedBorderColor = Color(0xFF475467)
+                                )
                             )
-                        )
-                        Text(if (offer.active) "ON" else "OFF", color = if (offer.active) Cyan else Muted,
-                            fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall)
+                        }
                     }
-                    Column(horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally) {
+
+                    HorizontalDivider(color = Color(0xFF202A3B))
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End, verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
                         TextButton(
                             onClick = {
                                 editId = offer.id; name = offer.name; category = offer.category; duration = offer.duration
                                 code = offer.ussdCode; price = offer.price.toString(); active = offer.active; showEditor = true
                             },
-                            contentPadding = PaddingValues(horizontal = 3.dp, vertical = 0.dp),
-                            modifier = Modifier.height(30.dp)
-                        ) { Text("EDIT", color = Cyan, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall) }
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp)
+                        ) { Text("EDIT OFFER", color = Cyan, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall) }
                         TextButton(
                             onClick = {
                                 scope.launch {
@@ -1321,8 +1319,7 @@ private fun OffersScreen(db: LocalDatabase, onMessage: (String) -> Unit) {
                                     } catch (error: Exception) { onMessage(error.message ?: "Could not safely remove the offer.") }
                                 }
                             },
-                            contentPadding = PaddingValues(horizontal = 3.dp, vertical = 0.dp),
-                            modifier = Modifier.height(30.dp)
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp)
                         ) { Text("DELETE", color = Color(0xFFE88BA4), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall) }
                     }
                 }
