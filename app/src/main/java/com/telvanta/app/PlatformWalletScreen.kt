@@ -447,10 +447,10 @@ private fun WalletInfoCard(title: String, body: String) {
     }
 }
 
-private fun planName(plans: List<PlatformSubscriptionPlan>, code: String): String =
+fun planName(plans: List<PlatformSubscriptionPlan>, code: String): String =
     plans.firstOrNull { it.code == code }?.name ?: code.replace('_', ' ').uppercase()
 
-private fun formatWalletDate(value: String): String =
+fun formatWalletDate(value: String): String =
     runCatching {
         DateTimeFormatter.ofPattern("dd MMM yyyy, HH:mm")
             .withZone(ZoneId.of("Africa/Nairobi"))
