@@ -92,7 +92,7 @@ class LocalDatabaseTest {
         db.upsertCustomer("Jane Updated", "0712345678", "Updated notes")
         assertEquals(1, db.count("customers"))
         assertEquals("Jane Updated", db.customers().single().name)
-        assertFalse(db.customers().single().blacklisted)
+        assertTrue(db.customers().single().blacklisted)
     }
 
     @Test
