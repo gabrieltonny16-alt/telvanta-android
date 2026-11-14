@@ -1738,7 +1738,7 @@ private fun TransactionsScreen(db: LocalDatabase, onMessage: (String) -> Unit) {
         if (uri != null) try {
             context.contentResolver.openOutputStream(uri)?.bufferedWriter()?.use { it.write(csv()) }
             onMessage("Transaction history exported.")
-        } catch (e: Exception) { onMessage("Could not export transaction history: §{e.message ?: "file error"}") }
+        } catch (e: Exception) { val reason = e.message ?: "export error"; onMessage("Could not export transaction history: $reason") }
     }
     val volume = visible.sumOf { it.amount }
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(9.dp)) {
@@ -1838,7 +1838,8 @@ private fun TransactionsScreen(db: LocalDatabase, onMessage: (String) -> Unit) {
                 Text("Amount  ·  Ksh §{money(row.amount)}", color = Color.White)
                 Text("Date  ·  §{dateFormat.format(Date(row.createdAt))}", color = Muted)
                 Text("Source  ·  §{row.source}", color = Muted)
-                Text("Reference  ·  §{row.reference.ifBlank { "Not available" }}", color = Muted)
+                val referenceText = row.reference.ifBlank { "Not available" }
+                Text("Reference  ·  $referenceText", color = Muted)
                 Text("Order status  ·  §{row.orderStatus}", color = Muted)
                 Text("Transaction status  ·  §{row.transactionStatus}", color = Muted)
             } },
