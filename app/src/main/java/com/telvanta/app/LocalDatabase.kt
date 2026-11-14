@@ -7,17 +7,17 @@ import android.database.sqlite.SQLiteOpenHelper
 
 data class ImportedOffer(val name: String, val category: String, val originalPrice: Double?, val sellingPrice: Double, val source: String = "Signature import")
 data class OfferRow(val id: Long, val name: String, val category: String, val price: Double, val originalPrice: Double?, val source: String, val verified: Boolean, val active: Boolean, val ussdCode: String = "", val duration: String = "", val sourceId: String = "", val simProfile: String = "", val tags: String = "")
-data class CustomerRow(val id: Long, val name: String, val phone: String, val notes: String)
+data class CustomerRow(val id: Long, val name: String, val phone: String, val notes: String, val blacklisted: Boolean = false)
 data class OrderRow(val id: Long, val customer: String, val offer: String, val price: Double, val status: String, val createdAt: Long)
 data class TransactionRow(val id: Long, val orderId: Long, val amount: Double, val status: String, val reference: String, val createdAt: Long)
 data class TransactionHistoryRow(val id: Long, val customer: String, val offer: String, val amount: Double, val transactionStatus: String, val orderStatus: String, val reference: String, val createdAt: Long, val source: String)
 
 /** Device-local business records only. This class does not initiate payments or fulfil bundles. */
-class LocalDatabase(context: Context) : SQLiteOpenHelper(context, "telvanta.db", null, 6) {
+class LocalDatabase(context: Context) : SQLiteOpenHelper(context, "telvanta.db", null, 7) {
     override fun onConfigure(db: SQLiteDatabase) { db.setForeignKeyConstraintsEnabled(true) }
     override fun onCreate(db: SQLiteDatabase) {
         db.execSQL("CREATE TABLE offers (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, category TEXT NOT NULL, original_price REAL, selling_price REAL NOT NULL, source TEXT NOT NULL DEFAULT 'Manual', verified INTEGER NOT NULL DEFAULT 0, is_active INTEGER NOT NULL DEFAULT 0, ussd_code TEXT NOT NULL DEFAULT '', duration TEXT NOT NULL DEFAULT '', source_id TEXT NOT NULL DEFAULT '', sim_profile TEXT NOT NULL DEFAULT '', tags TEXT NOT NULL DEFAULT '')")
-        db.execSQL("CREATE TABLE customers (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, phone TEXT NOT NULL UNIQUE, notes TEXT NOT NULL DEFAULT '')")
+        db.execSQL("CREATE TABLE customers (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, phone TEXT NOT NULL UNIQUE, notes TEXT NOT NULL DEFAULT '', is_blacklisted INTEGER NOT NULL DEFAULT 0)")
         db.execSQL("CREATE TABLE orders (id INTEGER PRIMARY KEY AUTOINCREMENT, customer_phone TEXT NOT NULL, offer_name TEXT NOT NULL, selling_price REAL NOT NULL, status TEXT NOT NULL DEFAULT 'PENDING', created_at INTEGER NOT NULL, source TEXT NOT NULL DEFAULT 'Manual')")
         db.execSQL("CREATE TABLE transactions (id INTEGER PRIMARY KEY AUTOINCREMENT, order_id INTEGER NOT NULL, amount REAL NOT NULL, status TEXT NOT NULL DEFAULT 'UNVERIFIED', reference TEXT NOT NULL DEFAULT '', created_at INTEGER NOT NULL, FOREIGN KEY(order_id) REFERENCES orders(id))")
         db.execSQL("CREATE UNIQUE INDEX idx_transactions_reference_unique ON transactions(reference) WHERE reference <> ''")
@@ -34,6 +34,7 @@ class LocalDatabase(context: Context) : SQLiteOpenHelper(context, "telvanta.db",
             db.execSQL("ALTER TABLE offers ADD COLUMN tags TEXT NOT NULL DEFAULT ''")
         }
         if (oldVersion < 6) db.execSQL("ALTER TABLE orders ADD COLUMN source TEXT NOT NULL DEFAULT 'Manual'")
+        if (oldVersion < 7) db.execSQL("ALTER TABLE customers ADD COLUMN is_blacklisted INTEGER NOT NULL DEFAULT 0")
     }
     fun count(table: String): Int {
         require(table in setOf("offers", "customers", "orders", "transactions"))
@@ -44,6 +45,11 @@ class LocalDatabase(context: Context) : SQLiteOpenHelper(context, "telvanta.db",
     }
     fun saveOffer(id: Long?, name: String, category: String, price: Double, originalPrice: Double? = null, source: String = "Manual", verified: Boolean = false, active: Boolean = false, ussdCode: String = "", duration: String = "", sourceId: String = "", simProfile: String = "", tags: String = "") {
         require(name.isNotBlank() && category.isNotBlank() && price >= 0 && (originalPrice == null || originalPrice >= 0) && source.isNotBlank())
+        val duplicatePrice = readableDatabase.rawQuery(
+            "SELECT id FROM offers WHERE selling_price=? AND id<>? LIMIT 1",
+            arrayOf(price.toString(), (id ?: -1L).toString())
+        ).use { it.moveToFirst() }
+        require(!duplicatePrice) { "KES ${price} is already assigned to another offer. Every offer must have a unique selling price." }
         val v = ContentValues().apply {
             put("name", name.trim()); put("category", category.trim()); put("selling_price", price)
             if (originalPrice == null) putNull("original_price") else put("original_price", originalPrice)
@@ -77,9 +83,9 @@ class LocalDatabase(context: Context) : SQLiteOpenHelper(context, "telvanta.db",
     }
 
     fun customers(search: String = ""): List<CustomerRow> = readableDatabase.rawQuery(
-        "SELECT id,name,phone,notes FROM customers WHERE name LIKE ? OR phone LIKE ? ORDER BY name",
+        "SELECT id,name,phone,notes,is_blacklisted FROM customers WHERE name LIKE ? OR phone LIKE ? ORDER BY name",
         arrayOf("%$search%", "%$search%")
-    ).use { c -> buildList { while (c.moveToNext()) add(CustomerRow(c.getLong(0),c.getString(1),c.getString(2),c.getString(3))) } }
+    ).use { c -> buildList { while (c.moveToNext()) add(CustomerRow(c.getLong(0),c.getString(1),c.getString(2),c.getString(3),c.getInt(4) == 1)) } }
     fun saveCustomer(id: Long?, name: String, phone: String, notes: String) {
         require(name.isNotBlank() && phone.isNotBlank())
         val v = ContentValues().apply { put("name",name.trim()); put("phone",phone.trim()); put("notes",notes.trim()) }
@@ -98,6 +104,12 @@ class LocalDatabase(context: Context) : SQLiteOpenHelper(context, "telvanta.db",
         if (updated == 0) db.insertOrThrow("customers", null, values)
     }
     fun deleteCustomer(id: Long) { writableDatabase.delete("customers", "id=?", arrayOf(id.toString())) }
+    fun setCustomerBlacklisted(id: Long, blacklisted: Boolean) { writableDatabase.execSQL("UPDATE customers SET is_blacklisted=? WHERE id=?", arrayOf(if (blacklisted) 1 else 0, id)) }
+    fun createSimulatedOrder(phone: String, offer: String, price: Double): Long {
+        require(phone.isNotBlank() && offer.isNotBlank() && price >= 0)
+        val values = ContentValues().apply { put("customer_phone", phone.trim()); put("offer_name", offer.trim()); put("selling_price", price); put("status", "SIMULATED"); put("created_at", System.currentTimeMillis()); put("source", "Simulation only") }
+        return writableDatabase.insertOrThrow("orders", null, values)
+    }
     fun orders(): List<OrderRow> = readableDatabase.rawQuery("SELECT id,customer_phone,offer_name,selling_price,status,created_at FROM orders ORDER BY id DESC", null).use { c ->
         buildList { while(c.moveToNext()) add(OrderRow(c.getLong(0),c.getString(1),c.getString(2),c.getDouble(3),c.getString(4),c.getLong(5))) }
     }

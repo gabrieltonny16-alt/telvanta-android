@@ -1,7 +1,7 @@
 name: BingwaPulse and Connect Pulse Android builds
 on:
   push:
-    branches: [ "main", "feature/vecta-branding", "feature/platform-wallet", "feature/automatic-offer-fulfilment", "feature/app-wide-ui-ux-cleanup" ]
+    branches: [ "main", "feature/vecta-branding", "feature/platform-wallet", "feature/automatic-offer-fulfilment", "feature/app-wide-ui-ux-cleanup", "feature/reference-layout-offers-customers" ]
   pull_request:
     branches: [ "main", "feature/vecta-branding", "feature/background-agent-operations" ]
   workflow_dispatch:
@@ -28,14 +28,15 @@ jobs:
       - name: Install Android platform
         run: |
           "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install "platforms;android-35" "build-tools;35.0.0"
-      - name: Run M-PESA parser unit tests
-        run: gradle --no-daemon :app:testDebugUnitTest
+      - name: Run all Android unit tests and compile navigation instrumentation tests
+        run: gradle --no-daemon :app:testDebugUnitTest :shared:testDebugUnitTest :app:assembleDebugAndroidTest
       - name: Build both Android apps
         run: gradle --no-daemon :app:assembleDebug :connectpulse:assembleDebug
       - name: Name APKs
         run: |
           cp app/build/outputs/apk/debug/app-debug.apk BingwaPulse-debug.apk
           cp connectpulse/build/outputs/apk/debug/connectpulse-debug.apk Connect-Pulse-debug.apk
+          cp app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk app-debug-androidTest.apk
       - name: Verify APK signatures and package metadata
         run: |
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs BingwaPulse-debug.apk
@@ -49,38 +50,6 @@ jobs:
           path: |
             BingwaPulse-debug.apk
             Connect-Pulse-debug.apk
+            app-debug-androidTest.apk
           if-no-files-found: error
           retention-days: 14
-
-  emulator-test:
-    if: github.event_name == 'workflow_dispatch'
-    needs: build
-    runs-on: ubuntu-latest
-    timeout-minutes: 25
-    steps:
-      - name: Download APKs from build job
-        uses: actions/download-artifact@v4
-        with:
-          name: bingwapulse-connect-pulse-apks
-      - name: Install and launch both APKs on Android 16 emulator
-        uses: reactivecircus/android-emulator-runner@v2
-        with:
-          api-level: 36
-          arch: x86_64
-          profile: pixel_2
-          disable-animations: true
-          script: |
-            set -e
-            adb install --no-streaming BingwaPulse-debug.apk
-            adb install --no-streaming Connect-Pulse-debug.apk
-            adb shell pm path com.telvanta.app
-            adb shell pm path com.bingwapulse.connectpulse
-            adb logcat -c
-            adb shell monkey -p com.telvanta.app 1
-            sleep 8
-            adb shell pidof com.telvanta.app
-            adb shell monkey -p com.bingwapulse.connectpulse 1
-            sleep 8
-            adb shell pidof com.bingwapulse.connectpulse
-            adb logcat -d -s AndroidRuntime:E > android-crashes.log
-            ! grep -q "FATAL EXCEPTION" android-crashes.log

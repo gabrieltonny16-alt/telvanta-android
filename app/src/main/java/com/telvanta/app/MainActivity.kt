@@ -169,51 +169,69 @@ private fun BingwaPulseApp(db: LocalDatabase) {
             title={Column(verticalArrangement=Arrangement.spacedBy(2.dp)) { Text("BINGWAPULSE",fontWeight=FontWeight.Black,color=Navy,letterSpacing=1.3.sp,style=MaterialTheme.typography.titleLarge); Text(selected.uppercase(),style=MaterialTheme.typography.labelSmall,color=Muted,letterSpacing=1.5.sp) }},
             colors=TopAppBarDefaults.topAppBarColors(containerColor=Color(0xFF05070D))
         ) }) { padding ->
-            LazyColumn(Modifier.fillMaxSize().padding(padding).padding(horizontal=16.dp),verticalArrangement=Arrangement.spacedBy(10.dp),contentPadding=PaddingValues(top=10.dp,bottom=12.dp)) {
-                if (SecureSessionStore(context).isLocalWorkspace()) {
-                    item {
-                        Row(Modifier.fillMaxWidth(), horizontalArrangement=Arrangement.End) {
-                            Surface(color=Color(0xFF0B0F19), shape=RoundedCornerShape(50)) {
-                                Text("LOCAL PREVIEW", color=Muted, style=MaterialTheme.typography.labelSmall, modifier=Modifier.padding(horizontal=10.dp, vertical=5.dp))
+            if (selected in setOf("Customers", "Signature", "Signature Offers", "Settings")) {
+                // These screens own their vertical scrolling. Do not nest them in the outer LazyColumn:
+                // nested vertical scroll containers can receive unbounded height and crash at runtime.
+                Column(Modifier.fillMaxSize().padding(padding).padding(horizontal = 16.dp).padding(top = 10.dp, bottom = 12.dp)) {
+                    if (SecureSessionStore(context).isLocalWorkspace()) {
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                            Surface(color = Color(0xFF0B0F19), shape = RoundedCornerShape(50)) {
+                                Text("LOCAL PREVIEW", color = Muted, style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp))
                             }
                         }
                     }
-                }
-                item {
-                    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    when(selected) {
-                        "Dashboard" -> BingwaDashboard(db) { destination -> selected = destination; message = "" }
-                        "Offers" -> OffersScreen(db){message=it}
-                        "Customers" -> CustomersScreen(db){message=it}
-                        "Orders" -> OrdersScreen(db){message=it}
-                        "Payment Inbox" -> PaymentInboxScreen()
-                        "Transactions", "Transaction History" -> TransactionsScreen(db){message=it}
-                        "Bulk Messenger" -> BulkMessengerScreen(db)
-                        "Auto-Reply" -> AutoReplyScreen()
-                        "Help & Support" -> FeatureWorkspaceScreen("Help & Support")
-                        "About BingwaPulse" -> FeatureWorkspaceScreen("About BingwaPulse")
-                        "EngageBot" -> EngageBotScreen()
-                        "Message Processing" -> FeatureWorkspaceScreen("Message Processing")
-                        "Account & Session" -> AccountSessionScreen { message = it }
-                        "SiteLink" -> SiteLinkScreen(db) { message = it }
-                        "Signature Offers", "Signature" -> SignatureOffersScreen(db) { message = it }
-                        "Statistics" -> StatisticsScreen(db)
-                        "Wallet" -> WalletScreen()
-                        "Quick Dial" -> QuickDialScreen(db) { message = it }
-                        "Auto Renewals" -> FeatureWorkspaceScreen("Auto Renewals")
-                        "Signature" -> FeatureWorkspaceScreen("Signature")
-                        "Connect Pulse" -> ConnectPulseScreen()
-                        "Updates" -> UpdatesScreen()
-                        "Device Activation" -> PermissionSetupScreen()
-                        "Settings" -> BingwaPulseSettingsScreen { destination -> selected = destination }
-                        "Authorized Senders" -> MessageProcessingRulesScreen("Authorized Senders") { message = it }
-                        "Blacklist" -> MessageProcessingRulesScreen("Blacklist") { message = it }
-                        "Contact Name Tag" -> ContactNameTagScreen { message = it }
-                        else -> FeatureWorkspaceScreen(selected)
+                    Box(Modifier.weight(1f).fillMaxWidth()) {
+                        when (selected) {
+                            "Customers" -> CustomersScreen(db) { message = it }
+                            "Signature", "Signature Offers" -> SignatureOffersScreen(db, onQuickDial = { selected = "Quick Dial"; message = "" }) { message = it }
+                            "Settings" -> BingwaPulseSettingsScreen { destination -> selected = destination }
+                        }
                     }
-                    }
+                    if (message.isNotBlank()) Text(message, color = Cyan, fontWeight = FontWeight.SemiBold)
                 }
-                if(message.isNotBlank()) item { Text(message,color=Cyan,fontWeight=FontWeight.SemiBold) }
+            } else {
+                LazyColumn(Modifier.fillMaxSize().padding(padding).padding(horizontal=16.dp),verticalArrangement=Arrangement.spacedBy(10.dp),contentPadding=PaddingValues(top=10.dp,bottom=12.dp)) {
+                    if (SecureSessionStore(context).isLocalWorkspace()) {
+                        item {
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                                Surface(color=Color(0xFF0B0F19), shape=RoundedCornerShape(50)) {
+                                    Text("LOCAL PREVIEW", color=Muted, style=MaterialTheme.typography.labelSmall, modifier=Modifier.padding(horizontal=10.dp, vertical=5.dp))
+                                }
+                            }
+                        }
+                    }
+                    item {
+                        Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        when(selected) {
+                            "Dashboard" -> BingwaDashboard(db) { destination -> selected = destination; message = "" }
+                            "Offers" -> OffersScreen(db){message=it}
+                            "Orders" -> OrdersScreen(db){message=it}
+                            "Payment Inbox" -> PaymentInboxScreen()
+                            "Transactions", "Transaction History" -> TransactionsScreen(db){message=it}
+                            "Bulk Messenger" -> BulkMessengerScreen(db)
+                            "Auto-Reply" -> AutoReplyScreen()
+                            "Help & Support" -> FeatureWorkspaceScreen("Help & Support")
+                            "About BingwaPulse" -> FeatureWorkspaceScreen("About BingwaPulse")
+                            "EngageBot" -> EngageBotScreen()
+                            "Message Processing" -> FeatureWorkspaceScreen("Message Processing")
+                            "Account & Session" -> AccountSessionScreen { message = it }
+                            "SiteLink" -> SiteLinkScreen(db) { message = it }
+                            "Statistics" -> StatisticsScreen(db)
+                            "Wallet" -> WalletScreen()
+                            "Quick Dial" -> QuickDialScreen(db) { message = it }
+                            "Auto Renewals" -> FeatureWorkspaceScreen("Auto Renewals")
+                            "Connect Pulse" -> ConnectPulseScreen()
+                            "Updates" -> UpdatesScreen()
+                            "Device Activation" -> PermissionSetupScreen()
+                            "Authorized Senders" -> MessageProcessingRulesScreen("Authorized Senders") { message = it }
+                            "Blacklist" -> MessageProcessingRulesScreen("Blacklist") { message = it }
+                            "Contact Name Tag" -> ContactNameTagScreen { message = it }
+                            else -> FeatureWorkspaceScreen(selected)
+                        }
+                        }
+                    }
+                    if(message.isNotBlank()) item { Text(message,color=Cyan,fontWeight=FontWeight.SemiBold) }
+                }
             }
         }
         }
@@ -788,28 +806,17 @@ private fun SiteLinkScreen(db: LocalDatabase, onMessage: (String) -> Unit) {
 }
 
 @Composable
-private fun SignatureOffersScreen(db: LocalDatabase, onMessage: (String) -> Unit) {
+private fun SignatureOffersScreen(db: LocalDatabase, onQuickDial: () -> Unit, onMessage: (String) -> Unit) {
     data class CandidateOffer(val id: String, val simProfile: String, val category: String, val name: String, val duration: String, val price: Int, val code: String, val tags: String, val note: String)
     val context = LocalContext.current
     val candidates = remember {
         runCatching {
             val raw = context.assets.open("signature_offers_seed.json").bufferedReader().use { it.readText() }
-            val root = JSONObject(raw)
-            val rows = root.getJSONArray("offers")
+            val rows = JSONObject(raw).getJSONArray("offers")
             buildList {
                 for (i in 0 until rows.length()) {
                     val row = rows.getJSONObject(i)
-                    add(CandidateOffer(
-                        id = row.optString("id"),
-                        simProfile = row.optString("simProfile", "any"),
-                        category = row.optString("category", "OTHER"),
-                        name = row.optString("name", "Unnamed offer"),
-                        duration = row.optString("duration", "Duration not captured"),
-                        price = row.optInt("amountKes", -1),
-                        code = row.optString("entryCode", ""),
-                        tags = row.optString("tags", ""),
-                        note = row.optString("reviewNote", if (row.has("entryCode")) "Candidate code — not independently verified" else "Exact entry code not captured")
-                    ))
+                    add(CandidateOffer(row.optString("id"), row.optString("simProfile", "any"), row.optString("category", "OTHER"), row.optString("name", "Unnamed offer"), row.optString("duration", "Duration not captured"), row.optInt("amountKes", -1), row.optString("entryCode", ""), row.optString("tags", ""), row.optString("reviewNote", "Candidate details — not independently verified")))
                 }
             }
         }.getOrElse { emptyList() }
@@ -817,137 +824,171 @@ private fun SignatureOffersScreen(db: LocalDatabase, onMessage: (String) -> Unit
     var search by remember { mutableStateOf("") }
     var category by remember { mutableStateOf("ALL") }
     var simProfile by remember { mutableStateOf("ALL") }
-    var showSaved by remember { mutableStateOf(false) }
     var reload by remember { mutableIntStateOf(0) }
-    var downloadCandidate by remember { mutableStateOf<CandidateOffer?>(null) }
-    var downloadPrice by remember { mutableStateOf("") }
+    var editing by remember { mutableStateOf<OfferRow?>(null) }
+    var candidateToSave by remember { mutableStateOf<CandidateOffer?>(null) }
+    var priceInput by remember { mutableStateOf("") }
+    var duplicateOffer by remember { mutableStateOf<OfferRow?>(null) }
+    var editingDuplicatePrice by remember { mutableStateOf(false) }
+    var signaturePriceError by remember { mutableStateOf("") }
     val saved = remember(reload) { db.offers().filter { it.source.contains("signature", ignoreCase = true) } }
     CloudOfferSyncEffect(db, reload, onMessage)
-    val categories = listOf("ALL", "DATA", "VOICE", "SMS", "COMBO")
     val visible = candidates.filter {
-        (category == "ALL" || it.category.equals(category, true)) &&
+        (category == "ALL" || it.category.equals(category, true) || (category == "VOICE" && it.category.equals("MINUTES", true))) &&
             (simProfile == "ALL" || it.simProfile.equals(simProfile, true)) &&
             (search.isBlank() || it.name.contains(search, true) || it.price.toString().contains(search) || it.code.contains(search, true))
     }
-    Text("Signature Offers", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = Cyan)
-    Surface(
-        color = Color(0xFF08232B),
-        shape = RoundedCornerShape(20.dp),
-        border = BorderStroke(1.dp, Color(0xFF00B8D4).copy(alpha = 0.32f)),
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Row(Modifier.padding(16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-            Surface(color = Color(0xFF00B8D4).copy(alpha = 0.16f), shape = RoundedCornerShape(14.dp)) {
-                Text("✦", color = Cyan, fontWeight = FontWeight.ExtraBold, modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp))
+    val downloadedIds = saved.map { it.sourceId }.filter { it.isNotBlank() }.toSet()
+    val countLabel = if (category == "ALL") candidates.size else visible.size
+    Box(Modifier.fillMaxSize()) {
+        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(bottom=12.dp), verticalArrangement=Arrangement.spacedBy(10.dp)) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment=androidx.compose.ui.Alignment.CenterVertically, horizontalArrangement=Arrangement.SpaceBetween) {
+                Column(verticalArrangement=Arrangement.spacedBy(2.dp)) {
+                    Text("SIGNATURE", color=Muted, fontWeight=FontWeight.Bold, letterSpacing=1.5.sp, style=MaterialTheme.typography.labelMedium)
+                    Text("Offer catalogue", color=Color.White, fontWeight=FontWeight.ExtraBold, style=MaterialTheme.typography.titleLarge)
+                }
+                OutlinedButton(onClick=onQuickDial, shape=RoundedCornerShape(50), contentPadding=PaddingValues(horizontal=14.dp, vertical=7.dp), border=BorderStroke(1.dp, Color(0xFF164653)), colors=ButtonDefaults.outlinedButtonColors(contentColor=Cyan)) {
+                    Text("QUICK DIAL ↗", fontWeight=FontWeight.Bold, style=MaterialTheme.typography.labelSmall)
+                }
             }
-            Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                Text("Original Signature catalogue", color = Navy, fontWeight = FontWeight.Bold)
-                Text("44 extracted offer records · Any SIM, Normal SIM and Notification SIM", color = Cyan, style = MaterialTheme.typography.bodySmall)
+            Row(Modifier.fillMaxWidth(), horizontalArrangement=Arrangement.spacedBy(6.dp), verticalAlignment=androidx.compose.ui.Alignment.CenterVertically) {
+                val chips = listOf("ALL", "DATA", "VOICE", "SMS", "COMBO")
+                chips.forEach { item ->
+                    val label = when(item) { "ALL" -> "All (${candidates.size})"; else -> item.lowercase().replaceFirstChar { it.uppercase() } }
+                    FilterChip(
+                        selected=category==item, onClick={category=item},
+                        label={Text(label, maxLines=1, style=MaterialTheme.typography.labelMedium)},
+                        colors=FilterChipDefaults.filterChipColors(selectedContainerColor=Cyan, selectedLabelColor=Color(0xFF04121A), containerColor=Color(0xFF111A2D), labelColor=Color(0xFFD7DFEA)),
+                        border=FilterChipDefaults.filterChipBorder(enabled=true, selected=category==item, borderColor=Color(0xFF202A3B), selectedBorderColor=Cyan)
+                    )
+                }
             }
-        }
-    }
-    Surface(
-        color = Color(0xFF0A1B22),
-        shape = RoundedCornerShape(18.dp),
-        border = BorderStroke(1.dp, Color(0xFF00B8D4).copy(alpha = 0.24f)),
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Row(Modifier.padding(15.dp), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-            Text("ⓘ", color = Cyan, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleLarge)
-            Text("These are your previously supplied offer records. Prices and USSD codes remain candidate details until checked against the live Safaricom menu. No purchase or USSD action is triggered here.", color = Muted, style = MaterialTheme.typography.bodySmall)
-        }
-    }
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        listOf("Candidates" to false, "Saved offers" to true).forEach { item ->
-            FilterChip(selected = showSaved == item.second, onClick = { showSaved = item.second }, label = { Text(item.first) })
-        }
-    }
-    if (!showSaved) {
-        OutlinedTextField(value = search, onValueChange = { search = it }, label = { Text("Search name, price or code") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
-        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            categories.forEach { item -> FilterChip(selected = category == item, onClick = { category = item }, label = { Text(item) }) }
-        }
-        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            listOf("ALL" to "All SIMs", "any" to "Any SIM", "normal" to "Normal SIM", "notification" to "Notification SIM").forEach { item -> FilterChip(selected = simProfile == item.first, onClick = { simProfile = item.first }, label = { Text(item.second) }) }
-        }
-        Text("Showing ${visible.size} of ${candidates.size} candidate records", color = Muted, style = MaterialTheme.typography.labelMedium)
-        if (candidates.isEmpty()) InfoCard("Catalogue unavailable", "The bundled candidate catalogue could not be read. No data was imported.")
-        visible.forEach { offer ->
-            Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF0B0F19)), modifier = Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = androidx.compose.ui.Alignment.Top) {
-                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                            Text(offer.name, fontWeight = FontWeight.Bold, color = Navy, style = MaterialTheme.typography.titleMedium, maxLines = 2)
-                            Text("${offer.category} · ${offer.duration}", color = Muted, style = MaterialTheme.typography.bodySmall)
-                            Text(when(offer.simProfile) { "normal" -> "NORMAL SIM"; "notification" -> "NOTIFICATION SIM"; else -> "ANY SIM" }, color = Muted, style = MaterialTheme.typography.labelSmall)
+            OutlinedTextField(
+                value=search, onValueChange={search=it}, modifier=Modifier.fillMaxWidth().heightIn(min=50.dp),
+                placeholder={Text("⌕  Search...", color=Muted)}, singleLine=true, shape=RoundedCornerShape(16.dp),
+                colors=OutlinedTextFieldDefaults.colors(focusedBorderColor=Cyan, unfocusedBorderColor=Color(0xFF202A3B), focusedContainerColor=Color(0xFF111A2D), unfocusedContainerColor=Color(0xFF111A2D), focusedTextColor=Color.White, unfocusedTextColor=Color.White, cursorColor=Cyan)
+            )
+            Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement=Arrangement.spacedBy(6.dp)) {
+                listOf("ALL" to "Any SIM", "any" to "Any SIM", "normal" to "Normal SIM", "notification" to "Notification SIM").forEach { item ->
+                    FilterChip(selected=simProfile==item.first, onClick={simProfile=item.first}, label={Text(item.second, style=MaterialTheme.typography.labelSmall)}, colors=FilterChipDefaults.filterChipColors(selectedContainerColor=Color(0xFF153B4A), selectedLabelColor=Cyan, containerColor=Color(0xFF0D1422), labelColor=Muted))
+                }
+            }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement=Arrangement.SpaceBetween, verticalAlignment=androidx.compose.ui.Alignment.CenterVertically) {
+                Text("Showing ${visible.size} of ${candidates.size} offers", color=Muted, style=MaterialTheme.typography.labelSmall)
+                Text("${saved.size} downloaded", color=Cyan, style=MaterialTheme.typography.labelSmall, fontWeight=FontWeight.Bold)
+            }
+            if (visible.isEmpty()) InfoCard("No matching offers", "Try another category or search term.")
+            visible.forEach { offer ->
+                val savedOffer = saved.firstOrNull { it.sourceId == offer.id && offer.id.isNotBlank() }
+                val displayedPrice = savedOffer?.price ?: offer.price.toDouble()
+                Card(
+                    modifier=Modifier.fillMaxWidth(),
+                    colors=CardDefaults.cardColors(containerColor=Color(0xFF111A2D)),
+                    border=BorderStroke(1.dp, if(savedOffer!=null) Color(0xFF155366) else Color(0xFF202A3B)),
+                    shape=RoundedCornerShape(19.dp)
+                ) {
+                    Column(Modifier.fillMaxWidth().padding(horizontal=14.dp, vertical=12.dp), verticalArrangement=Arrangement.spacedBy(7.dp)) {
+                        Row(Modifier.fillMaxWidth(), verticalAlignment=androidx.compose.ui.Alignment.CenterVertically, horizontalArrangement=Arrangement.SpaceBetween) {
+                            Row(Modifier.weight(1f), verticalAlignment=androidx.compose.ui.Alignment.CenterVertically, horizontalArrangement=Arrangement.spacedBy(7.dp)) {
+                                Text(offer.name, color=Color.White, fontWeight=FontWeight.ExtraBold, style=MaterialTheme.typography.titleMedium, maxLines=1)
+                                Surface(color=if(savedOffer!=null) Color(0xFF103D50) else Color(0xFF3A2C18), shape=RoundedCornerShape(50)) {
+                                    Text(if(savedOffer!=null) "✓ Downloaded" else "● Unverified", color=if(savedOffer!=null) Cyan else Color(0xFFFFD58A), fontWeight=FontWeight.Bold, modifier=Modifier.padding(horizontal=7.dp, vertical=4.dp), style=MaterialTheme.typography.labelSmall, maxLines=1)
+                                }
+                            }
+                            Column(horizontalAlignment=androidx.compose.ui.Alignment.End) {
+                                if(savedOffer?.originalPrice!=null && savedOffer.originalPrice>displayedPrice) Text("KES ${money(savedOffer.originalPrice)}", color=Muted, style=MaterialTheme.typography.labelSmall)
+                                Text(if(displayedPrice>=0) "KES ${money(displayedPrice)}" else "Price —", color=Cyan, fontWeight=FontWeight.ExtraBold, style=MaterialTheme.typography.titleMedium, maxLines=1)
+                            }
                         }
-                        Text(if (offer.price >= 0) "KES ${offer.price}" else "Price unknown", color = Cyan, fontWeight = FontWeight.ExtraBold, maxLines = 1)
-                    }
-                    if (offer.code.isNotBlank()) Surface(color = Color(0xFF05070D), shape = RoundedCornerShape(8.dp)) { Text(offer.code, color = Muted, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Medium, modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp), maxLines = 1, softWrap = false, style = MaterialTheme.typography.labelMedium) } else Text("USSD code not captured", color = Muted, style = MaterialTheme.typography.bodySmall)
-                    if (offer.tags.isNotBlank()) Text("Tags: ${offer.tags}", color = Muted, style = MaterialTheme.typography.bodySmall)
-                    Text(offer.note, color = Muted, style = MaterialTheme.typography.bodySmall)
-                    Surface(color = Color(0xFF3A2C18), shape = RoundedCornerShape(50)) {
-                        Row(Modifier.padding(horizontal = 9.dp, vertical = 5.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            Text("●", color = Color(0xFFFFC857), style = MaterialTheme.typography.labelSmall)
-                            Text("CANDIDATE · NOT VERIFIED", color = Color(0xFFFFD58A), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall)
+                        Text("${offer.duration}  ·  ${when(offer.simProfile) { "normal" -> "NORMAL SIM"; "notification" -> "NOTIFICATION SIM"; else -> "ANY SIM" }}", color=Muted, style=MaterialTheme.typography.bodySmall)
+                        Row(Modifier.fillMaxWidth(), verticalAlignment=androidx.compose.ui.Alignment.CenterVertically, horizontalArrangement=Arrangement.SpaceBetween) {
+                            if(offer.code.isNotBlank()) Surface(color=Color(0xFF070B13), shape=RoundedCornerShape(8.dp)) {
+                                Text(offer.code, color=Color(0xFFD9E1EC), fontFamily=FontFamily.Monospace, modifier=Modifier.padding(horizontal=10.dp, vertical=7.dp), style=MaterialTheme.typography.labelMedium, maxLines=1)
+                            } else Text("USSD not captured", color=Muted, style=MaterialTheme.typography.labelSmall)
+                            Text(if(offer.category.equals("VOICE",true)) "VOICE" else offer.category.uppercase(Locale.ROOT), color=Muted, style=MaterialTheme.typography.labelSmall, fontWeight=FontWeight.Bold)
+                        }
+                        Row(Modifier.fillMaxWidth(), verticalAlignment=androidx.compose.ui.Alignment.CenterVertically, horizontalArrangement=Arrangement.End) {
+                            if(savedOffer!=null) {
+                                Button(onClick={editing=savedOffer; priceInput=savedOffer.price.toString()}, shape=RoundedCornerShape(50), contentPadding=PaddingValues(horizontal=15.dp, vertical=7.dp)) { Text("Edit Price", fontWeight=FontWeight.Bold, style=MaterialTheme.typography.labelMedium) }
+                            } else {
+                                Button(onClick={candidateToSave=offer; priceInput=if(offer.price>=0) offer.price.toString() else ""}, shape=RoundedCornerShape(50), contentPadding=PaddingValues(horizontal=15.dp, vertical=7.dp)) { Text("⇩ Download", fontWeight=FontWeight.Bold, style=MaterialTheme.typography.labelMedium) }
+                            }
                         }
                     }
-                    Button(onClick = { downloadCandidate = offer; downloadPrice = if (offer.price >= 0) offer.price.toString() else "" }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) { Text("Download to My Offers") }
                 }
             }
         }
-    } else {
-        Text("Saved signature offers (${saved.size})", fontWeight = FontWeight.Bold, color = Navy)
-        if (saved.isEmpty()) InfoCard("No saved offers yet", "Candidate records are shown separately so unverified source entries do not silently become active offers.")
-        saved.forEach { offer ->
-            Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF0B0F19)), modifier = Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                    Text(offer.name, fontWeight = FontWeight.Bold, color = Navy, style = MaterialTheme.typography.titleMedium, maxLines = 2)
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) { Text(offer.category + " · " + offer.duration, color = Muted, style = MaterialTheme.typography.bodySmall); Text("KES " + money(offer.price), color = Cyan, fontWeight = FontWeight.ExtraBold) }
-                    Text("Source: " + offer.source + " · " + if (offer.verified) "Operator marked verified" else "Unverified", color = Muted, style = MaterialTheme.typography.bodySmall)
-                }
-            }
-        }
     }
-    downloadCandidate?.let { candidate ->
+    candidateToSave?.let { offer ->
+        AlertDialog(onDismissRequest={candidateToSave=null; editingDuplicatePrice=false; signaturePriceError=""}, title={Text(if(editingDuplicatePrice) "Edit offer price" else "Download offer")}, text={
+            Column(verticalArrangement=Arrangement.spacedBy(8.dp)) {
+                Text(offer.name, fontWeight=FontWeight.Bold)
+                Text("Set your selling price. Candidate price and USSD details are not independently verified.", color=Muted, style=MaterialTheme.typography.bodySmall)
+                OutlinedTextField(value=priceInput, onValueChange={priceInput=it.filter { ch -> ch.isDigit() || ch=='.' }; signaturePriceError=""}, label={Text("Selling price (KES)")}, singleLine=true, isError=signaturePriceError.isNotBlank())
+                if (signaturePriceError.isNotBlank()) Text(signaturePriceError, color=Color(0xFFFF8A8A), style=MaterialTheme.typography.bodySmall)
+            }
+        }, confirmButton={TextButton(onClick={
+            val price=priceInput.toDoubleOrNull()
+            if(price==null || price<=0) onMessage("Enter a valid selling price.")
+            else {
+                val existingAtPrice = db.offers().firstOrNull { it.price == price }
+                if (existingAtPrice != null) {
+                    if (editingDuplicatePrice) {
+                        signaturePriceError = "KES ${money(price)} is already assigned to ${existingAtPrice.name}. Enter a different price to continue."
+                    } else {
+                        duplicateOffer = existingAtPrice
+                    }
+                } else try {
+                    db.saveOffer(null, offer.name, when(offer.category.uppercase(Locale.ROOT)) { "VOICE" -> "Minutes"; "DATA" -> "Data"; "SMS" -> "SMS"; "COMBO" -> "Combo"; else -> offer.category }, price, if(offer.price>=0) offer.price.toDouble() else null, "Signature import · ${offer.simProfile} SIM", false, false, ussdCode=offer.code, duration=offer.duration, sourceId=offer.id, simProfile=offer.simProfile, tags=offer.tags)
+                    reload++; candidateToSave=null; editingDuplicatePrice=false; signaturePriceError=""; onMessage("${offer.name} downloaded to My Offers.")
+                } catch(e:Exception) { onMessage(e.message ?: "Could not save offer.") }
+            }
+        }) { Text("Download", color=Cyan) }}, dismissButton={TextButton(onClick={candidateToSave=null; editingDuplicatePrice=false; signaturePriceError=""}){Text("Cancel")}}, containerColor=Color(0xFF111A2D), titleContentColor=Color.White, textContentColor=Color(0xFFD1D9E6))
+    }
+    duplicateOffer?.let { existing ->
+        val pending = candidateToSave
         AlertDialog(
-            onDismissRequest = { downloadCandidate = null },
-            title = { Text("Set selling price") },
+            onDismissRequest = { duplicateOffer = null },
+            title = { Text("Price already in use") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(candidate.name, fontWeight = FontWeight.Bold)
-                    Text(if (candidate.price >= 0) "Signature reference price: KES ${candidate.price}" else "Signature reference price was not captured.")
-                    OutlinedTextField(
-                        value = downloadPrice,
-                        onValueChange = { downloadPrice = it.filter { ch -> ch.isDigit() || ch == '.' } },
-                        label = { Text("Your selling price (KES)") },
-                        singleLine = true
-                    )
-                    Text("The offer will be added to My Offers using this price.", style = MaterialTheme.typography.bodySmall, color = Muted)
+                    Text("KES ${money(existing.price)} is already assigned to ${existing.name}. Every offer must have a different selling price.", color = Color.White)
+                    Text("Choose whether to edit the new offer's price or replace the existing offer with this Signature offer.", color = Muted, style = MaterialTheme.typography.bodySmall)
                 }
             },
             confirmButton = {
                 TextButton(onClick = {
-                    val price = downloadPrice.toDoubleOrNull()
-                    if (price == null || price <= 0.0) onMessage("Enter a valid selling price greater than zero.")
+                    val candidate = pending
+                    if (candidate == null) duplicateOffer = null
                     else try {
-                        db.saveOffer(null, candidate.name, when (candidate.category.uppercase()) { "VOICE" -> "Minutes"; "DATA" -> "Data"; "SMS" -> "SMS"; "COMBO" -> "Combo"; else -> candidate.category },
-                            price, if (candidate.price >= 0) candidate.price.toDouble() else null,
-                            "Signature import · ${candidate.simProfile} SIM", false, false,
-                            ussdCode = candidate.code, duration = candidate.duration, sourceId = candidate.id,
-                            simProfile = candidate.simProfile, tags = candidate.tags)
-                        reload++
-                        downloadCandidate = null
-                        onMessage("${candidate.name} added to My Offers at KES ${money(price)}.")
-                    } catch (e: Exception) {
-                        onMessage(e.message ?: "Could not download this offer. Check whether its selling price is already used.")
-                    }
-                }) { Text("Download offer") }
+                        db.saveOffer(existing.id, candidate.name, when(candidate.category.uppercase(Locale.ROOT)) { "VOICE" -> "Minutes"; "DATA" -> "Data"; "SMS" -> "SMS"; "COMBO" -> "Combo"; else -> candidate.category }, existing.price, if(candidate.price>=0) candidate.price.toDouble() else null, "Signature import · ${candidate.simProfile} SIM", false, false, ussdCode=candidate.code, duration=candidate.duration, sourceId=candidate.id, simProfile=candidate.simProfile, tags=candidate.tags)
+                        reload++; duplicateOffer=null; candidateToSave=null; onMessage("${candidate.name} replaced ${existing.name} at KES ${money(existing.price)}.")
+                    } catch(e:Exception) { onMessage(e.message ?: "Could not replace the existing offer.") }
+                }) { Text("Replace", color = Cyan, fontWeight = FontWeight.Bold) }
             },
-            dismissButton = { TextButton(onClick = { downloadCandidate = null }) { Text("Cancel") } }
+            dismissButton = {
+                TextButton(onClick = { editingDuplicatePrice = true; signaturePriceError = ""; duplicateOffer = null }) { Text("Edit", color = Color.White) }
+            },
+            containerColor = Color(0xFF111A2D), titleContentColor = Color.White, textContentColor = Color(0xFFD1D9E6)
         )
     }
+
+    editing?.let { offer ->
+        AlertDialog(onDismissRequest={editing=null}, title={Text("Edit selling price")}, text={
+            Column(verticalArrangement=Arrangement.spacedBy(8.dp)) {
+                Text(offer.name, fontWeight=FontWeight.Bold)
+                OutlinedTextField(value=priceInput, onValueChange={priceInput=it.filter { ch -> ch.isDigit() || ch=='.' }}, label={Text("Selling price (KES)")}, singleLine=true)
+            }
+        }, confirmButton={TextButton(onClick={
+            val price=priceInput.toDoubleOrNull()
+            if(price==null || price<=0) onMessage("Enter a valid selling price.")
+            else try { db.saveOffer(offer.id,offer.name,offer.category,price,offer.originalPrice,offer.source,offer.verified,offer.active,offer.ussdCode,offer.duration,offer.sourceId,offer.simProfile,offer.tags); reload++; editing=null; onMessage("Selling price updated.") }
+            catch(e:Exception) { onMessage(e.message ?: "Could not update price.") }
+        }){Text("Save price", color=Cyan)}}, dismissButton={TextButton(onClick={editing=null}){Text("Cancel")}}, containerColor=Color(0xFF111A2D), titleContentColor=Color.White, textContentColor=Color(0xFFD1D9E6))
+    }
 }
+
+
 @Composable
 private fun UpdatesScreen() {
     val context = LocalContext.current
@@ -1379,29 +1420,189 @@ private fun OffersScreen(db: LocalDatabase, onMessage: (String) -> Unit) {
 }
 
 @Composable
-private fun CustomersScreen(db:LocalDatabase,onMessage:(String)->Unit) {
-    var editId by remember { mutableStateOf<Long?>(null) }; var name by remember { mutableStateOf("") }; var phone by remember { mutableStateOf("") }; var notes by remember { mutableStateOf("") }; var search by remember { mutableStateOf("") }; var reload by remember { mutableIntStateOf(0) }
-    Text("Customers",style=MaterialTheme.typography.headlineMedium,fontWeight=FontWeight.Bold)
-    OutlinedTextField(name,{name=it},label={Text("Customer name")},modifier=Modifier.fillMaxWidth(),singleLine=true)
-    OutlinedTextField(phone,{phone=it},label={Text("Phone number")},modifier=Modifier.fillMaxWidth(),singleLine=true)
-    OutlinedTextField(notes,{notes=it},label={Text("Notes (optional)")},modifier=Modifier.fillMaxWidth())
-    Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp)) {
-        Button(onClick={if(name.isBlank()||phone.isBlank()) onMessage("Enter customer name and phone number.")
-            else try{db.saveCustomer(editId,name,phone,notes);name="";phone="";notes="";editId=null;reload++;onMessage("Customer saved locally.")}
-            catch(_:Exception){onMessage("Could not save: phone number may already be used.")}
-        },modifier=Modifier.weight(1f)){Text(if(editId==null)"Save customer" else "Update customer")}
-        OutlinedButton(onClick={editId=null;name="";phone="";notes=""}){Text("Clear")}
-    }
-    OutlinedTextField(search,{search=it},label={Text("Search name or phone")},modifier=Modifier.fillMaxWidth(),singleLine=true)
-    val customers=remember(reload,search){db.customers(search)}
-    Text("Customer records (${customers.size})",fontWeight=FontWeight.Bold)
-    customers.forEach { c -> Card(colors=CardDefaults.cardColors(containerColor=Color(0xFF0B0F19)),modifier=Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(12.dp),verticalArrangement=Arrangement.spacedBy(4.dp)) {
-            Text(c.name,fontWeight=FontWeight.Bold);Text(c.phone,color=Muted);if(c.notes.isNotBlank())Text(c.notes)
-            Row(Modifier.fillMaxWidth()) { TextButton(onClick={editId=c.id;name=c.name;phone=c.phone;notes=c.notes}){Text("Edit")};TextButton(onClick={db.deleteCustomer(c.id);reload++;onMessage("Customer deleted.")}){Text("Delete")} }
+private fun CustomersScreen(db: LocalDatabase, onMessage: (String) -> Unit) {
+    val context = LocalContext.current
+    var editId by remember { mutableStateOf<Long?>(null) }
+    var name by remember { mutableStateOf("") }
+    var phone by remember { mutableStateOf("") }
+    var notes by remember { mutableStateOf("") }
+    var search by remember { mutableStateOf("") }
+    var filter by remember { mutableStateOf("All") }
+    var reload by remember { mutableIntStateOf(0) }
+    var showEditor by remember { mutableStateOf(false) }
+    var simulateCustomer by remember { mutableStateOf<CustomerRow?>(null) }
+    var simulatedOffer by remember { mutableStateOf("1GB - 1 Hr") }
+    var simulatedPrice by remember { mutableStateOf("20") }
+
+    val customers = remember(reload, search) { db.customers(search.trim()) }
+    val orders = remember(reload) { db.orders() }
+    val offers = remember(reload) { db.offers() }
+    val phoneKey: (String) -> String = { value -> value.filter { it.isDigit() }.takeLast(9) }
+    val recentCutoff = System.currentTimeMillis() - 30L * 24 * 60 * 60 * 1000
+    fun customerOrders(customer: CustomerRow) = orders.filter { phoneKey(it.customer) == phoneKey(customer.phone) && phoneKey(customer.phone).isNotBlank() }
+    val visibleCustomers = customers.filter { customer ->
+        val count = customerOrders(customer).size
+        when (filter) {
+            "Frequent" -> count >= 5 && !customer.blacklisted
+            "Recent" -> customerOrders(customer).any { it.createdAt >= recentCutoff } && !customer.blacklisted
+            "Blacklisted" -> customer.blacklisted
+            else -> true
         }
-    } }
+    }
+    val totalCustomers = db.count("customers")
+    val totalOrders = orders.count { !it.status.equals("SIMULATED", true) }
+
+    fun clearEditor() { editId = null; name = ""; phone = ""; notes = "" }
+
+    Box(Modifier.fillMaxSize()) {
+        Column(
+            Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(bottom = 78.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text("CUSTOMERS", color = Muted, fontWeight = FontWeight.Bold, letterSpacing = 1.5.sp, style = MaterialTheme.typography.labelMedium)
+                    Text("Customer records ($totalCustomers)", color = Color.White, fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.titleLarge)
+                }
+                TextButton(onClick = { simulateCustomer = customers.firstOrNull(); if (simulateCustomer == null) onMessage("Add a customer before simulating a purchase.") }) {
+                    Text("+ Simulate Purchase", color = Cyan, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelMedium)
+                }
+            }
+            OutlinedTextField(
+                value = search, onValueChange = { search = it },
+                modifier = Modifier.fillMaxWidth().heightIn(min = 54.dp),
+                placeholder = { Text("Search name or phone", color = Muted) },
+                leadingIcon = { Text("⌕", color = Muted, style = MaterialTheme.typography.titleLarge) },
+                singleLine = true, shape = RoundedCornerShape(18.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = Cyan, unfocusedBorderColor = Color(0xFF202A3B),
+                    focusedContainerColor = Color(0xFF111A2D), unfocusedContainerColor = Color(0xFF111A2D),
+                    focusedTextColor = Color.White, unfocusedTextColor = Color.White, cursorColor = Cyan
+                )
+            )
+            Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                listOf("All", "Frequent", "Recent", "Blacklisted").forEach { item ->
+                    FilterChip(
+                        selected = filter == item, onClick = { filter = item },
+                        label = { Text(item) },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = Cyan, selectedLabelColor = Color(0xFF04121A),
+                            containerColor = Color(0xFF111A2D), labelColor = Color(0xFFD7DFEA)
+                        ),
+                        border = FilterChipDefaults.filterChipBorder(
+                            enabled = true, selected = filter == item,
+                            borderColor = Color(0xFF202A3B), selectedBorderColor = Cyan
+                        )
+                    )
+                }
+            }
+            Row(Modifier.fillMaxWidth(), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                    Box(Modifier.size(8.dp).clip(RoundedCornerShape(50)).background(Cyan))
+                    Text("Customer records (${visibleCustomers.size})", color = Color.White, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
+                }
+                Text("${totalOrders} orders", color = Muted, style = MaterialTheme.typography.labelSmall)
+            }
+            if (visibleCustomers.isEmpty()) {
+                InfoCard(if (filter == "Blacklisted") "No blacklisted customers" else "No customers found", "Customers and their recorded order activity will appear here.")
+            }
+            visibleCustomers.forEach { customer ->
+                val customerOrders = customerOrders(customer)
+                val latest = customerOrders.maxByOrNull { it.createdAt }
+                val spend = customerOrders.filterNot { it.status.equals("SIMULATED", true) }.sumOf { it.price }
+                val initials = customer.name.trim().split(Regex("\\s+")).filter { it.isNotBlank() }.take(2).mapNotNull { it.firstOrNull()?.uppercaseChar() }.joinToString("")
+                val vip = customerOrders.count { !it.status.equals("SIMULATED", true) } >= 8
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFF111A2D)),
+                    border = BorderStroke(1.dp, Color(0xFF202A3B)),
+                    shape = RoundedCornerShape(20.dp)
+                ) {
+                    Column(Modifier.fillMaxWidth().padding(horizontal = 15.dp, vertical = 14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Row(Modifier.fillMaxWidth(), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Surface(color = Color(0xFF123548), shape = RoundedCornerShape(15.dp), border = BorderStroke(1.dp, Color(0xFF24536A))) {
+                                Box(Modifier.size(48.dp), contentAlignment = androidx.compose.ui.Alignment.Center) {
+                                    Text(initials.ifBlank { "?" }, color = Cyan, fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.titleMedium)
+                                }
+                            }
+                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    Text(customer.name, color = Color.White, fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.titleMedium, maxLines = 1)
+                                    if (vip) Surface(color = Color(0xFF103D50), shape = RoundedCornerShape(50)) { Text("VIP", color = Cyan, modifier = Modifier.padding(horizontal=8.dp, vertical=3.dp), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold) }
+                                    if (customer.blacklisted) Surface(color = Color(0xFF49212B), shape = RoundedCornerShape(50)) { Text("BLACKLISTED", color = Color(0xFFFF9AAA), modifier = Modifier.padding(horizontal=7.dp, vertical=3.dp), style = MaterialTheme.typography.labelSmall) }
+                                }
+                                Text(customer.phone, color = Cyan, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
+                            }
+                            OutlinedButton(
+                                onClick = { runCatching { context.startActivity(Intent(Intent.ACTION_DIAL, Uri.fromParts("tel", customer.phone, null))) }.onFailure { onMessage("Could not open the phone dialler.") } },
+                                contentPadding = PaddingValues(horizontal=12.dp, vertical=8.dp),
+                                shape = RoundedCornerShape(15.dp),
+                                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
+                                border = BorderStroke(1.dp, Color(0xFF283447))
+                            ) { Text("☎ Dial", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelMedium) }
+                        }
+                        Row(Modifier.fillMaxWidth(), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                            Text("Last: ${latest?.let { it.offer + " · " + SimpleDateFormat("d MMM", Locale.getDefault()).format(Date(it.createdAt)) } ?: "No orders"}", color = Muted, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f), maxLines = 1)
+                            Text("${customerOrders.size} orders · KES ${money(spend)}", color = Color(0xFFD8E2EF), fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodySmall)
+                        }
+                        if (customer.notes.isNotBlank()) Text("Note: ${customer.notes}", color = Muted, style = MaterialTheme.typography.bodySmall, maxLines = 2)
+                        HorizontalDivider(color = Color(0xFF202A3B))
+                        Row(Modifier.fillMaxWidth(), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                            TextButton(onClick = { editId=customer.id; name=customer.name; phone=customer.phone; notes=customer.notes; showEditor=true }, contentPadding = PaddingValues(horizontal=5.dp)) { Text("EDIT", color=Cyan, style=MaterialTheme.typography.labelSmall) }
+                            TextButton(onClick = { runCatching { db.setCustomerBlacklisted(customer.id, !customer.blacklisted); reload++ }.onFailure { onMessage("Could not update blacklist.") } }, contentPadding = PaddingValues(horizontal=5.dp)) { Text(if (customer.blacklisted) "UNBLOCK" else "BLACKLIST", color=Color(0xFFFFB86B), style=MaterialTheme.typography.labelSmall) }
+                            Spacer(Modifier.weight(1f))
+                            TextButton(onClick = { runCatching { db.deleteCustomer(customer.id); reload++; onMessage("Customer deleted.") }.onFailure { onMessage("Could not delete customer.") } }, contentPadding = PaddingValues(horizontal=5.dp)) { Text("DELETE", color=Color(0xFFE88BA4), style=MaterialTheme.typography.labelSmall) }
+                        }
+                    }
+                }
+            }
+        }
+        FloatingActionButton(
+            onClick = { clearEditor(); showEditor = true },
+            modifier = Modifier.align(androidx.compose.ui.Alignment.BottomEnd).padding(end = 8.dp, bottom = 12.dp),
+            containerColor = Cyan, contentColor = Color(0xFF04121A), shape = RoundedCornerShape(19.dp)
+        ) { Text("+", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold) }
+    }
+
+    if (showEditor) AlertDialog(
+        onDismissRequest = { showEditor=false; clearEditor() },
+        title = { Text(if (editId == null) "Add customer" else "Edit customer") },
+        text = { Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedTextField(name, { name=it }, label={ Text("Customer name") }, modifier=Modifier.fillMaxWidth(), singleLine=true)
+            OutlinedTextField(phone, { phone=it }, label={ Text("Phone number") }, modifier=Modifier.fillMaxWidth(), singleLine=true)
+            OutlinedTextField(notes, { notes=it }, label={ Text("Notes (optional)") }, modifier=Modifier.fillMaxWidth(), minLines=2)
+        } },
+        confirmButton = { TextButton(onClick = {
+            if(name.isBlank() || phone.isBlank()) onMessage("Enter customer name and phone number.")
+            else try { db.saveCustomer(editId,name,phone,notes); showEditor=false; clearEditor(); reload++; onMessage("Customer saved locally.") }
+            catch (_:Exception) { onMessage("Could not save customer. Check whether the phone number is already used.") }
+        }) { Text(if(editId==null) "Save customer" else "Update customer", color=Cyan) } },
+        dismissButton = { TextButton(onClick={ showEditor=false; clearEditor() }) { Text("Cancel") } },
+        containerColor=Color(0xFF111A2D), titleContentColor=Color.White, textContentColor=Color(0xFFD1D9E6)
+    )
+
+    simulateCustomer?.let { selectedCustomer ->
+        AlertDialog(
+            onDismissRequest = { simulateCustomer=null },
+            title = { Text("Simulate a purchase") },
+            text = { Column(verticalArrangement=Arrangement.spacedBy(8.dp)) {
+                Text("Local demo only. This does not send a payment request or activate a bundle.", color=Muted, style=MaterialTheme.typography.bodySmall)
+                OutlinedTextField(value=selectedCustomer.name, onValueChange={}, readOnly=true, label={Text("Customer")}, modifier=Modifier.fillMaxWidth())
+                OutlinedTextField(value=simulatedOffer, onValueChange={simulatedOffer=it}, label={Text("Offer name")}, modifier=Modifier.fillMaxWidth(), singleLine=true)
+                OutlinedTextField(value=simulatedPrice, onValueChange={simulatedPrice=it.filter { ch -> ch.isDigit() || ch=='.' }}, label={Text("Price (KES)")}, modifier=Modifier.fillMaxWidth(), singleLine=true)
+            } },
+            confirmButton = { TextButton(onClick={
+                val price=simulatedPrice.toDoubleOrNull()
+                if(price==null || price<=0 || simulatedOffer.isBlank()) onMessage("Enter an offer and a valid price.")
+                else try { db.createSimulatedOrder(selectedCustomer.phone,simulatedOffer,price); reload++; simulateCustomer=null; onMessage("Demo purchase recorded locally. No payment was made.") }
+                catch (_:Exception) { onMessage("Could not record the demo purchase.") }
+            }) { Text("Record simulation", color=Cyan) } },
+            dismissButton = { TextButton(onClick={simulateCustomer=null}) { Text("Cancel") } },
+            containerColor=Color(0xFF111A2D), titleContentColor=Color.White, textContentColor=Color(0xFFD1D9E6)
+        )
+    }
 }
+
 
 @Composable
 private fun PaymentInboxScreen() {
