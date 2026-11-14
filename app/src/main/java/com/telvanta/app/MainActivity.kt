@@ -196,7 +196,7 @@ private fun BingwaPulseApp(db: LocalDatabase) {
                         "Message Processing" -> FeatureWorkspaceScreen("Message Processing")
                         "Account & Session" -> AccountSessionScreen { message = it }
                         "SiteLink" -> SiteLinkScreen(db) { message = it }
-                        "Signature Offers", "Signature" -> SignatureOffersScreen(db) { message = it }
+                        "Signature Offers", "Signature" -> SignatureOffersScreen(db, onQuickDial = { selected = "Quick Dial"; message = "" }) { message = it }
                         "Statistics" -> StatisticsScreen(db)
                         "Wallet" -> WalletScreen()
                         "Quick Dial" -> QuickDialScreen(db) { message = it }
@@ -789,73 +789,146 @@ private fun SiteLinkScreen(db: LocalDatabase, onMessage: (String) -> Unit) {
 }
 
 @Composable
-private fun SignatureOffersScreen(db: LocalDatabase, onMessage: (String) -> Unit) {
+private fun SignatureOffersScreen(db: LocalDatabase, onQuickDial: () -> Unit, onMessage: (String) -> Unit) {
     data class CandidateOffer(val id: String, val simProfile: String, val category: String, val name: String, val duration: String, val price: Int, val code: String, val tags: String, val note: String)
     val context = LocalContext.current
     val candidates = remember {
         runCatching {
-            val root = JSONObject(context.assets.open("signature_offers_seed.json").bufferedReader().use { it.readText() })
-            val rows = root.getJSONArray("offers")
-            buildList { for (i in 0 until rows.length()) { val row = rows.getJSONObject(i); add(CandidateOffer(row.optString("id"), row.optString("simProfile", "any"), row.optString("category", "OTHER"), row.optString("name", "Unnamed offer"), row.optString("duration", "Duration not captured"), row.optInt("amountKes", -1), row.optString("entryCode", ""), row.optString("tags", ""), row.optString("reviewNote", "Candidate offer — not independently verified"))) } }
+            val raw = context.assets.open("signature_offers_seed.json").bufferedReader().use { it.readText() }
+            val rows = JSONObject(raw).getJSONArray("offers")
+            buildList {
+                for (i in 0 until rows.length()) {
+                    val row = rows.getJSONObject(i)
+                    add(CandidateOffer(row.optString("id"), row.optString("simProfile", "any"), row.optString("category", "OTHER"), row.optString("name", "Unnamed offer"), row.optString("duration", "Duration not captured"), row.optInt("amountKes", -1), row.optString("entryCode", ""), row.optString("tags", ""), row.optString("reviewNote", "Candidate details — not independently verified")))
+                }
+            }
         }.getOrElse { emptyList() }
     }
     var search by remember { mutableStateOf("") }
     var category by remember { mutableStateOf("ALL") }
     var simProfile by remember { mutableStateOf("ALL") }
-    var showSaved by remember { mutableStateOf(false) }
     var reload by remember { mutableIntStateOf(0) }
-    var selectedOffer by remember { mutableStateOf<CandidateOffer?>(null) }
-    var sellingPrice by remember { mutableStateOf("") }
-    val saved = remember(reload) { db.offers().filter { it.source.contains("signature", true) } }
+    var editing by remember { mutableStateOf<OfferRow?>(null) }
+    var candidateToSave by remember { mutableStateOf<CandidateOffer?>(null) }
+    var priceInput by remember { mutableStateOf("") }
+    val saved = remember(reload) { db.offers().filter { it.source.contains("signature", ignoreCase = true) } }
     CloudOfferSyncEffect(db, reload, onMessage)
-    val visible = candidates.filter { (category == "ALL" || it.category.equals(category, true)) && (simProfile == "ALL" || it.simProfile.equals(simProfile, true)) && (search.isBlank() || it.name.contains(search, true) || it.code.contains(search, true) || it.price.toString().contains(search)) }
-    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(11.dp)) {
-        Row(Modifier.fillMaxWidth(), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) { Text("SIGNATURE", color = Color.White, fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.titleLarge); Text(if (showSaved) "Your saved offers" else "Extracted offer catalogue", color = Muted, style = MaterialTheme.typography.bodySmall) }
-            TextButton(onClick = { showSaved = !showSaved }) { Text(if (showSaved) "CANDIDATES" else "MY OFFERS", color = Cyan, fontWeight = FontWeight.Bold) }
-        }
-        if (!showSaved) {
-            Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                listOf("ALL", "DATA", "VOICE", "SMS").forEach { item -> FilterChip(category == item, { category = item }, label = { Text(if (item == "ALL") "All (" + candidates.size + ")" else item.replaceFirstChar { it.uppercase() }) }, colors = FilterChipDefaults.filterChipColors(selectedContainerColor = Cyan, selectedLabelColor = Color(0xFF06111B), containerColor = Color(0xFF10192B), labelColor = Color(0xFFD4DCE8))) }
+    val visible = candidates.filter {
+        (category == "ALL" || it.category.equals(category, true) || (category == "VOICE" && it.category.equals("MINUTES", true))) &&
+            (simProfile == "ALL" || it.simProfile.equals(simProfile, true)) &&
+            (search.isBlank() || it.name.contains(search, true) || it.price.toString().contains(search) || it.code.contains(search, true))
+    }
+    val downloadedIds = saved.map { it.sourceId }.filter { it.isNotBlank() }.toSet()
+    val countLabel = if (category == "ALL") candidates.size else visible.size
+    Box(Modifier.fillMaxSize()) {
+        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(bottom=12.dp), verticalArrangement=Arrangement.spacedBy(10.dp)) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment=androidx.compose.ui.Alignment.CenterVertically, horizontalArrangement=Arrangement.SpaceBetween) {
+                Column(verticalArrangement=Arrangement.spacedBy(2.dp)) {
+                    Text("SIGNATURE", color=Muted, fontWeight=FontWeight.Bold, letterSpacing=1.5.sp, style=MaterialTheme.typography.labelMedium)
+                    Text("Offer catalogue", color=Color.White, fontWeight=FontWeight.ExtraBold, style=MaterialTheme.typography.titleLarge)
+                }
+                OutlinedButton(onClick=onQuickDial, shape=RoundedCornerShape(50), contentPadding=PaddingValues(horizontal=14.dp, vertical=7.dp), border=BorderStroke(1.dp, Color(0xFF164653)), colors=ButtonDefaults.outlinedButtonColors(contentColor=Cyan)) {
+                    Text("QUICK DIAL ↗", fontWeight=FontWeight.Bold, style=MaterialTheme.typography.labelSmall)
+                }
             }
-            OutlinedTextField(search, { search = it }, Modifier.fillMaxWidth(), placeholder = { Text("⌕  Search…", color = Muted) }, singleLine = true, shape = RoundedCornerShape(16.dp), colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Cyan, unfocusedBorderColor = Color(0xFF202A3B), focusedContainerColor = Color(0xFF10192B), unfocusedContainerColor = Color(0xFF10192B), focusedTextColor = Color.White, unfocusedTextColor = Color.White, cursorColor = Cyan))
-            Row(Modifier.fillMaxWidth(), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-                Text(visible.size.toString() + " offers", color = Muted, style = MaterialTheme.typography.labelSmall)
-                var expanded by remember { mutableStateOf(false) }
-                Box { TextButton(onClick = { expanded = true }) { Text(if (simProfile == "ALL" || simProfile == "any") "ANY SIM ▾" else simProfile.uppercase() + " ▾", color = Cyan, style = MaterialTheme.typography.labelSmall) }; DropdownMenu(expanded, { expanded = false }) { listOf("ALL" to "Any SIM", "any" to "Any SIM", "normal" to "Normal SIM", "notification" to "Notification SIM").forEach { opt -> DropdownMenuItem(text = { Text(opt.second) }, onClick = { simProfile = opt.first; expanded = false }) } } }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement=Arrangement.spacedBy(6.dp), verticalAlignment=androidx.compose.ui.Alignment.CenterVertically) {
+                val chips = listOf("ALL", "DATA", "VOICE", "SMS", "COMBO")
+                chips.forEach { item ->
+                    val label = when(item) { "ALL" -> "All (\${candidates.size})"; else -> item.lowercase().replaceFirstChar { it.uppercase() } }
+                    FilterChip(
+                        selected=category==item, onClick={category=item},
+                        label={Text(label, maxLines=1, style=MaterialTheme.typography.labelMedium)},
+                        colors=FilterChipDefaults.filterChipColors(selectedContainerColor=Cyan, selectedLabelColor=Color(0xFF04121A), containerColor=Color(0xFF111A2D), labelColor=Color(0xFFD7DFEA)),
+                        border=FilterChipDefaults.filterChipBorder(enabled=true, selected=category==item, borderColor=Color(0xFF202A3B), selectedBorderColor=Cyan)
+                    )
+                }
             }
+            OutlinedTextField(
+                value=search, onValueChange={search=it}, modifier=Modifier.fillMaxWidth().heightIn(min=50.dp),
+                placeholder={Text("⌕  Search...", color=Muted)}, singleLine=true, shape=RoundedCornerShape(16.dp),
+                colors=OutlinedTextFieldDefaults.colors(focusedBorderColor=Cyan, unfocusedBorderColor=Color(0xFF202A3B), focusedContainerColor=Color(0xFF111A2D), unfocusedContainerColor=Color(0xFF111A2D), focusedTextColor=Color.White, unfocusedTextColor=Color.White, cursorColor=Cyan)
+            )
+            Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement=Arrangement.spacedBy(6.dp)) {
+                listOf("ALL" to "Any SIM", "any" to "Any SIM", "normal" to "Normal SIM", "notification" to "Notification SIM").forEach { item ->
+                    FilterChip(selected=simProfile==item.first, onClick={simProfile=item.first}, label={Text(item.second, style=MaterialTheme.typography.labelSmall)}, colors=FilterChipDefaults.filterChipColors(selectedContainerColor=Color(0xFF153B4A), selectedLabelColor=Cyan, containerColor=Color(0xFF0D1422), labelColor=Muted))
+                }
+            }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement=Arrangement.SpaceBetween, verticalAlignment=androidx.compose.ui.Alignment.CenterVertically) {
+                Text("Showing \${visible.size} of \${candidates.size} offers", color=Muted, style=MaterialTheme.typography.labelSmall)
+                Text("\${saved.size} downloaded", color=Cyan, style=MaterialTheme.typography.labelSmall, fontWeight=FontWeight.Bold)
+            }
+            if (visible.isEmpty()) InfoCard("No matching offers", "Try another category or search term.")
             visible.forEach { offer ->
-                Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = Color(0xFF10192B)), border = BorderStroke(1.dp, Color(0xFF202A3B)), shape = RoundedCornerShape(20.dp)) {
-                    Column(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Row(Modifier.fillMaxWidth(), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                                Text(offer.name, color = Color.White, fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.titleMedium, maxLines = 1)
-                                Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) { Text(offer.duration, color = Muted, style = MaterialTheme.typography.bodySmall); Surface(color = Color(0xFF3A2C18), shape = RoundedCornerShape(50)) { Text("● Unverified", color = Color(0xFFFFD36E), modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp), style = MaterialTheme.typography.labelSmall) } }
+                val savedOffer = saved.firstOrNull { it.sourceId == offer.id && offer.id.isNotBlank() }
+                val displayedPrice = savedOffer?.price ?: offer.price.toDouble()
+                Card(
+                    modifier=Modifier.fillMaxWidth(),
+                    colors=CardDefaults.cardColors(containerColor=Color(0xFF111A2D)),
+                    border=BorderStroke(1.dp, if(savedOffer!=null) Color(0xFF155366) else Color(0xFF202A3B)),
+                    shape=RoundedCornerShape(19.dp)
+                ) {
+                    Column(Modifier.fillMaxWidth().padding(horizontal=14.dp, vertical=12.dp), verticalArrangement=Arrangement.spacedBy(7.dp)) {
+                        Row(Modifier.fillMaxWidth(), verticalAlignment=androidx.compose.ui.Alignment.CenterVertically, horizontalArrangement=Arrangement.SpaceBetween) {
+                            Row(Modifier.weight(1f), verticalAlignment=androidx.compose.ui.Alignment.CenterVertically, horizontalArrangement=Arrangement.spacedBy(7.dp)) {
+                                Text(offer.name, color=Color.White, fontWeight=FontWeight.ExtraBold, style=MaterialTheme.typography.titleMedium, maxLines=1)
+                                Surface(color=if(savedOffer!=null) Color(0xFF103D50) else Color(0xFF3A2C18), shape=RoundedCornerShape(50)) {
+                                    Text(if(savedOffer!=null) "✓ Downloaded" else "● Unverified", color=if(savedOffer!=null) Cyan else Color(0xFFFFD58A), fontWeight=FontWeight.Bold, modifier=Modifier.padding(horizontal=7.dp, vertical=4.dp), style=MaterialTheme.typography.labelSmall, maxLines=1)
+                                }
                             }
-                            Column(horizontalAlignment = androidx.compose.ui.Alignment.End, verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                                Text(if (offer.price >= 0) "KES " + offer.price else "KES —", color = Cyan, fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.titleMedium)
-                                Button(onClick = { selectedOffer = offer; sellingPrice = if (offer.price >= 0) offer.price.toString() else "" }, contentPadding = PaddingValues(horizontal = 12.dp, vertical = 5.dp), shape = RoundedCornerShape(50), colors = ButtonDefaults.buttonColors(containerColor = Cyan, contentColor = Color(0xFF06111B))) { Text("↓ Download", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold) }
+                            Column(horizontalAlignment=androidx.compose.ui.Alignment.End) {
+                                if(savedOffer?.originalPrice!=null && savedOffer.originalPrice>displayedPrice) Text("KES \${money(savedOffer.originalPrice)}", color=Muted, style=MaterialTheme.typography.labelSmall)
+                                Text(if(displayedPrice>=0) "KES \${money(displayedPrice)}" else "Price —", color=Cyan, fontWeight=FontWeight.ExtraBold, style=MaterialTheme.typography.titleMedium, maxLines=1)
                             }
                         }
-                        Row(Modifier.fillMaxWidth(), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Surface(color = Color(0xFF070C16), shape = RoundedCornerShape(8.dp)) { Text(offer.code.ifBlank { "USSD not captured" }, color = Color(0xFFD4DCE8), fontFamily = FontFamily.Monospace, modifier = Modifier.padding(horizontal = 9.dp, vertical = 7.dp), style = MaterialTheme.typography.labelMedium, maxLines = 1) }
-                            Text(if (offer.simProfile == "normal") "NORMAL SIM" else if (offer.simProfile == "notification") "NOTIFICATION SIM" else "ANY SIM", color = Muted, style = MaterialTheme.typography.labelSmall)
+                        Text("\${offer.duration}  ·  \${when(offer.simProfile) { "normal" -> "NORMAL SIM"; "notification" -> "NOTIFICATION SIM"; else -> "ANY SIM" }}", color=Muted, style=MaterialTheme.typography.bodySmall)
+                        Row(Modifier.fillMaxWidth(), verticalAlignment=androidx.compose.ui.Alignment.CenterVertically, horizontalArrangement=Arrangement.SpaceBetween) {
+                            if(offer.code.isNotBlank()) Surface(color=Color(0xFF070B13), shape=RoundedCornerShape(8.dp)) {
+                                Text(offer.code, color=Color(0xFFD9E1EC), fontFamily=FontFamily.Monospace, modifier=Modifier.padding(horizontal=10.dp, vertical=7.dp), style=MaterialTheme.typography.labelMedium, maxLines=1)
+                            } else Text("USSD not captured", color=Muted, style=MaterialTheme.typography.labelSmall)
+                            Text(if(offer.category.equals("VOICE",true)) "VOICE" else offer.category.uppercase(Locale.ROOT), color=Muted, style=MaterialTheme.typography.labelSmall, fontWeight=FontWeight.Bold)
+                        }
+                        Row(Modifier.fillMaxWidth(), verticalAlignment=androidx.compose.ui.Alignment.CenterVertically, horizontalArrangement=Arrangement.End) {
+                            if(savedOffer!=null) {
+                                Button(onClick={editing=savedOffer; priceInput=savedOffer.price.toString()}, shape=RoundedCornerShape(50), contentPadding=PaddingValues(horizontal=15.dp, vertical=7.dp)) { Text("Edit Price", fontWeight=FontWeight.Bold, style=MaterialTheme.typography.labelMedium) }
+                            } else {
+                                Button(onClick={candidateToSave=offer; priceInput=if(offer.price>=0) offer.price.toString() else ""}, shape=RoundedCornerShape(50), contentPadding=PaddingValues(horizontal=15.dp, vertical=7.dp)) { Text("⇩ Download", fontWeight=FontWeight.Bold, style=MaterialTheme.typography.labelMedium) }
+                            }
                         }
                     }
                 }
             }
-        } else {
-            Text("Saved signature offers (" + saved.size + ")", color = Color.White, fontWeight = FontWeight.Bold)
-            if (saved.isEmpty()) InfoCard("No saved offers yet", "Downloaded offers appear here.")
-            saved.forEach { offer -> Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = Color(0xFF10192B)), border = BorderStroke(1.dp, Color(0xFF202A3B)), shape = RoundedCornerShape(18.dp)) { Row(Modifier.fillMaxWidth().padding(14.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) { Column(Modifier.weight(1f)) { Text(offer.name, color = Color.White, fontWeight = FontWeight.Bold); Text(offer.category.uppercase() + " · " + offer.duration, color = Muted, style = MaterialTheme.typography.bodySmall) }; Text("KES " + money(offer.price), color = Cyan, fontWeight = FontWeight.ExtraBold) } } }
         }
     }
-    selectedOffer?.let { offer ->
-        AlertDialog(onDismissRequest = { selectedOffer = null }, title = { Text("Set selling price") }, text = { Column(verticalArrangement = Arrangement.spacedBy(8.dp)) { Text(offer.name, fontWeight = FontWeight.Bold); Text(if (offer.price >= 0) "Reference price: KES " + offer.price else "Reference price not captured."); OutlinedTextField(sellingPrice, { sellingPrice = it.filter { ch -> ch.isDigit() || ch == '.' } }, label = { Text("Your selling price (KES)") }, singleLine = true); Text("Adds to My Offers only. No purchase is triggered.", color = Muted, style = MaterialTheme.typography.bodySmall) } }, confirmButton = { TextButton(onClick = { val price = sellingPrice.toDoubleOrNull(); if (price == null || price <= 0) onMessage("Enter a valid selling price.") else try { db.saveOffer(null, offer.name, when (offer.category.uppercase()) { "VOICE" -> "Minutes"; "DATA" -> "Data"; "SMS" -> "SMS"; "COMBO" -> "Combo"; else -> offer.category }, price, if (offer.price >= 0) offer.price.toDouble() else null, "Signature import · " + offer.simProfile + " SIM", false, false, ussdCode = offer.code, duration = offer.duration, sourceId = offer.id, simProfile = offer.simProfile, tags = offer.tags); reload++; selectedOffer = null; onMessage("Offer added to My Offers.") } catch (error: Exception) { onMessage(error.message ?: "Could not save offer.") } }) { Text("Download offer", color = Cyan) } }, dismissButton = { TextButton(onClick = { selectedOffer = null }) { Text("Cancel") } }, containerColor = Color(0xFF10192B), titleContentColor = Color.White, textContentColor = Color(0xFFD4DCE8))
+    candidateToSave?.let { offer ->
+        AlertDialog(onDismissRequest={candidateToSave=null}, title={Text("Download offer")}, text={
+            Column(verticalArrangement=Arrangement.spacedBy(8.dp)) {
+                Text(offer.name, fontWeight=FontWeight.Bold)
+                Text("Set your selling price. Candidate price and USSD details are not independently verified.", color=Muted, style=MaterialTheme.typography.bodySmall)
+                OutlinedTextField(value=priceInput, onValueChange={priceInput=it.filter { ch -> ch.isDigit() || ch=='.' }}, label={Text("Selling price (KES)")}, singleLine=true)
+            }
+        }, confirmButton={TextButton(onClick={
+            val price=priceInput.toDoubleOrNull()
+            if(price==null || price<=0) onMessage("Enter a valid selling price.")
+            else try {
+                db.saveOffer(null, offer.name, when(offer.category.uppercase(Locale.ROOT)) { "VOICE" -> "Minutes"; "DATA" -> "Data"; "SMS" -> "SMS"; "COMBO" -> "Combo"; else -> offer.category }, price, if(offer.price>=0) offer.price.toDouble() else null, "Signature import · \${offer.simProfile} SIM", false, false, ussdCode=offer.code, duration=offer.duration, sourceId=offer.id, simProfile=offer.simProfile, tags=offer.tags)
+                reload++; candidateToSave=null; onMessage("\${offer.name} downloaded to My Offers.")
+            } catch(e:Exception) { onMessage(e.message ?: "Could not save offer.") }
+        }) { Text("Download", color=Cyan) }}, dismissButton={TextButton(onClick={candidateToSave=null}){Text("Cancel")}}, containerColor=Color(0xFF111A2D), titleContentColor=Color.White, textContentColor=Color(0xFFD1D9E6))
+    }
+    editing?.let { offer ->
+        AlertDialog(onDismissRequest={editing=null}, title={Text("Edit selling price")}, text={
+            Column(verticalArrangement=Arrangement.spacedBy(8.dp)) {
+                Text(offer.name, fontWeight=FontWeight.Bold)
+                OutlinedTextField(value=priceInput, onValueChange={priceInput=it.filter { ch -> ch.isDigit() || ch=='.' }}, label={Text("Selling price (KES)")}, singleLine=true)
+            }
+        }, confirmButton={TextButton(onClick={
+            val price=priceInput.toDoubleOrNull()
+            if(price==null || price<=0) onMessage("Enter a valid selling price.")
+            else try { db.saveOffer(offer.id,offer.name,offer.category,price,offer.originalPrice,offer.source,offer.verified,offer.active,offer.ussdCode,offer.duration,offer.sourceId,offer.simProfile,offer.tags); reload++; editing=null; onMessage("Selling price updated.") }
+            catch(e:Exception) { onMessage(e.message ?: "Could not update price.") }
+        }){Text("Save price", color=Cyan)}}, dismissButton={TextButton(onClick={editing=null}){Text("Cancel")}}, containerColor=Color(0xFF111A2D), titleContentColor=Color.White, textContentColor=Color(0xFFD1D9E6))
     }
 }
-
-
 @Composable
 private fun OffersScreen(db: LocalDatabase, onMessage: (String) -> Unit) {
     val context = LocalContext.current
