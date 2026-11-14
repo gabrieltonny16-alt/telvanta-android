@@ -929,6 +929,157 @@ private fun SignatureOffersScreen(db: LocalDatabase, onQuickDial: () -> Unit, on
         }){Text("Save price", color=Cyan)}}, dismissButton={TextButton(onClick={editing=null}){Text("Cancel")}}, containerColor=Color(0xFF111A2D), titleContentColor=Color.White, textContentColor=Color(0xFFD1D9E6))
     }
 }
+
+
+@Composable
+private fun UpdatesScreen() {
+    val context = LocalContext.current
+    var checking by remember { mutableStateOf(false) }
+    var checkAttempt by remember { mutableIntStateOf(0) }
+    var status by remember { mutableStateOf("Checking for the latest published release…") }
+    var latestVersion by remember { mutableStateOf("") }
+    var releaseNotes by remember { mutableStateOf("") }
+    var apkUrl by remember { mutableStateOf("") }
+    var currentVersion by remember { mutableStateOf("0.1.0") }
+    var downloadId by remember { mutableStateOf<Long?>(null) }
+    val scope = rememberCoroutineScope()
+
+    fun installDownloadedApk(id: Long) {
+        try {
+            val manager = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+            val uri = manager.getUriForDownloadedFile(id)
+            if (uri == null) { status = "Download did not finish. Try again."; return }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !context.packageManager.canRequestPackageInstalls()) {
+                status = "Download complete. Allow BingwaPulse to install unknown apps in Android Settings, then tap Install downloaded update."
+                return
+            }
+            val intent = Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(uri, "application/vnd.android.package-archive")
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            context.startActivity(intent)
+            status = "Android installer opened. Approve the update to finish."
+        } catch (_: Exception) {
+            status = "Download is ready, but Android could not open the installer. Check app-install permission in Settings."
+        }
+    }
+
+    LaunchedEffect(checkAttempt) {
+        currentVersion = try { context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "unknown" } catch (_: Exception) { "unknown" }
+        checking = true
+        val result = withContext(Dispatchers.IO) {
+            try {
+                val conn = (URL("https://api.github.com/repos/gabrieltonny16-alt/telvanta-android/releases/latest").openConnection() as HttpURLConnection).apply {
+                    connectTimeout = 10000; readTimeout = 10000
+                    setRequestProperty("Accept", "application/vnd.github+json")
+                    setRequestProperty("User-Agent", "BingwaPulse-Android")
+                }
+                try {
+                    if (conn.responseCode == 404) "NO_RELEASE" to ""
+                    else if (conn.responseCode !in 200..299) "ERROR" to "Release service returned HTTP " + conn.responseCode
+                    else "OK" to conn.inputStream.bufferedReader().use { it.readText() }
+                } finally { conn.disconnect() }
+            } catch (e: Exception) { "ERROR" to (e.message ?: "Network error") }
+        }
+        checking = false
+        when (result.first) {
+            "NO_RELEASE" -> status = "No published update is available yet. This app checks automatically when opened; publish a signed release to enable updates."
+            "ERROR" -> status = "Could not check updates. Check your internet connection and try again."
+            else -> try {
+                val json = JSONObject(result.second)
+                latestVersion = json.optString("tag_name", "")
+                releaseNotes = json.optString("body", "No release notes provided.")
+                val assets = json.optJSONArray("assets")
+                if (assets != null) for (i in 0 until assets.length()) {
+                    val asset = assets.getJSONObject(i)
+                    if (asset.optString("name").endsWith(".apk", ignoreCase = true)) { apkUrl = asset.optString("browser_download_url"); break }
+                }
+                status = when {
+                    latestVersion.isBlank() -> "Release information is incomplete."
+                    latestVersion.trimStart('v','V') == currentVersion.trimStart('v','V') -> "You’re using the latest published version ($currentVersion)."
+                    apkUrl.isBlank() -> "Version $latestVersion is published, but it has no APK asset attached yet."
+                    else -> "Version $latestVersion is available."
+                }
+            } catch (_: Exception) { status = "Could not read release information. Try again later." }
+        }
+    }
+
+    val receiver = remember {
+        object : BroadcastReceiver() {
+            override fun onReceive(ctx: Context?, intent: Intent?) {
+                val id = intent?.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1L) ?: -1L
+                if (id > 0 && id == downloadId) installDownloadedApk(id)
+            }
+        }
+    }
+    DisposableEffect(context) {
+        val filter = IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE)
+        if (Build.VERSION.SDK_INT >= 33) context.registerReceiver(receiver, filter, Context.RECEIVER_NOT_EXPORTED)
+        else @Suppress("DEPRECATION") context.registerReceiver(receiver, filter)
+        onDispose { try { context.unregisterReceiver(receiver) } catch (_: Exception) {} }
+    }
+
+    Text("App updates", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = Navy)
+    InfoCard("Current version", "BingwaPulse $currentVersion")
+    InfoCard("Update status", status)
+    if (latestVersion.isNotBlank()) {
+        InfoCard("Latest release", latestVersion)
+        InfoCard("Release notes", releaseNotes.ifBlank { "No release notes provided." })
+    }
+    Button(onClick = {
+        if (apkUrl.isBlank()) status = "No downloadable APK is available. Publish a signed release with an APK asset first."
+        else try {
+            val request = DownloadManager.Request(Uri.parse(apkUrl))
+                .setTitle("BingwaPulse update $latestVersion")
+                .setDescription("Downloading app update")
+                .setMimeType("application/vnd.android.package-archive")
+                .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+                .setDestinationInExternalFilesDir(context, Environment.DIRECTORY_DOWNLOADS, "bingwapulse-update.apk")
+            downloadId = (context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager).enqueue(request)
+            status = "Downloading version $latestVersion. Android will notify you when it is ready."
+        } catch (_: Exception) { status = "Could not start the update download. Try again." }
+    }, enabled = apkUrl.isNotBlank() && !checking, modifier = Modifier.fillMaxWidth()) { Text("Update now") }
+    OutlinedButton(onClick = { checkAttempt++ }, enabled = !checking, modifier = Modifier.fillMaxWidth()) { Text(if (checking) "Checking…" else "Check again") }
+    InfoCard("Android security", "Android requires your approval to install an APK update. Updates must be signed with the same certificate as the installed app.")
+}
+
+@Composable
+private fun PlannedFeatureScreen(title: String, details: String) {
+    Text(title, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = Navy)
+    InfoCard("Not implemented yet", details)
+    InfoCard("Build status", "This menu item is shown so the workspace is organized, but it is not an active integration. We will implement and test it before calling it ready.")
+}
+
+@Composable
+private fun CloudOfferSyncEffect(db: LocalDatabase, revision: Int, onMessage: (String) -> Unit) {
+    val context = LocalContext.current
+    val store = remember { SecureSessionStore(context) }
+    val api = remember { BingwaSupabaseApi() }
+    LaunchedEffect(revision) {
+        if (store.isLocalWorkspace()) return@LaunchedEffect
+        val saved = store.load() ?: return@LaunchedEffect
+        try {
+            var active = if (saved.expiresAtEpochSeconds <= System.currentTimeMillis() / 1000L + 60L) {
+                withContext(Dispatchers.IO) { api.refreshSession(saved) }.also(store::save)
+            } else saved
+            val businessId = active.businessId
+                ?: withContext(Dispatchers.IO) { api.firstBusinessId(active) }
+                ?: throw IllegalStateException("No business workspace is connected.")
+            if (active.businessId != businessId) {
+                active = active.copy(businessId = businessId)
+                store.save(active)
+            }
+            val localOffers = db.offers()
+            withContext(Dispatchers.IO) {
+                localOffers.forEach { offer -> api.syncLocalOfferToCloud(active, businessId, offer) }
+            }
+            if (localOffers.isNotEmpty()) onMessage("${localOffers.size} local offer(s) synchronized with the cloud catalogue.")
+        } catch (error: Exception) {
+            onMessage(error.message ?: "Could not synchronize local offers with the cloud catalogue.")
+        }
+    }
+}
+
 @Composable
 private fun OffersScreen(db: LocalDatabase, onMessage: (String) -> Unit) {
     val context = LocalContext.current
@@ -1390,6 +1541,356 @@ private fun CustomersScreen(db: LocalDatabase, onMessage: (String) -> Unit) {
         )
     }
 }
+
+
+@Composable
+private fun PaymentInboxScreen() {
+    val context = LocalContext.current
+    val store = remember { SecureSessionStore(context) }
+    val api = remember { BingwaSupabaseApi() }
+    val scope = rememberCoroutineScope()
+    var session by remember { mutableStateOf(store.load()) }
+    var candidates by remember { mutableStateOf<List<MpesaNotificationReviewCandidate>>(emptyList()) }
+    var notice by remember { mutableStateOf("") }
+    var busy by remember { mutableStateOf(false) }
+    var pendingVerification by remember { mutableStateOf<MpesaNotificationReviewCandidate?>(null) }
+    var tillNumber by remember { mutableStateOf("1561763") }
+    var tillBusy by remember { mutableStateOf(false) }
+    var tillNotice by remember { mutableStateOf("") }
+    var businessName by remember { mutableStateOf("GABRIEL'S INTERNET SERVICES") }
+    var workspaceExists by remember { mutableStateOf(session?.businessId != null) }
+    var workspaceBusy by remember { mutableStateOf(false) }
+    var workspaceNotice by remember { mutableStateOf("") }
+
+    fun createBusinessWorkspace() {
+        val current = session
+        if (current == null) {
+            workspaceNotice = "Sign in to BingwaPulse before creating a business workspace."
+            return
+        }
+        val name = businessName.trim()
+        if (name.length !in 2..120) {
+            workspaceNotice = "Business name must contain 2–120 characters."
+            return
+        }
+        scope.launch {
+            workspaceBusy = true
+            try {
+                var active = current
+                if (active.expiresAtEpochSeconds <= System.currentTimeMillis() / 1000L + 60L) {
+                    active = withContext(Dispatchers.IO) { api.refreshSession(active) }
+                    store.save(active)
+                }
+                val existingId = active.businessId
+                    ?: withContext(Dispatchers.IO) { api.firstBusinessId(active) }
+                val businessId = existingId ?: run {
+                    val baseSlug = name.lowercase()
+                        .replace(Regex("[^a-z0-9]+"), "-")
+                        .trim('-')
+                        .take(40)
+                        .ifBlank { "bingwapulse-business" }
+                    val slug = "$baseSlug-${active.userId.takeLast(6).lowercase()}"
+                    withContext(Dispatchers.IO) { api.createBusiness(active, name, slug) }
+                }
+                active = active.copy(businessId = businessId)
+                store.save(active)
+                session = active
+                workspaceExists = true
+                workspaceNotice = if (existingId == null) {
+                    "Business workspace created. Next, save the Till and sync your Signature offers."
+                } else {
+                    "Your existing business workspace is connected."
+                }
+                candidates = withContext(Dispatchers.IO) {
+                    api.listMpesaNotificationCandidates(active, businessId)
+                }
+            } catch (error: Exception) {
+                workspaceNotice = error.message ?: "Could not create the business workspace."
+            } finally {
+                workspaceBusy = false
+            }
+        }
+    }
+
+    fun saveTillConfiguration() {
+        val current = session
+        if (current == null) {
+            tillNotice = "Sign in to a business workspace first."
+            return
+        }
+        if (!tillNumber.trim().matches(Regex("^[0-9]{5,8}$"))) {
+            tillNotice = "Enter the exact 5–8 digit M-PESA Till number."
+            return
+        }
+        scope.launch {
+            tillBusy = true
+            try {
+                var active = current
+                if (active.expiresAtEpochSeconds <= System.currentTimeMillis() / 1000L + 60L) {
+                    active = withContext(Dispatchers.IO) { api.refreshSession(active) }
+                    store.save(active)
+                    session = active
+                }
+                val businessId = active.businessId
+                    ?: withContext(Dispatchers.IO) { api.firstBusinessId(active) }
+                    ?: throw IllegalStateException("Create your business workspace first.")
+                withContext(Dispatchers.IO) { api.savePaymentIngressTill(active, businessId, tillNumber) }
+                tillNotice = "Till saved. Safaricom C2B URL registration and the callback token are the remaining payment-verification setup."
+            } catch (error: Exception) {
+                tillNotice = error.message ?: "Could not save the Till configuration."
+            } finally {
+                tillBusy = false
+            }
+        }
+    }
+
+    fun refreshCandidates() {
+        if (store.isLocalWorkspace()) {
+            notice = "Sign in to a real business workspace to review payment candidates."
+            return
+        }
+        val current = session
+        if (current == null) {
+            notice = "Sign in to BingwaPulse before reviewing M-PESA payments."
+            return
+        }
+        scope.launch {
+            busy = true
+            try {
+                var activeSession = current
+                if (activeSession.expiresAtEpochSeconds <= System.currentTimeMillis() / 1000L + 60L) {
+                    activeSession = withContext(Dispatchers.IO) { api.refreshSession(activeSession) }
+                    store.save(activeSession)
+                    session = activeSession
+                }
+                val businessId = activeSession.businessId
+                    ?: withContext(Dispatchers.IO) { api.firstBusinessId(activeSession) }
+                    ?: throw IllegalStateException("This account has no active business workspace.")
+                if (activeSession.businessId == null) {
+                    activeSession = activeSession.copy(businessId = businessId)
+                    store.save(activeSession)
+                    session = activeSession
+                }
+                candidates = withContext(Dispatchers.IO) {
+                    api.listMpesaNotificationCandidates(activeSession, businessId)
+                }
+                notice = if (candidates.isEmpty()) {
+                    "No M-PESA notification candidates have reached this business inbox yet."
+                } else {
+                    "Loaded ${candidates.size} payment candidate(s)."
+                }
+            } catch (error: Exception) {
+                notice = error.message ?: "Could not load the payment inbox."
+            } finally {
+                busy = false
+            }
+        }
+    }
+
+    fun retryCandidate(candidate: MpesaNotificationReviewCandidate) {
+        val current = session ?: run {
+            notice = "Your session has expired. Sign in again."
+            return
+        }
+        scope.launch {
+            busy = true
+            try {
+                var activeSession = current
+                if (activeSession.expiresAtEpochSeconds <= System.currentTimeMillis() / 1000L + 60L) {
+                    activeSession = withContext(Dispatchers.IO) { api.refreshSession(activeSession) }
+                    store.save(activeSession)
+                    session = activeSession
+                }
+                val businessId = activeSession.businessId
+                    ?: withContext(Dispatchers.IO) { api.firstBusinessId(activeSession) }
+                    ?: throw IllegalStateException("This account has no active business workspace.")
+                withContext(Dispatchers.IO) {
+                    api.retryMpesaNotificationCandidate(activeSession, businessId, candidate.id)
+                }
+                notice = "Retry requested. The server will re-check the Till and offer configuration."
+                refreshCandidates()
+            } catch (error: Exception) {
+                notice = error.message ?: "The candidate could not be retried."
+            } finally {
+                busy = false
+            }
+        }
+    }
+
+    fun submitReview(candidate: MpesaNotificationReviewCandidate, decision: String) {
+        val current = session ?: run {
+            notice = "Your session has expired. Sign in again."
+            return
+        }
+        scope.launch {
+            busy = true
+            try {
+                var activeSession = current
+                if (activeSession.expiresAtEpochSeconds <= System.currentTimeMillis() / 1000L + 60L) {
+                    activeSession = withContext(Dispatchers.IO) { api.refreshSession(activeSession) }
+                    store.save(activeSession)
+                    session = activeSession
+                }
+                val businessId = activeSession.businessId
+                    ?: withContext(Dispatchers.IO) { api.firstBusinessId(activeSession) }
+                    ?: throw IllegalStateException("This account has no active business workspace.")
+                withContext(Dispatchers.IO) {
+                    api.reviewMpesaNotificationCandidate(activeSession, businessId, candidate.id, decision)
+                }
+                notice = if (decision == "verify") {
+                    "Payment verified. Its order is now PAID and awaits the separate fulfilment worker."
+                } else {
+                    "Payment candidate rejected and sent to reconciliation."
+                }
+                pendingVerification = null
+                refreshCandidates()
+            } catch (error: Exception) {
+                notice = error.message ?: "The payment review could not be saved."
+            } finally {
+                busy = false
+            }
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        refreshCandidates()
+        val current = session
+        if (current != null && !store.isLocalWorkspace()) {
+            runCatching {
+                var active = current
+                val businessId = active.businessId ?: withContext(Dispatchers.IO) { api.firstBusinessId(active) }
+                if (businessId != null) {
+                    active = active.copy(businessId = businessId)
+                    store.save(active)
+                    session = active
+                    workspaceExists = true
+                    val savedTill = withContext(Dispatchers.IO) { api.getPaymentIngressTill(active, businessId) }
+                    if (!savedTill.isNullOrBlank()) tillNumber = savedTill
+                } else {
+                    workspaceExists = false
+                }
+            }
+        }
+    }
+
+    Text("M-PESA Payment Inbox", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.ExtraBold, color = Navy)
+    InfoCard(
+        "Payment evidence and order staging",
+        "Only strict incoming M-PESA Till confirmations qualify for automatic matching: the M-PESA sender title, receipt, date/time, amount, payer and new account balance must all be present. The business must have exactly one active Till configured. Generic wallet, outgoing, incomplete or ambiguous messages remain held. Trusted Safaricom C2B callbacks are also supported."
+    )
+    if (store.isLocalWorkspace()) {
+        InfoCard("Account connection required", "Payment review is unavailable in local preview mode. Sign in and connect a business workspace to load its candidates.")
+        return
+    }
+    if (session == null) {
+        InfoCard("Sign in required", "Sign in to your BingwaPulse account before creating the business workspace and connecting its Till.")
+        return
+    }
+    if (!workspaceExists) {
+        Text("BUSINESS WORKSPACE", color = Navy, fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.titleMedium)
+        InfoCard(
+            "Create your business workspace",
+            "This creates the owner workspace for your offers, agent phone, Till payments and customer orders. It does not initiate a payment."
+        )
+        OutlinedTextField(
+            value = businessName,
+            onValueChange = { businessName = it.take(120) },
+            label = { Text("Business name") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth()
+        )
+        Button(
+            onClick = { createBusinessWorkspace() },
+            enabled = !workspaceBusy && businessName.trim().length in 2..120,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text(if (workspaceBusy) "Creating workspace…" else "Create business workspace")
+        }
+        if (workspaceNotice.isNotBlank()) Text(workspaceNotice, color = Cyan, fontWeight = FontWeight.SemiBold)
+        return
+    }
+    Text("TRUSTED TILL PAYMENT SETUP", color = Navy, fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.titleMedium)
+    InfoCard(
+        "Automatic Till verification",
+        "Save the receiving Till here. Notification matching requires exactly one active Till and the strict incoming confirmation format described above. Trusted C2B callbacks can also verify receipts; anything incomplete or ambiguous remains held for reconciliation."
+    )
+    OutlinedTextField(
+        value = tillNumber,
+        onValueChange = { tillNumber = it.filter(Char::isDigit).take(8) },
+        label = { Text("M-PESA Buy Goods Till number") },
+        singleLine = true,
+        modifier = Modifier.fillMaxWidth()
+    )
+    Button(onClick = { saveTillConfiguration() }, enabled = !tillBusy && tillNumber.length in 5..8, modifier = Modifier.fillMaxWidth()) {
+        Text(if (tillBusy) "Saving Till…" else "Save Till for automatic verification")
+    }
+    if (tillNotice.isNotBlank()) Text(tillNotice, color = Cyan, style = MaterialTheme.typography.bodySmall)
+    InfoCard(
+        "Safaricom C2B registration URLs",
+        "Validation: https://tuuhucisljlaaovtnbeu.supabase.co/functions/v1/mpesa-c2b-callback?mode=validate&token=YOUR_SECRET_TOKEN\n\nConfirmation: https://tuuhucisljlaaovtnbeu.supabase.co/functions/v1/mpesa-c2b-callback?mode=confirm&token=YOUR_SECRET_TOKEN\n\nSet the same strong token as the Supabase Edge Function secret MPESA_C2B_CALLBACK_TOKEN, then register both URLs for this Till in Safaricom Daraja. This is C2B confirmation only; it does not send STK prompts."
+    )
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+        Button(onClick = { refreshCandidates() }, enabled = !busy, modifier = Modifier.weight(1f)) {
+            Text(if (busy) "Loading…" else "Refresh inbox")
+        }
+        if (busy) CircularProgressIndicator(modifier = Modifier.size(22.dp), color = Cyan, strokeWidth = 2.dp)
+    }
+    if (notice.isNotBlank()) Text(notice, color = Cyan, fontWeight = FontWeight.SemiBold)
+    if (candidates.isEmpty() && !busy) {
+        InfoCard("Nothing to review yet", "New matching M-PESA notifications will appear here after the agent phone has Notification Access and successfully syncs to this business.")
+    }
+    candidates.forEach { candidate ->
+        Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF0B0F19)), modifier = Modifier.fillMaxWidth()) {
+            Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                    Text("KES ${candidate.amountMinor?.div(100) ?: "—"}", color = Navy, fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.titleLarge)
+                    Text(candidate.stagingStatus.replace('_', ' ').uppercase(), color = if (candidate.stagingStatus == "staged_for_review") Color(0xFFFFD166) else Muted, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall)
+                }
+                Text("Receipt: ${candidate.receiptCode ?: "Not identified"}", color = Navy, fontWeight = FontWeight.SemiBold)
+                Text("Payer: ${candidate.senderPhone ?: "Not identified"}", color = Muted)
+                if (!candidate.senderName.isNullOrBlank()) Text("Name: ${candidate.senderName}", color = Muted)
+                Text("Parser: ${candidate.candidateStatus.replace('_', ' ')} · Match: ${candidate.matchStatus.uppercase()}", color = Muted, style = MaterialTheme.typography.labelSmall)
+                if (!candidate.stagingReason.isNullOrBlank()) Text(candidate.stagingReason, color = Muted, style = MaterialTheme.typography.bodySmall)
+                if (!candidate.stagedOrderId.isNullOrBlank()) Text("Order: ${candidate.stagedOrderId}", color = Muted, style = MaterialTheme.typography.labelSmall)
+                if (candidate.stagingStatus == "blocked") {
+                    OutlinedButton(onClick = { retryCandidate(candidate) }, enabled = !busy, modifier = Modifier.fillMaxWidth()) {
+                        Text("Retry after fixing configuration")
+                    }
+                }
+                if (candidate.stagingStatus == "staged_for_review") {
+                    InfoCard(
+                        "Automatic match not completed",
+                        "No single recent Quick Dial order matched this receipt. The payment is held safely; no bundle will be sent until the order can be matched."
+                    )
+                }
+                if (candidate.stagingStatus == "verified") {
+                    Text("Automatically matched · payment marked PAID · fulfilment queued for the worker.", color = Cyan, style = MaterialTheme.typography.bodySmall)
+                }
+            }
+        }
+    }
+
+    pendingVerification?.let { candidate ->
+        AlertDialog(
+            onDismissRequest = { if (!busy) pendingVerification = null },
+            title = { Text("Verify this M-PESA payment?") },
+            text = {
+                Text("Only continue after checking the transaction in the actual Lipa na M-PESA Till record. Confirm receipt ${candidate.receiptCode ?: "—"} for KES ${candidate.amountMinor?.div(100) ?: "—"} and payer ${candidate.senderPhone ?: "—"}. This marks the linked order PAID; it does not itself start a bundle purchase.")
+            },
+            confirmButton = {
+                TextButton(onClick = { submitReview(candidate, "verify") }, enabled = !busy) {
+                    Text("I checked the Till record")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingVerification = null }, enabled = !busy) {
+                    Text("Not yet")
+                }
+            }
+        )
+    }
+}
+
 @Composable
 private fun OrdersScreen(db:LocalDatabase,onMessage:(String)->Unit) {
     var phone by remember { mutableStateOf("") };var offer by remember { mutableStateOf("") };var price by remember { mutableStateOf("") };var reload by remember { mutableIntStateOf(0) }
