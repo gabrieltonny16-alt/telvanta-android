@@ -1,9 +1,9 @@
 name: BingwaPulse and Connect Pulse Android builds
 on:
   push:
-    branches: [ "main", "feature/vecta-branding" ]
+    branches: [ "main", "feature/vecta-branding", "feature/platform-wallet" ]
   pull_request:
-    branches: [ "main" ]
+    branches: [ "main", "feature/vecta-branding" ]
   workflow_dispatch:
 permissions:
   contents: write
