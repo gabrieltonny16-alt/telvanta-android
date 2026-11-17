@@ -21,6 +21,21 @@ class BingwaPulseApiClient(context: Context, private val baseUrl: String) {
         sessions.saveToken(token)
     }
 
+    fun requestOtp(email: String, mode: String) {
+        require(mode == "login" || mode == "register") { "Choose sign in or create account" }
+        request("POST", "/v1/auth/otp/request", JSONObject().put("email", email.trim()).put("mode", mode), authenticated = false)
+    }
+
+    fun verifyOtp(email: String, code: String, mode: String, displayName: String = "", tenantName: String = "") {
+        require(code.matches(Regex("[0-9]{6}"))) { "Enter the six-digit code" }
+        val body = JSONObject().put("email", email.trim()).put("code", code).put("mode", mode)
+        if (mode == "register") body.put("displayName", displayName.trim()).put("tenantName", tenantName.trim())
+        val response = request("POST", "/v1/auth/otp/verify", body, authenticated = false)
+        val token = response.optString("token")
+        require(token.isNotBlank()) { "API did not return a session token" }
+        sessions.saveToken(token)
+    }
+
     fun isSignedIn(): Boolean = !sessions.token().isNullOrBlank()
     fun signOut() = sessions.clear()
 

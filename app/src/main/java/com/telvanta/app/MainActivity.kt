@@ -186,28 +186,67 @@ private fun SettingsScreen(db: LocalDatabase) {
     val context = LocalContext.current
     var apiUrl by remember { mutableStateOf(context.getSharedPreferences("bingwapulse_api", 0).getString("base_url", "https://your-api-host") ?: "https://your-api-host") }
     var email by remember { mutableStateOf("") }
-    var password by remember { mutableStateOf("") }
+    var displayName by remember { mutableStateOf("") }
+    var tenantName by remember { mutableStateOf("") }
+    var code by remember { mutableStateOf("") }
+    var otpMode by remember { mutableStateOf("") }
     var status by remember { mutableStateOf("Offline records are stored on this phone.") }
     var busy by remember { mutableStateOf(false) }
     Text("Connect your workspace",style=MaterialTheme.typography.headlineMedium,fontWeight=FontWeight.Bold)
-    InfoCard("Secure API connection","Enter your deployed BingwaPulse API address. HTTPS is required. Sign in with the same account used in the Web workspace to share records.")
+    InfoCard("Secure API connection","Enter your deployed BingwaPulse API address. HTTPS is required. Use the same email account on Web and Android to share records.")
     OutlinedTextField(apiUrl,{apiUrl=it;context.getSharedPreferences("bingwapulse_api",0).edit().putString("base_url",it).apply()},label={Text("API address (HTTPS)")},modifier=Modifier.fillMaxWidth(),singleLine=true)
     OutlinedTextField(email,{email=it},label={Text("Account email")},modifier=Modifier.fillMaxWidth(),singleLine=true)
-    OutlinedTextField(password,{password=it},label={Text("Password")},modifier=Modifier.fillMaxWidth(),singleLine=true,visualTransformation=PasswordVisualTransformation())
-    Button(enabled=!busy,onClick={
-        if(email.isBlank()||password.isBlank()||!apiUrl.startsWith("https://")) status="Enter your email, password and an HTTPS API address."
-        else {
-            busy=true;status="Signing in…"
-            thread {
-                try {
-                    BingwaPulseApiClient(context,apiUrl).login(email,password)
-                    Handler(Looper.getMainLooper()).post { busy=false;password="";status="Signed in. Your session is encrypted with Android Keystore." }
-                } catch(e:Exception) {
-                    Handler(Looper.getMainLooper()).post { busy=false;status=e.message ?: "Could not sign in." }
+    OutlinedTextField(displayName,{displayName=it},label={Text("Your name (new account)")},modifier=Modifier.fillMaxWidth(),singleLine=true)
+    OutlinedTextField(tenantName,{tenantName=it},label={Text("Business name (new account)")},modifier=Modifier.fillMaxWidth(),singleLine=true)
+    if (otpMode.isNotBlank()) {
+        OutlinedTextField(code,{code=it.filter(Char::isDigit).take(6)},label={Text("Six-digit email code")},modifier=Modifier.fillMaxWidth(),singleLine=true)
+        Button(enabled=!busy,onClick={
+            if(code.length!=6) status="Enter the six-digit code."
+            else {
+                busy=true;status="Verifying email code…"
+                thread {
+                    try {
+                        BingwaPulseApiClient(context,apiUrl).verifyOtp(email,code,otpMode,displayName,tenantName)
+                        Handler(Looper.getMainLooper()).post { busy=false;code="";otpMode="";status="Email verified. Signed in. Your session is encrypted with Android Keystore." }
+                    } catch(e:Exception) {
+                        Handler(Looper.getMainLooper()).post { busy=false;status=e.message ?: "Could not verify the code." }
+                    }
                 }
             }
+        },modifier=Modifier.fillMaxWidth()){Text("Verify code & sign in")}
+        OutlinedButton(enabled=!busy,onClick={otpMode="";code="";status="Verification cancelled."},modifier=Modifier.fillMaxWidth()){Text("Cancel")}
+    } else {
+        Row(horizontalArrangement=Arrangement.spacedBy(8.dp),modifier=Modifier.fillMaxWidth()) {
+            Button(enabled=!busy,onClick={
+                if(email.isBlank()||!apiUrl.startsWith("https://")) status="Enter your email and an HTTPS API address."
+                else {
+                    busy=true;status="Requesting sign-in code…"
+                    thread {
+                        try {
+                            BingwaPulseApiClient(context,apiUrl).requestOtp(email,"login")
+                            Handler(Looper.getMainLooper()).post { busy=false;otpMode="login";status="If this email has an account, a six-digit code has been sent." }
+                        } catch(e:Exception) {
+                            Handler(Looper.getMainLooper()).post { busy=false;status=e.message ?: "Could not request a code." }
+                        }
+                    }
+                }
+            },modifier=Modifier.weight(1f)){Text("Sign in")}
+            OutlinedButton(enabled=!busy,onClick={
+                if(email.isBlank()||displayName.trim().length<2||tenantName.trim().length<2||!apiUrl.startsWith("https://")) status="Enter email, your name, business name and an HTTPS API address."
+                else {
+                    busy=true;status="Requesting sign-up code…"
+                    thread {
+                        try {
+                            BingwaPulseApiClient(context,apiUrl).requestOtp(email,"register")
+                            Handler(Looper.getMainLooper()).post { busy=false;otpMode="register";status="A six-digit code has been requested. Check your email." }
+                        } catch(e:Exception) {
+                            Handler(Looper.getMainLooper()).post { busy=false;status=e.message ?: "Could not request a code." }
+                        }
+                    }
+                }
+            },modifier=Modifier.weight(1f)){Text("Create account")}
         }
-    },modifier=Modifier.fillMaxWidth()){Text("Sign in to BingwaPulse")}
+    }
     Button(enabled=!busy,onClick={
         busy=true;status="Synchronizing records…"
         thread {
