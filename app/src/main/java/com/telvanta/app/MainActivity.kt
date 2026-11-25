@@ -183,7 +183,7 @@ private fun BingwaPulseApp(db: LocalDatabase, guestMode: Boolean) {
                 }
                 item {
                     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    if (guestMode && selected in setOf("Quick Dial", "Auto-Reply", "Payment Inbox", "Connect Pulse", "Device Activation", "Account & Session")) {
+                    if (guestMode && selected in setOf("Payment Inbox", "Connect Pulse", "Device Activation", "Account & Session")) {
                         GuestAccessGateScreen(selected)
                     } else when(selected) {
                         "Dashboard" -> BingwaDashboard(db) { destination -> selected = destination; message = "" }
@@ -203,7 +203,7 @@ private fun BingwaPulseApp(db: LocalDatabase, guestMode: Boolean) {
                         "Signature Offers", "Signature" -> SignatureOffersScreen(db) { message = it }
                         "Statistics" -> StatisticsScreen(db)
                         "Wallet" -> WalletScreen()
-                        "Quick Dial" -> QuickDialScreen(db) { message = it }
+                        "Quick Dial" -> QuickDialScreen(db, guestMode) { message = it }
                         "Auto Renewals" -> FeatureWorkspaceScreen("Auto Renewals")
                         "Signature" -> FeatureWorkspaceScreen("Signature")
                         "Connect Pulse" -> ConnectPulseScreen()
@@ -414,7 +414,7 @@ private fun ConnectPulseScreen() {
 
 
 @Composable
-private fun QuickDialScreen(db: LocalDatabase, onMessage: (String) -> Unit) {
+private fun QuickDialScreen(db: LocalDatabase, guestMode: Boolean, onMessage: (String) -> Unit) {
     var customerPhone by remember { mutableStateOf("") }
     var selectedOfferId by remember { mutableStateOf<Long?>(null) }
     var refresh by remember { mutableIntStateOf(0) }
@@ -567,8 +567,18 @@ private fun QuickDialScreen(db: LocalDatabase, onMessage: (String) -> Unit) {
                 }
             }
         }
+        if (guestMode) {
+            InfoCard(
+                "Guest exploration",
+                "Choose an offer and enter a sample recipient to inspect the Quick Dial workflow. The live order, payment matching, USSD and bundle-delivery action stays disabled until you sign in."
+            )
+        }
         Button(
             onClick = {
+                if (guestMode) {
+                    onMessage("Sign in to create a real order or start USSD fulfilment. Guest mode cannot send or deliver bundles.")
+                    return@Button
+                }
                 val offer = selectedOffer
                 if (!phoneValid) {
                     onMessage("Enter a valid Kenyan recipient number before continuing.")
@@ -655,7 +665,7 @@ private fun QuickDialScreen(db: LocalDatabase, onMessage: (String) -> Unit) {
                     }
                 }
             },
-            enabled = selectedOffer != null && phoneValid && !busy,
+            enabled = selectedOffer != null && phoneValid && !busy && !guestMode,
             modifier = Modifier.fillMaxWidth().height(58.dp),
             shape = RoundedCornerShape(18.dp),
             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0E2937),
@@ -663,14 +673,18 @@ private fun QuickDialScreen(db: LocalDatabase, onMessage: (String) -> Unit) {
                 disabledContentColor = Muted)
         ) {
             Text(when {
+                guestMode -> "Sign in to use Quick Dial"
                 busy -> "Preparing order…"
                 selectedOffer == null -> "Select an offer"
                 !phoneValid -> "Enter recipient number"
                 else -> "☎   Dial • KES ${money(selectedOffer.price)}"
             }, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
         }
-        Text("With Phone permission, the fulfilment worker starts the saved USSD code. Without permission, BingwaPulse opens the Android dialler for you to review the code, choose a SIM and press Call. A call attempt is never proof of bundle delivery.",
-            color = Muted, style = MaterialTheme.typography.bodySmall)
+        Text(
+            if (guestMode) "No order is created and no USSD request is sent while exploring as a guest."
+            else "With Phone permission, the fulfilment worker starts the saved USSD code. Without permission, BingwaPulse opens the Android dialler for you to review the code, choose a SIM and press Call. A call attempt is never proof of bundle delivery.",
+            color = Muted, style = MaterialTheme.typography.bodySmall
+        )
     }
 }
 @Composable
@@ -2028,7 +2042,7 @@ private data class AutoReplyDraft(
 @Composable
 fun AutoReplyScreen() {
     val context = LocalContext.current
-    val prefs = remember { context.getSharedPreferences("bingwapulse_auto_reply_templates_v3", Context.MODE_PRIVATE) }
+    val prefs = remember { context.getSharedPreferences(if (SecureSessionStore(context).isGuestMode()) "bingwapulse_guest_auto_reply_templates_v3" else "bingwapulse_auto_reply_templates_v3", Context.MODE_PRIVATE) }
     val defaults = remember {
         listOf(
             AutoReplyDraft("offer-recommended", "Offer Already Recommended", "Hello <firstName>, you have already purchased this offer today. Please try again tomorrow.", true, true),
