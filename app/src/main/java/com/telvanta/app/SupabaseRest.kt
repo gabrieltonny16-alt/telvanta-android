@@ -31,15 +31,21 @@ class SecureSessionStore(context: Context) {
 
     fun isLocalWorkspace(): Boolean = prefs.getBoolean("local_workspace", false)
 
-    fun enableLocalWorkspace() {
-        prefs.edit().putBoolean("local_workspace", true).remove("session").apply()
+    fun isGuestMode(): Boolean = prefs.getBoolean("guest_mode", false)
+
+    fun enableGuestMode() {
+        prefs.edit().putBoolean("guest_mode", true).putBoolean("local_workspace", false).remove("session").apply()
     }
 
-    fun hasSession(): Boolean = isLocalWorkspace() ||
+    fun enableLocalWorkspace() {
+        prefs.edit().putBoolean("local_workspace", true).putBoolean("guest_mode", false).remove("session").apply()
+    }
+
+    fun hasSession(): Boolean = isGuestMode() || isLocalWorkspace() ||
         load()?.expiresAtEpochSeconds?.let { it > System.currentTimeMillis() / 1000L + 60L } == true
 
     fun save(session: BingwaSession) {
-        prefs.edit().putBoolean("local_workspace", false).apply()
+        prefs.edit().putBoolean("local_workspace", false).putBoolean("guest_mode", false).apply()
         val json = JSONObject()
             .put("access_token", session.accessToken)
             .put("refresh_token", session.refreshToken)
@@ -79,7 +85,7 @@ class SecureSessionStore(context: Context) {
     }
 
     fun clear() {
-        prefs.edit().remove("session").remove("local_workspace").apply()
+        prefs.edit().remove("session").remove("local_workspace").remove("guest_mode").apply()
     }
 
     private fun getOrCreateKey(): SecretKey {
