@@ -183,10 +183,10 @@ private fun BingwaAuthScreen(store: SecureSessionStore, api: BingwaSupabaseApi, 
                 }
                 Spacer(Modifier.height(6.dp))
                 TextButton(onClick = {
-                    store.enableLocalWorkspace()
+                    store.enableGuestMode()
                     onComplete()
                 }, enabled = !busy, modifier = Modifier.fillMaxWidth()) {
-                    Text("Open local workspace (no account needed)")
+                    Text("Explore BingwaPulse as a guest")
                 }
             }
         } else {
