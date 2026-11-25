@@ -833,6 +833,25 @@ class BingwaSupabaseApi {
         )
     }
 
+    fun getPublicSubscriptionPlans(): List<PlatformSubscriptionPlan> {
+        val rows = JSONArray(request(
+            "GET",
+            "/rest/v1/platform_subscription_plans?select=code,name,duration_seconds,price_kes,description&is_active=eq.true&order=sort_order.asc"
+        ))
+        return buildList {
+            for (i in 0 until rows.length()) {
+                val row = rows.getJSONObject(i)
+                add(PlatformSubscriptionPlan(
+                    code = row.getString("code"),
+                    name = row.getString("name"),
+                    durationSeconds = row.optLong("duration_seconds"),
+                    priceKes = row.optInt("price_kes"),
+                    description = row.optString("description")
+                ))
+            }
+        }
+    }
+
     fun getPlatformWalletSnapshot(
         session: BingwaSession,
         businessId: String
