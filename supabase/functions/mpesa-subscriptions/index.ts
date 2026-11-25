@@ -118,7 +118,7 @@ Deno.serve(async (req: Request) => {
     }
 
     const authorization = req.headers.get("Authorization") ?? "";
-    const jwt = authorization.match(/^Bearer\\s+(.+)$/i)?.[1];
+    const jwt = authorization.match(/^Bearer\s+(.+)$/i)?.[1];
     if (!jwt) return json({ error: "Sign in to purchase a subscription." }, 401);
     const { data: authData, error: authError } = await db.auth.getUser(jwt);
     const user = authError ? null : authData.user;
