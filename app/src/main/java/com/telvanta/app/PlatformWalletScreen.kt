@@ -212,7 +212,7 @@ internal fun WalletScreen() {
                 val attemptId = withContext(Dispatchers.IO) {
                     api.createMpesaSubscriptionIntent(activeSession, businessId, plan.code, mpesaPayerPhone)
                 }
-                paymentNotice = "M-PESA prompt sent. Approve the KES \${plan.priceKes} payment on your phone. Waiting for Safaricom confirmation..."
+                paymentNotice = "M-PESA prompt sent. Approve the KES ${plan.priceKes} payment on your phone. Waiting for Safaricom confirmation..."
                 var finalStatus = "pending"
                 var receipt = ""
                 for (poll in 1..40) {
