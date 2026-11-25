@@ -231,7 +231,7 @@ internal fun WalletScreen() {
                             if (receipt.isNotBlank()) " Receipt: $receipt" else ""
                     }
                     "failed", "expired" -> {
-                        paymentNotice = "Safaricom did not complete this subscription payment. No subscription was activated. Check your M-PESA messages before trying again."
+                        paymentNotice = "The payment could not be verified. Check your M-PESA messages and do not retry until you confirm whether money was deducted."
                     }
                     else -> {
                         paymentNotice = "The M-PESA payment is still awaiting confirmation. Do not send another payment yet; refresh the wallet and check your M-PESA messages."
