@@ -760,6 +760,44 @@ class BingwaSupabaseApi {
     }
 
 
+    fun createMpesaSubscriptionIntent(
+        session: BingwaSession,
+        businessId: String,
+        planCode: String,
+        payerPhone: String
+    ): String {
+        require(businessId.isNotBlank() && planCode.isNotBlank())
+        val normalizedPhone = normalizePhone(payerPhone)
+        val response = JSONObject(request(
+            "POST",
+            "/functions/v1/mpesa-subscriptions",
+            JSONObject()
+                .put("action", "create-intent")
+                .put("business_id", businessId)
+                .put("plan_code", planCode)
+                .put("payer_phone", normalizedPhone),
+            token = session.accessToken
+        ))
+        return response.getString("attempt_id")
+    }
+
+    fun getMpesaSubscriptionStatus(
+        session: BingwaSession,
+        businessId: String,
+        attemptId: String
+    ): JSONObject {
+        require(businessId.isNotBlank() && attemptId.isNotBlank())
+        return JSONObject(request(
+            "POST",
+            "/functions/v1/mpesa-subscriptions",
+            JSONObject()
+                .put("action", "status")
+                .put("business_id", businessId)
+                .put("attempt_id", attemptId),
+            token = session.accessToken
+        ))
+    }
+
     fun createSambazaSubscriptionIntent(
         session: BingwaSession,
         businessId: String,

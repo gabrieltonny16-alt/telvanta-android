@@ -16,6 +16,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import android.Manifest
 import android.content.Context
@@ -117,6 +118,7 @@ internal fun WalletScreen() {
     var paymentNotice by remember { mutableStateOf("") }
     var paymentBusy by remember { mutableStateOf(false) }
     var pendingPlan by remember { mutableStateOf<PlatformSubscriptionPlan?>(null) }
+    var mpesaPayerPhone by remember { mutableStateOf("") }
     val processAirtimePayment: (PlatformSubscriptionPlan) -> Unit = { plan ->
         paymentBusy = true
         paymentNotice = "Preparing your subscription request..."
@@ -191,6 +193,63 @@ internal fun WalletScreen() {
                 paymentBusy = false
                 paymentNotice = error.message ?: "Could not prepare the subscription request."
             }
+        }
+    }
+    val processMpesaPayment: (PlatformSubscriptionPlan) -> Unit = { plan ->
+        paymentBusy = true
+        paymentNotice = "Preparing your M-PESA STK Push..."
+        scope.launch {
+            try {
+                val current = session ?: throw IllegalStateException("Sign in before purchasing a subscription.")
+                val businessId = current.businessId
+                    ?: withContext(Dispatchers.IO) { api.firstBusinessId(current) }
+                    ?: throw IllegalStateException("No business workspace is linked to this account.")
+                val activeSession = if (current.businessId == businessId) current else current.copy(businessId = businessId)
+                if (activeSession !== current) {
+                    session = activeSession
+                    store.save(activeSession)
+                }
+                val attemptId = withContext(Dispatchers.IO) {
+                    api.createMpesaSubscriptionIntent(activeSession, businessId, plan.code, mpesaPayerPhone)
+                }
+                paymentNotice = "M-PESA prompt sent. Approve the KES \${plan.priceKes} payment on your phone. Waiting for Safaricom confirmation..."
+                var finalStatus = "pending"
+                var receipt = ""
+                for (poll in 1..40) {
+                    kotlinx.coroutines.delay(3000L)
+                    val statusRow = withContext(Dispatchers.IO) {
+                        api.getMpesaSubscriptionStatus(activeSession, businessId, attemptId)
+                    }
+                    finalStatus = statusRow.optString("status", "unknown")
+                    receipt = statusRow.optString("receipt", "")
+                    if (finalStatus == "completed" || finalStatus == "failed" || finalStatus == "expired") break
+                }
+                when (finalStatus) {
+                    "completed" -> {
+                        snapshot = withContext(Dispatchers.IO) { api.getPlatformWalletSnapshot(activeSession, businessId) }
+                        paymentNotice = "M-PESA payment verified. Your subscription is active." +
+                            if (receipt.isNotBlank()) " Receipt: $receipt" else ""
+                    }
+                    "failed", "expired" -> {
+                        paymentNotice = "Safaricom did not complete this subscription payment. No subscription was activated. Check your M-PESA messages before trying again."
+                    }
+                    else -> {
+                        paymentNotice = "The M-PESA payment is still awaiting confirmation. Do not send another payment yet; refresh the wallet and check your M-PESA messages."
+                    }
+                }
+            } catch (error: Exception) {
+                paymentNotice = error.message ?: "Could not start or verify the M-PESA payment."
+            } finally {
+                paymentBusy = false
+            }
+        }
+    }
+    val startMpesaPayment: (PlatformSubscriptionPlan) -> Unit = { plan ->
+        if (mpesaPayerPhone.isBlank()) {
+            paymentNotice = "Enter the phone number that will approve the M-PESA prompt."
+        } else {
+            paymentNotice = ""
+            processMpesaPayment(plan)
         }
     }
     val callPermissionLauncher = rememberLauncherForActivityResult(
@@ -383,6 +442,16 @@ internal fun WalletScreen() {
                 item {
                     WalletSectionTitle("SUBSCRIPTIONS", "An active plan covers USSD requests without using tokens.")
                 }
+                item {
+                    OutlinedTextField(
+                        value = mpesaPayerPhone,
+                        onValueChange = { mpesaPayerPhone = it.take(18) },
+                        label = { Text("M-PESA phone number") },
+                        placeholder = { Text("+2547XXXXXXXX") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
                 items(wallet.plans, key = { "plan_${it.code}" }) { plan ->
                     Card(
                         modifier = Modifier.fillMaxWidth(),
@@ -395,6 +464,13 @@ internal fun WalletScreen() {
                                 Text("KES ${plan.priceKes}", color = WalletAccent, fontWeight = FontWeight.ExtraBold)
                             }
                             Text(plan.description, color = WalletMuted, style = MaterialTheme.typography.bodySmall)
+                            OutlinedButton(
+                                onClick = { startMpesaPayment(plan) },
+                                enabled = !paymentBusy && mpesaPayerPhone.isNotBlank(),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text(if (paymentBusy) "Waiting for M-PESA confirmation…" else "Pay KES ${plan.priceKes} with M-PESA")
+                            }
                             Button(
                                 onClick = { startAirtimePayment(plan) },
                                 enabled = !paymentBusy,
