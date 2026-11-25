@@ -13,7 +13,7 @@ data class TransactionRow(val id: Long, val orderId: Long, val amount: Double, v
 data class TransactionHistoryRow(val id: Long, val customer: String, val offer: String, val amount: Double, val transactionStatus: String, val orderStatus: String, val reference: String, val createdAt: Long, val source: String)
 
 /** Device-local business records only. This class does not initiate payments or fulfil bundles. */
-class LocalDatabase(context: Context) : SQLiteOpenHelper(context, "telvanta.db", null, 6) {
+class LocalDatabase(context: Context, databaseName: String = "telvanta.db") : SQLiteOpenHelper(context, databaseName, null, 6) {
     override fun onConfigure(db: SQLiteDatabase) { db.setForeignKeyConstraintsEnabled(true) }
     override fun onCreate(db: SQLiteDatabase) {
         db.execSQL("CREATE TABLE offers (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, category TEXT NOT NULL, original_price REAL, selling_price REAL NOT NULL, source TEXT NOT NULL DEFAULT 'Manual', verified INTEGER NOT NULL DEFAULT 0, is_active INTEGER NOT NULL DEFAULT 0, ussd_code TEXT NOT NULL DEFAULT '', duration TEXT NOT NULL DEFAULT '', source_id TEXT NOT NULL DEFAULT '', sim_profile TEXT NOT NULL DEFAULT '', tags TEXT NOT NULL DEFAULT '')")
