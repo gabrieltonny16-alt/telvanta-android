@@ -183,7 +183,7 @@ private fun BingwaPulseApp(db: LocalDatabase, guestMode: Boolean) {
                 }
                 item {
                     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    if (guestMode && selected in setOf("Bulk Messenger", "Quick Dial", "Auto Renewals", "SiteLink", "Auto-Reply", "Payment Inbox", "Connect Pulse", "Device Activation", "Account & Session")) {
+                    if (guestMode && selected in setOf("Quick Dial", "Auto-Reply", "Payment Inbox", "Connect Pulse", "Device Activation", "Account & Session")) {
                         GuestAccessGateScreen(selected)
                     } else when(selected) {
                         "Dashboard" -> BingwaDashboard(db) { destination -> selected = destination; message = "" }
