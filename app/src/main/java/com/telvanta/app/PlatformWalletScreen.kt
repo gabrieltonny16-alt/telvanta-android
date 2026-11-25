@@ -108,7 +108,10 @@ internal fun WalletScreen() {
     val api = remember { BingwaSupabaseApi() }
     val scope = rememberCoroutineScope()
     var session by remember { mutableStateOf(store.load()) }
+    val guestMode = remember { store.isGuestMode() }
     var snapshot by remember { mutableStateOf<PlatformWalletSnapshot?>(null) }
+    var guestPlans by remember { mutableStateOf<List<PlatformSubscriptionPlan>>(emptyList()) }
+    var guestPlansLoading by remember { mutableStateOf(false) }
     var loading by remember { mutableStateOf(false) }
     var notice by remember { mutableStateOf("") }
     var paymentNotice by remember { mutableStateOf("") }
@@ -245,8 +248,20 @@ internal fun WalletScreen() {
         }
     }
 
-    LaunchedEffect(Unit) {
-        if (!localPreview) refreshWallet()
+    LaunchedEffect(guestMode, localPreview) {
+        if (guestMode) {
+            guestPlansLoading = true
+            notice = ""
+            try {
+                guestPlans = withContext(Dispatchers.IO) { api.getPublicSubscriptionPlans() }
+            } catch (error: Exception) {
+                notice = error.message ?: "Subscription plans are temporarily unavailable."
+            } finally {
+                guestPlansLoading = false
+            }
+        } else if (!localPreview) {
+            refreshWallet()
+        }
     }
 
     LazyColumn(
@@ -272,6 +287,42 @@ internal fun WalletScreen() {
                     "Preview workspace",
                     "This is local preview mode. Sign in with a business account to load real subscription status, token balances and wallet activity."
                 )
+            }
+        } else if (session == null && guestMode) {
+            item {
+                WalletInfoCard(
+                    "Explore subscription plans",
+                    "Compare current plan names, prices and durations. Guest access is read-only; sign in to activate a plan."
+                )
+            }
+            if (guestPlansLoading) {
+                item {
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        CircularProgressIndicator(color = WalletAccent)
+                        Text("Loading public plans…", color = WalletMuted)
+                    }
+                }
+            } else if (guestPlans.isEmpty()) {
+                item {
+                    WalletInfoCard("Plans unavailable", notice.ifBlank { "The public plan catalogue could not be loaded right now." })
+                }
+            } else {
+                items(guestPlans, key = { "guest_plan_" + it.code }) { plan ->
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = WalletPanel),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, WalletBorder)
+                    ) {
+                        Column(Modifier.padding(horizontal = 14.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                Text(plan.name, color = Color.White, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+                                Text("KES " + plan.priceKes, color = WalletAccent, fontWeight = FontWeight.ExtraBold)
+                            }
+                            Text(plan.description, color = WalletMuted, style = MaterialTheme.typography.bodySmall)
+                            Text("Sign in to subscribe", color = WalletAccent, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.labelMedium)
+                        }
+                    }
+                }
             }
         } else if (session == null) {
             item {
