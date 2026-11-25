@@ -64,20 +64,22 @@ class MainActivity : ComponentActivity() {
         window.navigationBarColor = android.graphics.Color.rgb(5, 6, 10)
         window.decorView.systemUiVisibility = 0
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) window.isNavigationBarContrastEnforced = false
-        if (!SecureSessionStore(this).hasSession()) {
+        val sessionStore = SecureSessionStore(this)
+        if (!sessionStore.hasSession()) {
             startActivity(Intent(this, AuthActivity::class.java))
             finish()
             return
         }
-        localDb = LocalDatabase(this)
-        setContent { BingwaPulseApp(localDb) }
+        val guestMode = sessionStore.isGuestMode()
+        localDb = LocalDatabase(this, if (guestMode) "bingwapulse_guest.db" else "telvanta.db")
+        setContent { BingwaPulseApp(localDb, guestMode) }
     }
     override fun onDestroy() { if (::localDb.isInitialized) localDb.close(); super.onDestroy() }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun BingwaPulseApp(db: LocalDatabase) {
+private fun BingwaPulseApp(db: LocalDatabase, guestMode: Boolean) {
     val context = LocalContext.current
     var selected by remember { mutableStateOf("Dashboard") }
     var message by remember { mutableStateOf("") }
@@ -126,7 +128,7 @@ private fun BingwaPulseApp(db: LocalDatabase) {
                     }
                     HorizontalDivider(color = Color(0xFF1E3A5F), modifier = Modifier.padding(vertical = 8.dp))
                     NavigationDrawerItem(
-                        label = { Text("Sign out", color = Color(0xFFFFB4AB), fontWeight = FontWeight.SemiBold) },
+                        label = { Text(if (guestMode) "Sign in / Create account" else "Sign out", color = Color(0xFFFFB4AB), fontWeight = FontWeight.SemiBold) },
                         selected = false,
                         onClick = {
                             SecureSessionStore(context).clear()
@@ -138,7 +140,7 @@ private fun BingwaPulseApp(db: LocalDatabase) {
                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 2.dp)
                     )
                     Spacer(Modifier.height(12.dp))
-                    Text("Account secured · local records remain on this device", color = Muted, style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp))
+                    Text(if (guestMode) "Guest exploration · demo records are isolated from account data" else "Account secured · local records remain on this device", color = Muted, style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp))
                     }
                 }
             }
@@ -170,18 +172,20 @@ private fun BingwaPulseApp(db: LocalDatabase) {
             colors=TopAppBarDefaults.topAppBarColors(containerColor=Color(0xFF05070D))
         ) }) { padding ->
             LazyColumn(Modifier.fillMaxSize().padding(padding).padding(horizontal=16.dp),verticalArrangement=Arrangement.spacedBy(10.dp),contentPadding=PaddingValues(top=10.dp,bottom=12.dp)) {
-                if (SecureSessionStore(context).isLocalWorkspace()) {
+                if (guestMode || SecureSessionStore(context).isLocalWorkspace()) {
                     item {
                         Row(Modifier.fillMaxWidth(), horizontalArrangement=Arrangement.End) {
                             Surface(color=Color(0xFF0B0F19), shape=RoundedCornerShape(50)) {
-                                Text("LOCAL PREVIEW", color=Muted, style=MaterialTheme.typography.labelSmall, modifier=Modifier.padding(horizontal=10.dp, vertical=5.dp))
+                                Text(if (guestMode) "GUEST EXPLORATION" else "LOCAL PREVIEW", color=Muted, style=MaterialTheme.typography.labelSmall, modifier=Modifier.padding(horizontal=10.dp, vertical=5.dp))
                             }
                         }
                     }
                 }
                 item {
                     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    when(selected) {
+                    if (guestMode && selected in setOf("Bulk Messenger", "Quick Dial", "Auto Renewals", "SiteLink", "Auto-Reply", "Payment Inbox", "Connect Pulse", "Device Activation", "Account & Session")) {
+                        GuestAccessGateScreen(selected)
+                    } else when(selected) {
                         "Dashboard" -> BingwaDashboard(db) { destination -> selected = destination; message = "" }
                         "Offers" -> OffersScreen(db){message=it}
                         "Customers" -> CustomersScreen(db){message=it}
@@ -221,6 +225,32 @@ private fun BingwaPulseApp(db: LocalDatabase) {
 }
 
 
+@Composable
+private fun GuestAccessGateScreen(feature: String) {
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text(feature, color = Navy, fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.headlineMedium)
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF0B0F19)),
+            border = BorderStroke(1.dp, Color(0xFF1E3A5F)),
+            shape = RoundedCornerShape(20.dp)
+        ) {
+            Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
+                Text("Explore first. Connect when ready.", color = Cyan, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+                Text(
+                    "$feature connects to account, device, messaging, payment or fulfilment services. Create an account or sign in to use its live controls.",
+                    color = Color(0xFFF8FAFC),
+                    style = MaterialTheme.typography.bodyMedium
+                )
+                Text(
+                    "Guest mode cannot send SMS, initiate payments, run USSD, pair worker devices or deliver bundles. Your guest demo records are kept in a separate on-device database.",
+                    color = Muted,
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
+        }
+    }
+}
 
 @Composable
 private fun ConnectPulseScreen() {
