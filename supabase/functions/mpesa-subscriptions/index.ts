@@ -16,6 +16,13 @@ const db = createClient(supabaseUrl, serviceKey, {
   auth: { persistSession: false, autoRefreshToken: false },
 });
 
+function constantTimeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let difference = 0;
+  for (let i = 0; i < a.length; i++) difference |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return difference === 0;
+}
+
 function normalizePhone(value: string): string | null {
   const digits = value.replace(/[^0-9]/g, "");
   if (/^254[17][0-9]{8}$/.test(digits)) return digits;
@@ -55,7 +62,7 @@ Deno.serve(async (req: Request) => {
     if (body?.Body?.stkCallback) {
       const callbackToken = new URL(req.url).searchParams.get("callback_token") ?? "";
       const expectedToken = Deno.env.get("MPESA_CALLBACK_TOKEN") ?? "";
-      if (!expectedToken || callbackToken.length < 32 || callbackToken !== expectedToken) {
+      if (!expectedToken || callbackToken.length < 32 || !constantTimeEqual(callbackToken, expectedToken)) {
         return json({ error: "Callback authentication failed." }, 401);
       }
       const cb = body.Body.stkCallback;
@@ -165,6 +172,9 @@ Deno.serve(async (req: Request) => {
     }
     if (environment !== "sandbox" && environment !== "production") {
       return json({ error: "M-PESA environment must be sandbox or production." }, 503);
+    }
+    if (environment === "production" && Deno.env.get("MPESA_LIVE_ENABLED") !== "true") {
+      return json({ error: "Live M-PESA is locked until an approved live test is enabled.", code: "MPESA_LIVE_DISABLED" }, 503);
     }
     // This integration is explicitly for the user's approved Buy Goods Till.
     if (tillNumber !== "1561763") {
