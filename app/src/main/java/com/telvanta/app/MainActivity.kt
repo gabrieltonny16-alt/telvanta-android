@@ -1983,7 +1983,7 @@ private fun TransactionsScreen(db: LocalDatabase, onMessage: (String) -> Unit) {
 @Composable
 private fun BulkMessengerScreen(db: LocalDatabase) {
     val context = LocalContext.current
-    val prefs = remember { context.getSharedPreferences("bingwapulse_bulk_messenger", Context.MODE_PRIVATE) }
+    val prefs = remember { context.getSharedPreferences(if (SecureSessionStore(context).isGuestMode()) "bingwapulse_guest_bulk_messenger" else "bingwapulse_bulk_messenger", Context.MODE_PRIVATE) }
     var audience by remember { mutableStateOf(prefs.getString("audience", "Selected customers") ?: "Selected customers") }
     var message by remember { mutableStateOf(prefs.getString("message", "Hello <firstName>, ") ?: "Hello <firstName>, ") }
     var campaignName by remember { mutableStateOf(prefs.getString("campaign", "") ?: "") }
